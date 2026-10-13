@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VKON • Employee Attendance Portal</title>
+  <meta name="description" content="VKON Smart Attendance Portal: Unified dashboard featuring Monthly Calendar history, Leave Application (Personal & RH), Present Check-In (500m GPS & Selfie Photo), and WFH Booking (2 days/wk).">
+  
+  <!-- Fonts: Inter & IBM Plex Mono matching vkon.in -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <link rel="stylesheet" href="styles.css?v=20261013_ist">
+</head>
+<body class="light-theme">
+  
+  <!-- ================= AUTHENTICATION / LOGIN SCREEN ================= -->
+  <div id="authScreen" class="auth-screen-overlay">
+    <!-- Corner Theme Toggle for Login Screen -->
+    <div class="auth-theme-toggle-corner">
+      <button type="button" id="authThemeToggleBtn" class="icon-btn theme-toggle-btn" title="Toggle Theme (Dark / Light)" aria-label="Toggle Theme">
+        <i class="fa-solid fa-moon theme-toggle-icon" id="authThemeIcon"></i>
+      </button>
+    </div>
+    <div class="auth-card glass-panel">
+      <div class="auth-brand">
+        <div class="brand-logo-wrap">
+          <img src="assets/vkon-logo-dark.png" alt="Vkon Automation" class="vkon-brand-logo-lg vkon-logo-dark">
+          <img src="assets/vkon-logo-light.png" alt="Vkon Automation" class="vkon-brand-logo-lg vkon-logo-light">
+        </div>
+        <p class="label-tech brand-tech-pill">Smart Attendance & Biometric Access System</p>
+      </div>
+
+      <!-- On-Screen Login Error Alert -->
+      <div id="loginErrorAlert" class="login-error-alert" style="display: none;" role="alert" aria-live="assertive">
+        <div class="login-error-icon">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+        </div>
+        <div class="login-error-body">
+          <strong id="loginErrorTitle">Invalid Login Credentials</strong>
+          <span id="loginErrorMessage">The username or password you entered is incorrect. Please verify your credentials and try again.</span>
+        </div>
+      </div>
+
+      <!-- Single Employee Simulation Credential Info -->
+      <div class="quick-credentials-hint" style="text-align: center; margin-bottom: 1.25rem;">
+        <span style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">Simulation Employee Account</span>
+        <div style="margin-top: 6px;">
+          <button type="button" class="btn btn-ghost btn-xs quick-fill-emp-btn" data-user="mukesh" data-pass="mukesh123" style="border: 1px dashed var(--accent-primary); padding: 6px 14px; border-radius: 8px; cursor: pointer; font-weight: 600; color: var(--accent-primary); background: rgba(234, 88, 12, 0.06); transition: all 0.2s ease;">
+            <i class="fa-solid fa-bolt text-primary"></i> Mukesh Sharma (EMP001) &bull; mukesh / mukesh123
+          </button>
+        </div>
+      </div>
+
+      <!-- Employee Login Form -->
+      <form id="employeeLoginForm" class="auth-form">
+        <div class="form-group">
+          <label for="loginUsername">Username / ID <span class="req">*</span></label>
+          <div class="input-icon-wrap">
+            <i class="fa-solid fa-id-badge input-icon"></i>
+            <input type="text" id="loginUsername" required class="form-control" placeholder="mukesh" value="mukesh">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="loginPassword">Password <span class="req">*</span></label>
+          <div class="input-icon-wrap">
+            <i class="fa-solid fa-lock input-icon"></i>
+            <input type="password" id="loginPassword" required class="form-control" placeholder="mukesh123" value="mukesh123">
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block" style="margin-top: 0.5rem;">
+          <i class="fa-solid fa-right-to-bracket"></i> Login to Attendance Portal
+        </button>
+      </form>
+
+      <!-- Executive Admin Direct Navigation Link -->
+      <div style="text-align: center; margin-top: 1.25rem; padding-top: 0.85rem; border-top: 1px solid var(--border-glass);">
+        <a href="admin.html" style="font-size: 0.8rem; color: var(--text-muted); text-decoration: none; display: inline-flex; align-items: center; gap: 6px; transition: color 0.2s ease;">
+          <i class="fa-solid fa-shield-halved"></i> Executive Admin Console &rarr;
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MAIN APP WRAPPER ================= -->
+  <div class="app-wrapper" id="mainAppWrapper" style="display: none;">
+    
+    <!-- Top Navigation Bar (NO employee switcher dropdown, NO admin portal link) -->
+    <header class="navbar">
+      <div class="nav-brand">
+        <div class="brand-logo-wrap">
+          <img src="assets/vkon-logo-dark.png" alt="Vkon Automation" class="vkon-brand-logo-nav vkon-logo-dark">
+          <img src="assets/vkon-logo-light.png" alt="Vkon Automation" class="vkon-brand-logo-nav vkon-logo-light">
+        </div>
+        <div class="brand-text">
+          <h1>VKON</h1>
+          <span class="badge-sub"><span class="label-tech">Attendance Portal</span></span>
+        </div>
+      </div>
+
+      <!-- Realtime Clock Widget -->
+      <div class="realtime-clock" id="liveClockWidget">
+        <div class="clock-time" id="clockTime">--:--:--</div>
+        <div class="clock-date" id="clockDate">Loading date...</div>
+      </div>
+
+      <!-- User Profile & Action Tools -->
+      <div class="nav-controls">
+        <!-- Logged-in Employee Display (Only changes upon true login) -->
+        <div class="employee-chip" id="employeeChip">
+          <img src="" alt="Avatar" class="chip-avatar" id="currentAvatar">
+          <div class="chip-info">
+            <span class="chip-name" id="currentEmpName">Mukesh Sharma</span>
+            <span class="chip-role" id="currentEmpRole">Senior Full-Stack Engineer</span>
+          </div>
+        </div>
+
+        <!-- Theme Toggle -->
+        <button id="themeToggleBtn" class="icon-btn theme-toggle-btn" title="Toggle Theme" aria-label="Toggle Theme">
+          <i class="fa-solid fa-moon theme-toggle-icon" id="themeIcon"></i>
+        </button>
+
+        <!-- Logout Button -->
+        <button id="logoutBtn" class="btn btn-ghost btn-sm text-danger" title="Logout" aria-label="Logout">
+          <i class="fa-solid fa-right-from-bracket"></i> Logout
+        </button>
+      </div>
+    </header>
+
+    <!-- Sub-bar: Realtime Status & Policy Summary -->
+    <div class="sub-bar">
+      <div class="sub-status-item">
+        <span class="status-indicator-dot dot-pending" id="todayDot"></span>
+        <span class="status-text font-bold" id="todayStatusText">Today: Not Punched In</span>
+      </div>
+      <div class="policy-badges-row">
+        <span class="policy-chip chip-present"><i class="fa-solid fa-location-crosshairs"></i> Geofence: <strong>&le; 500m</strong> + Live Photo (&ge; 70% Match)</span>
+        <span class="policy-chip chip-wfh"><i class="fa-solid fa-house-laptop"></i> Direct WFH: <strong id="headerWfhQuota">2 Days / Week</strong></span>
+        <span class="policy-chip chip-leave"><i class="fa-solid fa-umbrella-beach"></i> Personal Leave: <strong id="headerLeaveQuota">14 Days / Year</strong></span>
+        <span class="policy-chip chip-rh"><i class="fa-solid fa-calendar-check"></i> Restricted Holiday (RH): <strong id="headerRhQuota">2 / Month</strong></span>
+      </div>
+    </div>
+
+    <!-- Main Content: Single Unified Window -->
+    <main class="main-content">
+      
+      <!-- ================= TOP SECTION: EMPLOYEE ACTION HUB (BEFORE CALENDAR) ================= -->
+      <section class="employee-action-hub">
+        
+        <!-- 1. Long Button from Left to Right: Mark Present -->
+        <div class="mark-present-bar-wrapper">
+          <button type="button" id="btnToggleMarkPresent" class="btn-long-mark-present">
+            <div class="long-btn-content">
+              <span class="long-btn-icon"><i class="fa-solid fa-camera"></i></span>
+              <div class="long-btn-text">
+                <span class="long-btn-title">Mark Present (Check-In / Punch-Out)</span>
+                <span class="long-btn-sub" id="longBtnStatusHint">Click to open attendance check-in card &bull; Status: Ready</span>
+              </div>
+            </div>
+            <div class="long-btn-badge-group">
+              <span class="long-btn-status-pill" id="longBtnStatusPill">Ready</span>
+              <i class="fa-solid fa-arrow-up-right-from-square open-card-icon" id="arrowMarkPresent"></i>
+            </div>
+          </button>
+        </div>
+
+        <!-- 2. Single Row with Two Buttons: Apply for Leave and Work From Home -->
+        <div class="action-sub-buttons-row">
+          <button type="button" id="btnToggleApplyLeave" class="btn-sub-action btn-sub-leave">
+            <div class="sub-btn-content">
+              <i class="fa-solid fa-umbrella-beach"></i>
+              <div class="sub-btn-texts">
+                <span class="sub-title">Apply for Leave</span>
+                <span class="sub-meta" id="leaveBtnSubMeta">Personal Leave &bull; Restricted Leave</span>
+              </div>
+            </div>
+            <i class="fa-solid fa-arrow-up-right-from-square open-card-icon" id="arrowLeave"></i>
+          </button>
+
+          <button type="button" id="btnToggleWfh" class="btn-sub-action btn-sub-wfh">
+            <div class="sub-btn-content">
+              <i class="fa-solid fa-house-laptop"></i>
+              <div class="sub-btn-texts">
+                <span class="sub-title">Work From Home</span>
+                <span class="sub-meta" id="wfhBtnSubMeta">Request WFH (Subject to Admin Approval)</span>
+              </div>
+            </div>
+            <i class="fa-solid fa-arrow-up-right-from-square open-card-icon" id="arrowWfh"></i>
+          </button>
+        </div>
+
+      </section>
+
+      <!-- ================= MODAL CARD 1: MARK PRESENT ================= -->
+      <div class="modal-backdrop" id="modalCardMarkPresent" role="dialog" aria-modal="true" aria-hidden="true">
+        <div class="modal-dialog glass-panel action-card-dialog">
+          <div class="modal-header">
+            <div class="modal-title-group">
+              <div class="box-icon icon-present"><i class="fa-solid fa-camera"></i></div>
+              <div>
+                <h3>Mark Present &bull; Live Attendance Verification</h3>
+                <span class="box-policy-tag tag-present">Office Geofence (&le; 500m) + Live Photo Snapshot</span>
+              </div>
+            </div>
+            <button type="button" class="modal-close-btn" id="closeCardMarkPresentBtn" aria-label="Close card">&times;</button>
+          </div>
+
+          <div class="modal-body">
+            <!-- Status Card Overview -->
+            <div class="punch-status-card">
+              <div class="punch-status-icon" id="punchStatusIconBox">
+                <i class="fa-solid fa-building-circle-check"></i>
+              </div>
+              <div class="punch-status-details">
+                <span class="punch-state-label" id="punchStateLabel">Status: Ready to Punch In</span>
+                <span class="punch-state-sub" id="punchStateSub">Camera opens upon clicking below. Snapshot is automatically sent to Admin.</span>
+              </div>
+            </div>
+
+            <!-- Punch-Out Restriction Notice (Lock Banner) -->
+            <div id="punchOutLockNotice" class="shift-lock-banner" style="display: none;">
+              <i class="fa-solid fa-lock text-warning" id="shiftLockIcon"></i>
+              <div style="flex: 1;">
+                <span id="punchOutLockText">Minimum shift duration policy active.</span>
+                <div id="simulateShiftActionWrap" style="margin-top: 0.4rem; display: none;">
+                  <button type="button" id="btnSimulateCompleteShift" class="btn btn-xs btn-outline-warning">
+                    <i class="fa-solid fa-clock-rotate-left"></i> [Test Simulation] Mark Minimum Duration Met
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Today's Attendance Metrics (If punched) -->
+            <div class="today-metrics-strip" id="todayMetricsStrip" style="display: none;">
+              <div class="m-col">
+                <span class="m-lbl">Check-In</span>
+                <span class="m-val text-success font-mono" id="todayInTimeDisplay">--:--</span>
+              </div>
+              <div class="m-col">
+                <span class="m-lbl">Check-Out</span>
+                <span class="m-val font-mono" id="todayOutTimeDisplay">Active</span>
+              </div>
+              <div class="m-col">
+                <span class="m-lbl">Location Status</span>
+                <span class="m-val text-success font-mono" id="todayMatchScoreDisplay">Verified</span>
+              </div>
+            </div>
+
+            <div class="privacy-note-box">
+              <i class="fa-solid fa-camera text-primary"></i>
+              <span>Live camera prompt captures your photo and marks your attendance immediately. Captured photos are retained for 24 hours in the Admin Console.</span>
+            </div>
+
+            <!-- Buttons that trigger Verification Modal -->
+            <div class="punch-btn-wrapper">
+              <button id="openPunchInModalBtn" class="btn-punch punch-in btn-block">
+                <i class="fa-solid fa-fingerprint"></i>
+                <div class="punch-text">
+                  <span class="punch-main">MARK PRESENT (CHECK-IN)</span>
+                  <span class="punch-sub">Click to capture live photo and mark present</span>
+                </div>
+              </button>
+
+              <button id="openPunchOutModalBtn" class="btn-punch punch-out btn-block" style="display: none;">
+                <i class="fa-solid fa-right-from-bracket"></i>
+                <div class="punch-text">
+                  <span class="punch-main">PUNCH OUT (CLOCK-OUT)</span>
+                  <span class="punch-sub" id="punchOutSubText">Click to capture photo and complete today's shift</span>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= MODAL CARD 2: APPLY FOR LEAVE ================= -->
+      <div class="modal-backdrop" id="modalCardApplyLeave" role="dialog" aria-modal="true" aria-hidden="true">
+        <div class="modal-dialog glass-panel action-card-dialog">
+          <div class="modal-header">
+            <div class="modal-title-group">
+              <div class="box-icon icon-leave"><i class="fa-solid fa-umbrella-beach"></i></div>
+              <div>
+                <h3>Apply for Leave</h3>
+                <span class="box-policy-tag tag-leave">Personal Leave &bull; Restricted Leave</span>
+              </div>
+            </div>
+            <button type="button" class="modal-close-btn" id="closeCardApplyLeaveBtn" aria-label="Close card">&times;</button>
+          </div>
+
+          <div class="modal-body">
+            <!-- Leave Quotas Meters -->
+            <div class="quota-pill-display">
+              <div class="quota-col">
+                <span class="q-title">Personal Leave</span>
+                <span class="q-val font-bold"><span id="personalRemainingCount">14</span> Days Left</span>
+              </div>
+              <div class="quota-col">
+                <span class="q-title">Restricted Leave Quota</span>
+                <span class="q-val text-primary font-bold"><span id="rhUsedThisMonth">0</span> Used</span>
+              </div>
+              <div class="quota-col">
+                <span class="q-title">Restricted Days Left</span>
+                <span class="q-val text-success font-bold"><span id="rhRemainingCount">2</span> Left</span>
+              </div>
+            </div>
+
+            <!-- Leave Form -->
+            <form id="leaveRequestForm" class="box-form">
+              <!-- Leave Category: ONLY TWO OPTIONS (Personal Leave vs Restricted Leave) -->
+              <div class="form-group">
+                <label for="leaveCategorySelect">Leave Category <span class="req">*</span></label>
+                <select id="leaveCategorySelect" class="form-control">
+                  <option value="Personal">Personal Leave</option>
+                  <option value="Restricted">Restricted Leave</option>
+                </select>
+              </div>
+
+              <!-- Dedicated Restricted Holiday Selector (Only shown when Restricted Leave selected) -->
+              <div class="form-group" id="restrictedHolidayGroup" style="display: none;">
+                <label for="restrictedHolidaySelect">Select Dedicated Restricted Holiday <span class="req">*</span></label>
+                <select id="restrictedHolidaySelect" class="form-control">
+                  <!-- Dynamically populated from admin-declared Restricted Holidays -->
+                </select>
+                <span class="form-hint"><i class="fa-solid fa-circle-info text-primary"></i> Dedicated company-declared Restricted Holidays.</span>
+              </div>
+
+              <!-- Dedicated Locked Restricted Holiday Date Display (Strictly no option to edit/change date) -->
+              <div class="form-group" id="rhFixedDateDisplayGroup" style="display: none;">
+                <label style="font-weight: 600; font-size: 0.88rem; color: var(--text-muted); display: block; margin-bottom: 0.35rem;">
+                  Restricted Holiday Date <span class="badge-mini text-warning" style="margin-left: 6px; padding: 2px 7px; font-size: 0.7rem; border-radius: 6px; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.25);"><i class="fa-solid fa-lock"></i> Fixed Date</span>
+                </label>
+                <div class="rh-fixed-date-card" id="rhFixedDateCard">
+                  <div class="rh-fixed-date-left">
+                    <div class="rh-fixed-calendar-badge">
+                      <span class="rh-badge-month" id="rhCardMonth">OCT</span>
+                      <span class="rh-badge-day" id="rhCardDay">20</span>
+                    </div>
+                    <div class="rh-fixed-details">
+                      <div class="rh-fixed-title" id="rhCardTitle">Diwali Festival</div>
+                      <div class="rh-fixed-sub" id="rhCardDateSub">Tuesday, 20 October 2026</div>
+                    </div>
+                  </div>
+                  <div class="rh-fixed-tag">
+                    <i class="fa-solid fa-circle-check text-warning"></i> Declared Holiday
+                  </div>
+                </div>
+              </div>
+
+              <div class="form-row-2" id="leaveDatesRow">
+                <div class="form-group" id="leaveStartDateGroup">
+                  <label for="leaveStartDate" id="leaveStartDateLabel">Start Date <span class="req">*</span></label>
+                  <input type="date" id="leaveStartDate" required class="form-control">
+                  <span class="form-hint" id="rhLockedHint" style="display: none; color: var(--text-muted); font-size: 0.8rem; margin-top: 5px;"><i class="fa-solid fa-lock text-warning"></i> Date is locked to the selected Restricted Holiday and cannot be edited.</span>
+                </div>
+                <div class="form-group" id="leaveEndDateGroup">
+                  <label for="leaveEndDate" id="leaveEndDateLabel">End Date <span class="req">*</span></label>
+                  <input type="date" id="leaveEndDate" required class="form-control">
+                </div>
+              </div>
+
+              <div class="form-group" id="leaveReasonGroup">
+                <label for="leaveReasonInput">Reason for Leave <span class="req">*</span></label>
+                <input type="text" id="leaveReasonInput" required class="form-control" placeholder="e.g. Festival celebration, personal travel...">
+              </div>
+
+              <div class="days-calc-banner" id="leaveDaysNotice">
+                <i class="fa-solid fa-calendar-day"></i>
+                <span id="leaveDaysCountText">Select dates</span>
+              </div>
+
+              <div class="form-alert alert-danger" id="leaveBalanceWarning" style="display: none;">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                <span id="leaveBalanceWarningText">Exceeds allowed quota!</span>
+              </div>
+
+              <button type="submit" id="submitLeaveBtn" class="btn btn-warning btn-block">
+                <i class="fa-solid fa-paper-plane"></i> Submit Leave Application
+              </button>
+            </form>
+
+            <!-- Tracker Box for My Leave Requests with Cancel/Withdraw options -->
+            <div class="my-leaves-tracker-box">
+              <div class="my-leaves-tracker-header">
+                <h4><i class="fa-solid fa-clock-rotate-left text-warning"></i> My Leave Requests</h4>
+                <span class="badge-mini" id="myLeavesCountBadge">0 Requests</span>
+              </div>
+              <p class="form-hint">Withdraw your own pending request, or ask admin to cancel an approved leave.</p>
+              <div class="my-leaves-status-list" id="myLeavesStatusList">
+                <!-- Dynamically populated via JS -->
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= MODAL CARD 3: WORK FROM HOME ================= -->
+      <div class="modal-backdrop" id="modalCardWfh" role="dialog" aria-modal="true" aria-hidden="true">
+        <div class="modal-dialog glass-panel action-card-dialog">
+          <div class="modal-header">
+            <div class="modal-title-group">
+              <div class="box-icon icon-wfh"><i class="fa-solid fa-house-laptop"></i></div>
+              <div>
+                <h3>Work From Home Request</h3>
+                <span class="box-policy-tag tag-wfh">Requires Admin Approval to Apply</span>
+              </div>
+            </div>
+            <button type="button" class="modal-close-btn" id="closeCardWfhBtn" aria-label="Close card">&times;</button>
+          </div>
+
+          <div class="modal-body">
+            <!-- Weekly Quota Meter -->
+            <div class="quota-pill-display">
+              <div class="quota-col">
+                <span class="q-title">Weekly Allowance</span>
+                <span class="q-val font-bold">2 Days</span>
+              </div>
+              <div class="quota-col">
+                <span class="q-title">Booked / Approved</span>
+                <span class="q-val text-primary font-bold" id="wfhQuotaCounter">0 / 2</span>
+              </div>
+              <div class="quota-col">
+                <span class="q-title">Status</span>
+                <span class="q-val text-success font-bold" id="wfhStatusText">Available</span>
+              </div>
+            </div>
+
+            <div class="quota-progress-track">
+              <div class="quota-progress-bar" id="wfhProgressBar" style="width: 0%;"></div>
+            </div>
+
+            <!-- Form: Request WFH (Requires Admin Approval) -->
+            <form id="wfhRequestForm" class="box-form">
+              <div class="form-group">
+                <label for="wfhDateInput">Select Work From Home Date <span class="req">*</span></label>
+                <input type="date" id="wfhDateInput" required class="form-control">
+                <span class="form-hint" id="wfhOngoingNotice">
+                  <i class="fa-solid fa-calendar-check text-primary"></i> Accessible for any week (previous days and days already punched in cannot be booked). Max 2 days/wk.
+                </span>
+              </div>
+
+              <div class="form-alert alert-warning" id="wfhLimitWarning" style="display: none;">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                <span>Weekly quota exhausted! Maximum 2 days per week allowed.</span>
+              </div>
+
+              <button type="submit" id="submitWfhBtn" class="btn btn-primary btn-block">
+                <i class="fa-solid fa-paper-plane"></i> Submit WFH Request for Approval
+              </button>
+            </form>
+
+            <!-- Tracker Box for My WFH Requests with Cancel/Withdraw options -->
+            <div class="my-leaves-tracker-box">
+              <div class="my-leaves-tracker-header">
+                <h4><i class="fa-solid fa-house-laptop text-primary"></i> My Work From Home Requests</h4>
+                <span class="badge-mini" id="myWfhCountBadge">0 Requests</span>
+              </div>
+              <p class="form-hint">Withdraw pending WFH request, or ask admin to cancel an approved WFH.</p>
+              <div class="my-leaves-status-list" id="myWfhStatusList">
+                <!-- Dynamically populated via JS -->
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- ================= SECTION 1: MONTHLY CALENDAR ================= -->
+      <section class="calendar-section glass-panel">
+        
+        <!-- Calendar Header Toolbar -->
+        <div class="calendar-toolbar">
+          <div class="calendar-title-group">
+            <div class="calendar-nav-buttons">
+              <button id="prevMonthBtn" class="btn btn-secondary btn-sm" aria-label="Previous Month">
+                <i class="fa-solid fa-chevron-left"></i>
+              </button>
+              <h2 id="calendarMonthTitle">October 2026</h2>
+              <button id="nextMonthBtn" class="btn btn-secondary btn-sm" aria-label="Next Month">
+                <i class="fa-solid fa-chevron-right"></i>
+              </button>
+              <button id="todayJumpBtn" class="btn btn-ghost btn-sm">Jump to Today</button>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+              <span class="calendar-subtitle">Attendance history & records for <strong id="calendarEmpNameDisplay" class="text-primary">Mukesh Sharma</strong></span>
+              <span id="calendarTodayHeaderDate" class="today-header-pill"><i class="fa-solid fa-calendar-day"></i> Present Day: Loading IST...</span>
+            </div>
+          </div>
+
+          <!-- Calendar Metric Counters -->
+          <div class="calendar-quick-stats">
+            <div class="quick-stat-badge stat-green">
+              <span class="q-num" id="statsPresentCount">0</span>
+              <span class="q-label">Office Present</span>
+            </div>
+            <div class="quick-stat-badge stat-purple">
+              <span class="q-num" id="statsWfhCount">0</span>
+              <span class="q-label">WFH Days</span>
+            </div>
+            <div class="quick-stat-badge stat-amber">
+              <span class="q-num" id="statsLeaveCount">0</span>
+              <span class="q-label">Leaves & RH</span>
+            </div>
+            <div class="quick-stat-badge stat-red">
+              <span class="q-num" id="statsAbsentCount">0</span>
+              <span class="q-label">Absent</span>
+            </div>
+          </div>
+
+          <!-- Legend -->
+          <div class="calendar-legend-bar">
+            <span class="legend-item"><span class="legend-dot dot-present"></span> Present</span>
+            <span class="legend-item"><span class="legend-dot dot-wfh"></span> WFH</span>
+            <span class="legend-item"><span class="legend-dot dot-leave"></span> Personal Leave</span>
+            <span class="legend-item"><span class="legend-dot dot-rh"></span> Restricted Leave</span>
+            <span class="legend-item"><span class="legend-dot dot-holiday"></span> Official Holiday</span>
+            <span class="legend-item"><span class="legend-dot dot-absent"></span> Absent</span>
+            <span class="legend-item"><span class="legend-dot dot-weekend"></span> Weekend</span>
+          </div>
+        </div>
+
+        <!-- Monthly Days Grid -->
+        <div class="calendar-grid-box">
+          <div class="calendar-weekdays-row">
+            <div class="weekday-header">Sun</div>
+            <div class="weekday-header">Mon</div>
+            <div class="weekday-header">Tue</div>
+            <div class="weekday-header">Wed</div>
+            <div class="weekday-header">Thu</div>
+            <div class="weekday-header">Fri</div>
+            <div class="weekday-header">Sat</div>
+          </div>
+          <div class="calendar-days-grid" id="calendarDaysGrid">
+            <!-- Populated via JS -->
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ================= SECTION 2: ATTENDANCE REGULARISATION (AFTER CALENDAR) ================= -->
+      <section class="regularisation-section glass-panel" id="sectionAttendanceRegularisation">
+        <div class="box-header">
+          <div class="box-icon icon-regularise">
+            <i class="fa-solid fa-clock-rotate-left"></i>
+          </div>
+          <div class="box-title">
+            <h3>Request Attendance Regularisation</h3>
+            <span class="box-policy-tag tag-leave">Missed Punch-In / Punch-Out Correction</span>
+          </div>
+        </div>
+        <p class="subtitle" style="margin-bottom: 1.25rem;">If you attended the office but forgot to punch in or punch out, request the administrator to mark you present by declaring the missed date and work hours.</p>
+
+        <div class="regularisation-grid">
+          <!-- Regularisation Form -->
+          <form id="attendanceRegularisationForm" class="box-form glass-card-nested">
+            <!-- Interactive Regularisation Calendar Section -->
+            <div class="form-group reg-calendar-wrapper-group">
+              <div class="reg-cal-label-row" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                <label for="regularisationDate" style="margin: 0; font-weight: 600;">Missed Attendance Date <span class="req">*</span></label>
+                <span class="badge-mini text-primary" style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 6px; font-size: 0.75rem; background: rgba(234, 88, 12, 0.08);">
+                  <i class="fa-solid fa-calendar-days"></i> Interactive Calendar
+                </span>
+              </div>
+
+              <div class="reg-calendar-box" id="regCalendarBox">
+                <div class="reg-calendar-header">
+                  <button type="button" class="btn btn-ghost btn-xs" id="regCalPrevBtn" title="Previous Month">
+                    <i class="fa-solid fa-chevron-left"></i>
+                  </button>
+                  <span class="reg-cal-title font-bold" id="regCalMonthTitle">October 2026</span>
+                  <button type="button" class="btn btn-ghost btn-xs" id="regCalNextBtn" title="Next Month">
+                    <i class="fa-solid fa-chevron-right"></i>
+                  </button>
+                </div>
+
+                <!-- Calendar Legend -->
+                <div class="reg-cal-legend">
+                  <span class="reg-legend-chip legend-missed"><i class="fa-solid fa-circle-dot"></i> Missed (Selectable)</span>
+                  <span class="reg-legend-chip legend-present"><i class="fa-solid fa-circle-check"></i> Full Present</span>
+                  <span class="reg-legend-chip legend-wfh"><i class="fa-solid fa-house-laptop"></i> WFH Allotted</span>
+                  <span class="reg-legend-chip legend-leave"><i class="fa-solid fa-umbrella-beach"></i> Leave Accepted</span>
+                  <span class="reg-legend-chip legend-weekend"><i class="fa-solid fa-mug-hot"></i> Weekend</span>
+                </div>
+
+                <!-- Calendar Grid -->
+                <div class="reg-calendar-grid" id="regCalendarGrid">
+                  <!-- Rendered dynamically by app.js -->
+                </div>
+
+                <!-- Selected Date Notification Banner -->
+                <div class="reg-selected-date-banner" id="regSelectedDateBanner">
+                  <i class="fa-solid fa-hand-pointer text-warning"></i>
+                  <span id="regSelectedDateText">Click on an eligible missed working day in the calendar above.</span>
+                </div>
+              </div>
+
+              <!-- Synchronized Select Field for form validation and backward compatibility -->
+              <select id="regularisationDate" required class="form-control" style="position: absolute; opacity: 0; pointer-events: none; height: 1px; width: 1px; padding: 0; margin: 0; border: 0;">
+                <option value="">-- Select Eligible Missed Working Day --</option>
+              </select>
+            </div>
+
+            <div class="form-row-2">
+              <div class="form-group">
+                <label for="regularisationType">Missed Event Type <span class="req">*</span></label>
+                <select id="regularisationType" class="form-control">
+                  <option value="Missed Punch-In">Missed Punch-In Only</option>
+                  <option value="Missed Punch-Out">Missed Punch-Out Only</option>
+                  <option value="Missed Both (Full Day)">Missed Both (Full Day In &amp; Out)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-row-2">
+              <div class="form-group">
+                <label for="regularisationInTime">Actual Check-In Time <span class="req">*</span></label>
+                <input type="time" id="regularisationInTime" required class="form-control" value="09:15">
+              </div>
+              <div class="form-group">
+                <label for="regularisationOutTime">Actual Check-Out Time <span class="req">*</span></label>
+                <input type="time" id="regularisationOutTime" required class="form-control" value="18:15">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="regularisationReason">Reason for Missing Punch <span class="req">*</span></label>
+              <textarea id="regularisationReason" required class="form-control" rows="2" placeholder="e.g. Attended direct client meeting at 9:00 AM, forgot to punch at reception..."></textarea>
+            </div>
+
+            <button type="submit" id="submitRegularisationBtn" class="btn btn-warning btn-block">
+              <i class="fa-solid fa-paper-plane"></i> Submit Attendance Regularisation
+            </button>
+          </form>
+
+          <!-- My Regularisation Tracker -->
+          <div class="glass-card-nested">
+            <div class="my-leaves-tracker-header">
+              <h4><i class="fa-solid fa-clipboard-list text-warning"></i> My Regularisation Requests</h4>
+              <span class="badge-mini" id="myRegularisationsCountBadge">0 Requests</span>
+            </div>
+            <p class="form-hint">Track live approval status from Executive Admin.</p>
+            <div class="my-leaves-status-list" id="myRegularisationsList">
+              <!-- Dynamically populated via JS -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <div class="footer-content">
+        <p>VKON Smart Attendance Portal &bull; Geofence (&le; 500m) & Live Selfie Photo Verification</p>
+        <span class="footer-meta">Policies: Personal Leave &bull; Restricted Leave &bull; WFH with Admin Approval &bull; Attendance Regularisation</span>
+      </div>
+    </footer>
+  </div>
+
+  <!-- ================= ON-DEMAND CAMERA PHOTO CAPTURE MODAL (NO FACE VERIFICATION) ================= -->
+  <div class="modal-backdrop" id="punchVerificationModal" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="modal-dialog glass-panel verification-modal-dialog">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <h3 id="verifyModalTitle"><i class="fa-solid fa-camera text-primary"></i> Attendance Photo Capture</h3>
+          <span class="modal-status-badge" id="verifyActionBadge">Check-In</span>
+        </div>
+        <button class="modal-close-btn" id="closeVerifyModalBtn" aria-label="Close Verification">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="verify-modal-layout">
+          
+          <!-- Column 1: Real Camera Viewfinder -->
+          <div class="verify-camera-column">
+            <div class="camera-viewport-box">
+              <video id="verifyWebcamVideo" autoplay playsinline muted></video>
+              <canvas id="verifyPhotoCanvas" style="display: none;"></canvas>
+
+              <!-- Captured Snapshot Preview Overlay -->
+              <div class="captured-preview-overlay" id="verifyCapturedOverlay">
+                <img id="verifyCapturedPhotoImg" src="" alt="Live Captured Photo">
+                <span class="preview-badge" id="previewBadgeText"><i class="fa-solid fa-check"></i> Photo Ready</span>
+                <button type="button" id="verifyRetakeBtn" class="retake-btn-mini">
+                  <i class="fa-solid fa-rotate-left"></i> Retake Photo
+                </button>
+              </div>
+
+              <!-- Fallback if camera stream not active / permission needed -->
+              <div class="camera-fallback-screen" id="verifyCamFallback">
+                <i class="fa-solid fa-camera-slash fallback-icon"></i>
+                <p id="camFallbackMsg">Requesting camera access...</p>
+                <div class="fallback-btns">
+                  <button type="button" id="verifyRetryCamBtn" class="btn btn-xs btn-primary">
+                    <i class="fa-solid fa-video"></i> Allow Camera
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Action to Click Photo -->
+            <div class="modal-cam-capture-bar" style="margin-top: 0.85rem;">
+              <button type="button" class="btn btn-primary btn-block btn-capture-action" id="modalSnapPhotoBtn">
+                <i class="fa-solid fa-camera"></i> <span id="snapBtnText">Capture Live Photo</span>
+              </button>
+            </div>
+
+            <!-- Guidance Note -->
+            <div class="modal-verify-guidance" id="modalVerifyGuidance">
+              <i class="fa-solid fa-camera text-primary"></i>
+              <span id="modalVerifyGuidanceText">Click <strong>Capture Live Photo</strong> above, then confirm attendance.</span>
+            </div>
+          </div>
+
+          <!-- Column 2: Status & Geofence Verification -->
+          <div class="verify-checklist-column">
+            
+            <!-- Snapshot Preview Box -->
+            <div class="master-comparison-card" style="padding: 1rem; text-align: center;">
+              <div style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 0.5rem;">Captured Attendance Photo:</div>
+              <div style="width: 120px; height: 120px; margin: 0 auto; border-radius: 12px; overflow: hidden; border: 2px solid var(--border-glass); background: #000;">
+                <img id="modalLiveAvatar" src="" alt="Live Captured Snapshot" style="width: 100%; height: 100%; object-fit: cover;">
+              </div>
+              <div class="match-score-pill" style="margin-top: 0.75rem;">
+                <i class="fa-solid fa-camera text-primary"></i>
+                <span id="modalPhotoStatusText">Photo automatically sent to Admin</span>
+              </div>
+            </div>
+
+            <!-- GPS Geofence Check -->
+            <div class="verify-check-item" id="checkGpsItem">
+              <div class="check-item-header">
+                <span class="check-title"><i class="fa-solid fa-location-dot"></i> GPS Location Check</span>
+                <span class="verification-status-pill" id="modalGpsPill">Checking...</span>
+              </div>
+              <div class="check-item-detail">
+                <span>Distance: <strong id="modalDistValue">--</strong> m from Office Center</span>
+                <span class="form-hint" id="modalOfficeCenterHint">VKON Automation Tech Park</span>
+              </div>
+              <!-- Shortcut simulation for testing -->
+              <div class="modal-sim-shortcuts">
+                <button type="button" class="btn btn-xs btn-ghost sim-modal-btn" data-sim="inside">
+                  <i class="fa-solid fa-circle-check text-success"></i> Inside (40m)
+                </button>
+                <button type="button" class="btn btn-xs btn-ghost sim-modal-btn" data-sim="outside">
+                  <i class="fa-solid fa-circle-xmark text-danger"></i> Outside (1.2km)
+                </button>
+              </div>
+            </div>
+
+            <!-- Photograph Status Check -->
+            <div class="verify-check-item" id="checkPhotoItem">
+              <div class="check-item-header">
+                <span class="check-title"><i class="fa-solid fa-image"></i> Photo Status</span>
+                <span class="verification-status-pill" id="modalPhotoPill">Capture Required</span>
+              </div>
+              <span class="check-desc" id="modalPhotoDesc">Click "Capture Live Photo" to take photo and confirm attendance</span>
+            </div>
+
+          </div>
+
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" id="cancelVerifyModalBtn">Cancel</button>
+        <button type="button" class="btn btn-secondary btn-lg" id="confirmVerificationBtn" disabled>
+          <i class="fa-solid fa-check"></i> <span id="confirmBtnText">Confirm Check-In</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Day Details Modal (Opens when clicking any date on calendar) -->
+  <div class="modal-backdrop" id="dayDetailModal" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="modal-dialog glass-panel">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <h3 id="modalDayDate">Date Details</h3>
+          <span class="modal-status-badge" id="modalDayStatusBadge">Present</span>
+        </div>
+        <button class="modal-close-btn" id="closeDayModalBtn" aria-label="Close Modal">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="modal-record-grid">
+          <div class="modal-selfie-col">
+            <div class="modal-selfie-frame">
+              <img id="modalSelfieImg" src="" alt="Biometric Snapshot">
+              <span class="selfie-caption font-mono" id="modalSelfieTime">Snapshot (Retained 24h)</span>
+            </div>
+          </div>
+          
+          <div class="modal-info-col">
+            <div class="detail-field">
+              <span class="field-lbl">Employee</span>
+              <span class="field-val" id="modalEmpName">Mukesh Sharma</span>
+            </div>
+            <div class="detail-field">
+              <span class="field-lbl">Punch In Time</span>
+              <span class="field-val font-mono" id="modalPunchInTime">09:12 AM</span>
+            </div>
+            <div class="detail-field">
+              <span class="field-lbl">Punch Out Time</span>
+              <span class="field-val font-mono" id="modalPunchOutTime">06:05 PM</span>
+            </div>
+            <div class="detail-field">
+              <span class="field-lbl">Working Hours</span>
+              <span class="field-val font-mono" id="modalWorkDuration">8 hrs 53 mins</span>
+            </div>
+            <div class="detail-field">
+              <span class="field-lbl">Location Distance</span>
+              <span class="field-val" id="modalGpsDistance">78 meters</span>
+            </div>
+            <div class="detail-field">
+              <span class="field-lbl">Photograph Match Score</span>
+              <span class="field-val text-success" id="modalBioVerification">
+                <i class="fa-solid fa-circle-check"></i> Passed (&ge; 70%)
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="closeDayModalFooterBtn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Shared Engine & App Controller -->
+  <script src="shared.js?v=20261013_ist"></script>
+  <script src="app.js?v=20261013_ist"></script>
+
+  <!-- Present Day & Migration Guarantee -->
+  <script>
+    (function enforcePresentDay() {
+      try {
+        var recordsKey = (typeof STORAGE_KEYS !== "undefined" && STORAGE_KEYS.RECORDS) ? STORAGE_KEYS.RECORDS : "vkon_records_v6";
+        var raw = localStorage.getItem(recordsKey);
+        if (raw) {
+          var recs = JSON.parse(raw);
+          var changed = false;
+          Object.keys(recs).forEach(function(k) {
+            if (k.endsWith("_2026-10-08")) {
+              var r = recs[k];
+              if (r.employeeId !== "EMP002" || r.userPunched || r.checkInTime === "10:40 PM" || r.checkInTime === "08:30 PM") {
+                delete recs[k];
+                r.date = "2026-10-12";
+                recs[r.employeeId + "_2026-10-12"] = r;
+                changed = true;
+              }
+            }
+          });
+          if (changed) {
+            localStorage.setItem(recordsKey, JSON.stringify(recs));
+          }
+        }
+        if (typeof employeeState !== "undefined" && employeeState.currentEmployee) {
+          employeeState.calendarCurrentDate = (typeof getPresentDate === "function") ? getPresentDate() : ((typeof getNowIST === "function") ? getNowIST() : new Date());
+          if (typeof renderMonthlyCalendar === "function") renderMonthlyCalendar();
+          if (typeof updatePunchStatus === "function") updatePunchStatus();
+        }
+      } catch (e) {
+        console.warn("Present day sync:", e);
+      }
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,1114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VKON • Executive Admin Console</title>
+  <meta name="description" content="VKON Automation Administration Console: Member management with biometric photo enrollment, leave request approvals & rejections, holiday declarations, office geofence control, monthly attendance Excel export, and admin credentials.">
+  
+  <!-- Fonts: Inter & IBM Plex Mono matching vkon.in -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Leaflet Map CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <link rel="stylesheet" href="styles.css?v=20261013_ist">
+</head>
+<body class="light-theme admin-page">
+
+  <!-- ================= IN-PAGE ADMIN LOGIN OVERLAY ================= -->
+  <div id="adminAuthOverlay" class="auth-screen-overlay" style="display: none;">
+    <!-- Corner Theme Toggle for Admin Login Screen -->
+    <div class="auth-theme-toggle-corner">
+      <button type="button" id="adminAuthThemeToggleBtn" class="icon-btn theme-toggle-btn" title="Toggle Theme (Dark / Light)" aria-label="Toggle Theme">
+        <i class="fa-solid fa-moon theme-toggle-icon" id="adminOverlayThemeIcon"></i>
+      </button>
+    </div>
+    <div class="auth-card glass-panel">
+      <div class="auth-brand">
+        <div class="brand-logo-wrap">
+          <img src="assets/vkon-logo-dark.png" alt="Vkon Automation" class="vkon-brand-logo-lg vkon-logo-dark">
+          <img src="assets/vkon-logo-light.png" alt="Vkon Automation" class="vkon-brand-logo-lg vkon-logo-light">
+        </div>
+        <p class="label-tech brand-tech-pill">Executive Admin Verification</p>
+      </div>
+
+      <!-- On-Screen Admin Login Error Alert -->
+      <div id="adminLoginErrorAlert" class="login-error-alert" style="display: none;" role="alert" aria-live="assertive">
+        <div class="login-error-icon">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+        </div>
+        <div class="login-error-body">
+          <strong id="adminLoginErrorTitle">Access Denied: Invalid Credentials</strong>
+          <span id="adminLoginErrorMessage">The admin username or master password is incorrect. Please verify and try again.</span>
+        </div>
+      </div>
+
+      <form id="adminOverlayLoginForm" class="auth-form">
+        <div class="form-group">
+          <label for="adminOverlayUsername">Administrator Username <span class="req">*</span></label>
+          <div class="input-icon-wrap">
+            <i class="fa-solid fa-user-shield input-icon"></i>
+            <input type="text" id="adminOverlayUsername" required class="form-control" placeholder="admin" value="admin">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="adminOverlayPassword">Master Password <span class="req">*</span></label>
+          <div class="input-icon-wrap">
+            <i class="fa-solid fa-key input-icon"></i>
+            <input type="password" id="adminOverlayPassword" required class="form-control" placeholder="Enter master password" value="admin123">
+          </div>
+        </div>
+
+        <div class="quick-credentials-hint" style="text-align: center;">
+          <span>Default Master Credentials: <strong>admin</strong> / <strong>admin123</strong></span>
+          <div style="margin-top: 0.5rem;">
+            <button type="button" id="quickFillAdminBtn" class="btn btn-ghost btn-xs" style="border: 1px dashed var(--accent-warning); padding: 5px 12px; border-radius: 6px; cursor: pointer; color: var(--accent-warning);">
+              <i class="fa-solid fa-bolt"></i> Click to Auto-Fill Credentials
+            </button>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-warning btn-block">
+          <i class="fa-solid fa-unlock-keyhole"></i> Unlock Executive Console
+        </button>
+
+        <a href="index.html" class="btn btn-ghost btn-block" style="margin-top: 0.5rem; text-align: center; text-decoration: none;">
+          <i class="fa-solid fa-arrow-left"></i> Return to Employee Portal
+        </a>
+      </form>
+    </div>
+  </div>
+
+  <div class="app-wrapper">
+    
+    <!-- Top Navbar -->
+    <header class="navbar admin-navbar">
+      <div class="nav-brand">
+        <div class="brand-logo-wrap">
+          <img src="assets/vkon-logo-dark.png" alt="Vkon Automation" class="vkon-brand-logo-nav vkon-logo-dark">
+          <img src="assets/vkon-logo-light.png" alt="Vkon Automation" class="vkon-brand-logo-nav vkon-logo-light">
+        </div>
+        <div class="brand-text">
+          <h1>VKON Admin</h1>
+          <span class="badge-sub text-warning"><span class="label-tech">Executive Console</span></span>
+        </div>
+      </div>
+
+      <div class="realtime-clock" id="liveClockWidget">
+        <div class="clock-time" id="clockTime">--:--:--</div>
+        <div class="clock-date" id="clockDate">Loading...</div>
+      </div>
+
+      <div class="nav-controls">
+        <div class="admin-chip">
+          <i class="fa-solid fa-user-tie admin-chip-icon"></i>
+          <div class="chip-info">
+            <span class="chip-name">Administrator</span>
+            <span class="chip-role text-success">Full System Access</span>
+          </div>
+        </div>
+
+        <button id="themeToggleBtn" class="icon-btn theme-toggle-btn" title="Toggle Theme" aria-label="Toggle Theme">
+          <i class="fa-solid fa-moon theme-toggle-icon" id="themeIcon"></i>
+        </button>
+
+        <button id="adminLogoutBtn" class="btn btn-ghost btn-sm text-danger" title="Logout">
+          <i class="fa-solid fa-right-from-bracket"></i> Logout
+        </button>
+      </div>
+    </header>
+
+    <!-- Admin Navigation Tabs -->
+    <div class="sub-bar admin-sub-bar">
+      <div class="nav-tabs" role="tablist">
+        <button class="nav-tab active" data-tab="tab-monthly-sheet">
+          <i class="fa-solid fa-file-excel"></i> Monthly Sheet & Excel
+        </button>
+        <button class="nav-tab" data-tab="tab-roster">
+          <i class="fa-solid fa-users-gear"></i> Member Accounts & Biometrics
+        </button>
+        <button class="nav-tab" data-tab="tab-approvals">
+          <i class="fa-solid fa-clipboard-check"></i> Approvals Center <span class="badge-bubble" id="pendingRequestsBadge" style="display: none;">0</span>
+        </button>
+        <button class="nav-tab" data-tab="tab-holidays">
+          <i class="fa-solid fa-calendar-star"></i> Company Holidays
+        </button>
+        <button class="nav-tab" data-tab="tab-photos">
+          <i class="fa-solid fa-images"></i> 24h Attendance Photos
+        </button>
+        <button class="nav-tab" data-tab="tab-geofence">
+          <i class="fa-solid fa-location-dot"></i> Office Geofence (500m)
+        </button>
+        <button class="nav-tab" data-tab="tab-account" id="navTabAccount">
+          <i class="fa-solid fa-user-shield"></i> Admin Account & Security
+        </button>
+      </div>
+    </div>
+
+    <!-- Admin Main Body -->
+    <main class="main-content">
+
+      <!-- ================= TAB 1: MONTHLY ATTENDANCE MASTER SHEET & EXCEL ================= -->
+      <section id="tab-monthly-sheet" class="tab-panel active">
+        <div class="admin-panel glass-panel">
+          <div class="panel-header-toolbar">
+            <div class="toolbar-title-group">
+              <h2><i class="fa-solid fa-calendar-days text-primary"></i> Company Attendance Master Sheet</h2>
+              <p class="subtitle">Calculated up to today's date (<strong id="todayDateSubtitle">October 12, 2026</strong>) based strictly on elapsed official working days.</p>
+            </div>
+
+            <!-- Month Filter & Export Action -->
+            <div class="toolbar-actions-cluster">
+              <div class="date-selector-group">
+                <label for="reportMonthSelect" class="sr-only">Month</label>
+                <select id="reportMonthSelect" class="form-control select-month">
+                  <option value="9">October 2026 (Current)</option>
+                  <option value="8">September 2026</option>
+                  <option value="10">November 2026</option>
+                </select>
+              </div>
+
+              <button id="exportMonthlyExcelBtn" class="btn btn-warning">
+                <i class="fa-solid fa-file-excel"></i> Download Monthly Excel (CSV)
+              </button>
+            </div>
+          </div>
+
+          <!-- Company KPI Cards -->
+          <div class="kpi-grid">
+            <div class="kpi-card">
+              <div class="kpi-icon icon-bg-blue"><i class="fa-solid fa-users"></i></div>
+              <div class="kpi-data">
+                <span class="kpi-num" id="kpiTotalMembers">0</span>
+                <span class="kpi-lbl">Enrolled Members</span>
+              </div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-icon icon-bg-green"><i class="fa-solid fa-user-check"></i></div>
+              <div class="kpi-data">
+                <span class="kpi-num text-success" id="kpiAvgAttendance">--%</span>
+                <span class="kpi-lbl" id="kpiAvgAttLabel">To-Date Rate (Oct 1-8)</span>
+              </div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-icon icon-bg-purple"><i class="fa-solid fa-business-time"></i></div>
+              <div class="kpi-data">
+                <span class="kpi-num text-primary" id="kpiTotalHours">0 hrs</span>
+                <span class="kpi-lbl">Total Work Hours</span>
+              </div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-icon icon-bg-amber"><i class="fa-solid fa-clock"></i></div>
+              <div class="kpi-data">
+                <span class="kpi-num text-warning" id="kpiPendingCount">0</span>
+                <span class="kpi-lbl">Pending Leave Requests</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Master Attendance Table -->
+          <div class="table-responsive master-table-wrap">
+            <table class="data-table master-table">
+              <thead>
+                <tr>
+                  <th>Employee</th>
+                  <th>Emp ID</th>
+                  <th>Department</th>
+                  <th>Present Days</th>
+                  <th>Absent Days</th>
+                  <th>WFH Days</th>
+                  <th>Leave</th>
+                  <th>Total Work Time</th>
+                </tr>
+              </thead>
+              <tbody id="masterReportTableBody">
+                <!-- Populated via JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= TAB 2: MEMBER ACCOUNTS & BIOMETRIC ENROLLMENT ================= -->
+      <section id="tab-roster" class="tab-panel">
+        <div class="admin-split-grid">
+          
+          <!-- Left: Add New Member Form with Master Photo Capture -->
+          <div class="glass-panel admin-card">
+            <div class="card-header">
+              <div class="header-icon icon-bg-blue">
+                <i class="fa-solid fa-user-plus"></i>
+              </div>
+              <div class="header-title">
+                <h3>Enroll New Member</h3>
+                <p>Register credentials, leave quota, geofence rule & master photo</p>
+              </div>
+            </div>
+
+            <form id="addEmployeeForm" class="box-form padding-form">
+              <div class="form-row-2">
+                <div class="form-group">
+                  <label for="newEmpName">Full Name <span class="req">*</span></label>
+                  <input type="text" id="newEmpName" required class="form-control" placeholder="e.g. Rahul Verma">
+                </div>
+                <div class="form-group">
+                  <label for="newEmpRole">Designation / Role <span class="req">*</span></label>
+                  <input type="text" id="newEmpRole" required class="form-control" placeholder="e.g. QA Specialist">
+                </div>
+              </div>
+
+              <div class="form-row-2">
+                <div class="form-group">
+                  <label for="newEmpDept">Department <span class="req">*</span></label>
+                  <select id="newEmpDept" class="form-control">
+                    <option value="Engineering">Engineering</option>
+                    <option value="Product">Product</option>
+                    <option value="Operations">Operations</option>
+                    <option value="Design">Design</option>
+                    <option value="Human Resources">Human Resources</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="newEmpUsername">Login Username <span class="req">*</span></label>
+                  <input type="text" id="newEmpUsername" required class="form-control" placeholder="e.g. rahul">
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="newEmpPassword">Login Password <span class="req">*</span></label>
+                <input type="password" id="newEmpPassword" required class="form-control" placeholder="Create password">
+              </div>
+
+              <div class="form-group">
+                <label for="newEmpGeofenceRule">Geofence Location Rule</label>
+                <select id="newEmpGeofenceRule" class="form-control">
+                  <option value="required">Enforce 500m Geofence (Must be within office)</option>
+                  <option value="exempt">Exempt (Allowed to punch in/out anywhere)</option>
+                </select>
+              </div>
+
+              <!-- Master Reference Photo Enrollment (Webcam or Laptop Upload) -->
+              <div class="master-photo-box">
+                <label class="font-bold"><i class="fa-solid fa-camera"></i> Master Baseline Photo (&ge; 70% Match Baseline) <span class="req">*</span></label>
+                <p class="form-hint">Set via webcam or upload an official photo from your laptop.</p>
+
+                <div class="enroll-preview-frame">
+                  <img id="newEmpPhotoPreview" src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80" alt="Master Reference Photo">
+                  <span class="preview-badge" id="photoStatusBadge"><i class="fa-solid fa-id-badge"></i> Photo Ready</span>
+                </div>
+
+                <div class="photo-capture-actions">
+                  <button type="button" id="adminCaptureCamBtn" class="btn btn-secondary btn-sm">
+                    <i class="fa-solid fa-camera"></i> Capture via Webcam
+                  </button>
+                  <label class="btn btn-ghost btn-sm upload-label">
+                    <i class="fa-solid fa-laptop"></i> Upload from Laptop
+                    <input type="file" id="adminPhotoFileInput" accept="image/*" class="sr-only">
+                  </label>
+                </div>
+
+                <!-- Admin Camera Stream View -->
+                <div id="adminCamInline" class="admin-cam-inline" style="display: none;">
+                  <video id="adminWebcamVideo" autoplay playsinline muted></video>
+                  <div class="cam-inline-btns">
+                    <button type="button" id="adminSnapPhotoBtn" class="btn btn-primary btn-xs">
+                      <i class="fa-solid fa-circle-dot"></i> Snap Master Photo
+                    </button>
+                    <button type="button" id="adminCancelCamBtn" class="btn btn-ghost btn-xs text-danger">Cancel</button>
+                  </div>
+                </div>
+              </div>
+
+              <button type="submit" class="btn btn-primary btn-block">
+                <i class="fa-solid fa-user-check"></i> Enroll Employee & Create Account
+              </button>
+            </form>
+          </div>
+
+          <!-- Right: Enrolled Roster Table with Edit & Delete Options -->
+          <div class="glass-panel admin-card">
+            <div class="card-header">
+              <div class="header-icon icon-bg-green">
+                <i class="fa-solid fa-address-book"></i>
+              </div>
+              <div class="header-title">
+                <h3>Registered Staff Roster</h3>
+                <p>Edit username, password, leave days, geofence & master photo</p>
+              </div>
+            </div>
+
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Photo</th>
+                    <th>Name & Role</th>
+                    <th>Username</th>
+                    <th>Geofence</th>
+                    <th>Leave</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="adminRosterTableBody">
+                  <!-- Populated via JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ================= TAB 3: APPROVALS CENTER (SIDE DRAWER / DESKTOP SIDEBAR) ================= -->
+      <section id="tab-approvals" class="tab-panel">
+        <div class="approvals-drawer-layout">
+          
+          <!-- SIDE DRAWER / SIDEBAR -->
+          <aside class="glass-panel admin-card approvals-sidebar approvals-side-drawer">
+            <div class="sidebar-header" style="margin-bottom: 1.25rem;">
+              <h3 style="font-size: 1.05rem; display: flex; align-items: center; gap: 0.5rem;">
+                <i class="fa-solid fa-folder-tree text-primary"></i> Approval Categories
+              </h3>
+              <p class="subtitle" style="font-size: 0.8rem;">Select a category to review requests</p>
+            </div>
+
+            <nav class="approvals-nav-pills" id="approvalsNavPills">
+              <button type="button" class="approvals-nav-pill active" data-panel="panel-approval-wfh" id="navPillWfh">
+                <i class="fa-solid fa-house-laptop text-purple"></i>
+                <span>Work From Home</span>
+                <span class="badge-bubble badge-bubble-drawer" id="drawerWfhBadge" style="display: none;">0</span>
+              </button>
+
+              <button type="button" class="approvals-nav-pill" data-panel="panel-approval-leave" id="navPillLeave">
+                <i class="fa-solid fa-umbrella-beach text-amber"></i>
+                <span>Leave Approvals</span>
+                <span class="badge-bubble badge-bubble-drawer" id="drawerLeaveBadge" style="display: none;">0</span>
+              </button>
+
+              <button type="button" class="approvals-nav-pill" data-panel="panel-approval-reg" id="navPillReg">
+                <i class="fa-solid fa-clock-rotate-left text-blue"></i>
+                <span>Attendance Regularisation</span>
+                <span class="badge-bubble badge-bubble-drawer" id="drawerRegBadge" style="display: none;">0</span>
+              </button>
+            </nav>
+          </aside>
+
+          <!-- PANELS DISPLAY AREA -->
+          <main class="approvals-content-area">
+            
+            <!-- PANEL 1: APPROVAL FOR WORK FROM HOME -->
+            <div class="glass-panel admin-card approval-panel-view active" id="panel-approval-wfh">
+              <div class="card-header">
+                <div class="header-icon icon-bg-purple">
+                  <i class="fa-solid fa-house-laptop"></i>
+                </div>
+                <div class="header-title">
+                  <h3>Approval for Work From Home</h3>
+                  <p>Manage employee WFH applications and employee cancellation requests (Max 2 days/week)</p>
+                </div>
+              </div>
+
+              <div class="table-responsive">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Employee</th>
+                      <th>Requested WFH Date</th>
+                      <th>Work Week</th>
+                      <th>Status</th>
+                      <th>Approval Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="adminWfhTableBody">
+                    <!-- Populated via JS -->
+                  </tbody>
+                </table>
+              </div>
+              <div class="empty-state-card" id="emptyWfhMsg" style="display: none;">
+                <i class="fa-solid fa-house-circle-check"></i>
+                <p>No Work From Home requests found.</p>
+              </div>
+            </div>
+
+            <!-- PANEL 2: APPROVAL FOR LEAVE -->
+            <div class="glass-panel admin-card approval-panel-view" id="panel-approval-leave">
+              <div class="card-header">
+                <div class="header-icon icon-bg-amber">
+                  <i class="fa-solid fa-umbrella-beach"></i>
+                </div>
+                <div class="header-title">
+                  <h3>Approval for Leave (Personal Leave &amp; Restricted Holidays)</h3>
+                  <p>Review leave applications and employee cancellation requests with full authority</p>
+                </div>
+              </div>
+
+              <div class="table-responsive">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Employee</th>
+                      <th>Category</th>
+                      <th>Dates Requested</th>
+                      <th>Working Days</th>
+                      <th>Reason</th>
+                      <th>Status</th>
+                      <th>Approval Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="adminLeavesTableBody">
+                    <!-- Populated via JS -->
+                  </tbody>
+                </table>
+              </div>
+              <div class="empty-state-card" id="emptyLeavesMsg" style="display: none;">
+                <i class="fa-solid fa-calendar-check"></i>
+                <p>No leave requests found.</p>
+              </div>
+            </div>
+
+            <!-- PANEL 3: ATTENDANCE REGULARISATION -->
+            <div class="glass-panel admin-card approval-panel-view" id="panel-approval-reg">
+              <div class="card-header">
+                <div class="header-icon icon-bg-blue">
+                  <i class="fa-solid fa-clock-rotate-left"></i>
+                </div>
+                <div class="header-title">
+                  <h3>Attendance Regularisation Approvals</h3>
+                  <p>Approve or reject employee requests for missed punch-in or punch-out to mark attendance as Present</p>
+                </div>
+              </div>
+
+              <div class="table-responsive">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Employee</th>
+                      <th>Missed Date</th>
+                      <th>Event Type</th>
+                      <th>Declared Hours</th>
+                      <th>Reason / Remarks</th>
+                      <th>Status</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="adminRegularisationTableBody">
+                    <!-- Populated via JS -->
+                  </tbody>
+                </table>
+              </div>
+              <div class="empty-state-card" id="emptyRegularisationMsg" style="display: none;">
+                <i class="fa-solid fa-clipboard-check"></i>
+                <p>No attendance regularisation requests pending.</p>
+              </div>
+            </div>
+
+          </main>
+        </div>
+      </section>
+
+      <!-- ================= TAB 4: COMPANY HOLIDAYS & LEAVE POLICIES ================= -->
+      <section id="tab-holidays" class="tab-panel">
+        
+        <!-- Top Split: Declare Holiday & Declared Holidays Table -->
+        <div class="admin-split-grid">
+          
+          <!-- Add / Declare New Holiday Form (ONLY 2 Options: Declared Holiday & Restricted Holiday) -->
+          <div class="glass-panel admin-card">
+            <div class="card-header">
+              <div class="header-icon icon-bg-amber">
+                <i class="fa-solid fa-calendar-plus"></i>
+              </div>
+              <div class="header-title">
+                <h3>Declare Company Holiday</h3>
+                <p>Add official company off days or dedicated restricted holidays</p>
+              </div>
+            </div>
+
+            <form id="addHolidayForm" class="box-form padding-form">
+              <div class="form-group">
+                <label for="newHolidayName">Holiday Name <span class="req">*</span></label>
+                <input type="text" id="newHolidayName" required class="form-control" placeholder="e.g. Diwali Festival">
+              </div>
+
+              <div class="form-row-2">
+                <div class="form-group">
+                  <label for="newHolidayDate">Holiday Date <span class="req">*</span></label>
+                  <input type="date" id="newHolidayDate" required class="form-control">
+                </div>
+                <div class="form-group">
+                  <label for="newHolidayType">Holiday Type <span class="req">*</span></label>
+                  <select id="newHolidayType" class="form-control">
+                    <option value="Declared Holiday">Declared Holiday</option>
+                    <option value="Restricted Holiday">Restricted Holiday</option>
+                  </select>
+                </div>
+              </div>
+
+              <button type="submit" class="btn btn-warning btn-block">
+                <i class="fa-solid fa-calendar-check"></i> Save Holiday &amp; Update Calendar
+              </button>
+            </form>
+          </div>
+
+          <!-- Existing Holidays List with Edit/Delete -->
+          <div class="glass-panel admin-card">
+            <div class="card-header">
+              <div class="header-icon icon-bg-purple">
+                <i class="fa-solid fa-calendar-check"></i>
+              </div>
+              <div class="header-title">
+                <h3>Official Company Holidays</h3>
+                <p>Declared Holidays (Mandatory Off) &bull; Restricted Holidays (Dedicated dates for RH)</p>
+              </div>
+            </div>
+
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Holiday Name</th>
+                    <th>Type</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="adminHolidaysTableBody">
+                  <!-- Populated via JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Bottom Split: Central Company-Wide Leave Quotas & Individual Member Overrides -->
+        <div class="admin-split-grid" style="margin-top: 1.5rem;">
+          
+          <!-- Box 1: Company-Wide Central Leave Quotas (One point changes it for everyone) -->
+          <div class="glass-panel admin-card">
+            <div class="card-header">
+              <div class="header-icon icon-bg-green">
+                <i class="fa-solid fa-sliders"></i>
+              </div>
+              <div class="header-title">
+                <h3>Company-Wide Leave Quota Settings</h3>
+                <p>Change once here to update leave policies for all employees across the organization</p>
+              </div>
+            </div>
+
+            <form id="globalLeaveQuotasForm" class="box-form padding-form">
+              <div class="form-row-2">
+                <div class="form-group">
+                  <label for="globalPersonalQuotaInput">Personal Leave Quota (Days / Year) <span class="req">*</span></label>
+                  <input type="number" id="globalPersonalQuotaInput" required class="form-control" min="1" max="60" value="14">
+                  <span class="form-hint">Deducted when employees apply for Personal Leave</span>
+                </div>
+                <div class="form-group">
+                  <label for="globalRhQuotaInput">Restricted Leave Quota (Days / Year) <span class="req">*</span></label>
+                  <input type="number" id="globalRhQuotaInput" required class="form-control" min="0" max="30" value="2">
+                  <span class="form-hint">Eligible only on declared Restricted Holidays</span>
+                </div>
+              </div>
+
+              <button type="submit" class="btn btn-primary btn-block">
+                <i class="fa-solid fa-check-double"></i> Save Company-Wide Quotas
+              </button>
+            </form>
+          </div>
+
+          <!-- Box 2: Minimum Shift Hours & Punch-Out Restriction Policy -->
+          <div class="glass-panel admin-card" id="boxMinWorkPolicy">
+            <div class="card-header">
+              <div class="header-icon icon-bg-blue">
+                <i class="fa-solid fa-hourglass-start"></i>
+              </div>
+              <div class="header-title">
+                <h3>Minimum Shift Hours &amp; Punch-Out Restriction Policy</h3>
+                <p>Set required work duration before employees can punch out and be marked Present</p>
+              </div>
+            </div>
+
+            <form id="minWorkPolicyForm" class="box-form padding-form">
+              <div class="form-row-2">
+                <div class="form-group">
+                  <label for="policyMinHoursInput">Required Hours <span class="req">*</span></label>
+                  <input type="number" id="policyMinHoursInput" required class="form-control" min="1" max="16" step="1" value="8">
+                  <span class="form-hint">Minimum shift hours required</span>
+                </div>
+                <div class="form-group">
+                  <label for="policyMinMinutesInput">Additional Minutes</label>
+                  <input type="number" id="policyMinMinutesInput" required class="form-control" min="0" max="59" step="5" value="0">
+                  <span class="form-hint">Additional minutes (e.g., 0, 15, 30, 45)</span>
+                </div>
+              </div>
+
+              <div class="policy-preview-callout" style="padding: 0.85rem; border-radius: 8px; background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.2); margin-bottom: 1rem;">
+                <i class="fa-solid fa-shield-halved text-primary"></i>
+                <span style="font-size: 0.85rem;"> Active Policy: Employees must complete at least <strong id="previewPolicyDurationText" class="text-primary font-mono">8 hours 00 minutes</strong> of duty between Punch-In and Punch-Out before punch-out is allowed.</span>
+              </div>
+
+              <button type="submit" class="btn btn-warning btn-block">
+                <i class="fa-solid fa-floppy-disk"></i> Save Minimum Work Duration Policy
+              </button>
+            </form>
+          </div>
+
+        </div>
+
+      </section>
+
+      <!-- ================= TAB 5: 24-HOUR ATTENDANCE PHOTOS & WORKING STATUS ================= -->
+      <section id="tab-photos" class="tab-panel">
+        <div class="admin-photos-split-grid">
+          
+          <!-- Column 1 (Requirement 4): Photo snapshot, employee name, date & time, GPS distance only -->
+          <div class="glass-panel admin-card">
+            <div class="panel-header-toolbar">
+              <div class="toolbar-title-group">
+                <h2><i class="fa-solid fa-camera text-primary"></i> Attendance Verification Photos (Last 24 Hours)</h2>
+                <p class="subtitle">Live photos captured during check-ins and check-outs.</p>
+              </div>
+              <button id="purgeExpiredPhotosBtn" class="btn btn-secondary btn-sm">
+                <i class="fa-solid fa-broom"></i> Clean &gt;24h
+              </button>
+            </div>
+
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Photo Snapshot</th>
+                    <th>Employee Name</th>
+                    <th>Date & Time</th>
+                    <th>GPS Distance</th>
+                    <th style="width: 80px; text-align: center;">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="attendancePhotosTableBody">
+                  <!-- Populated via JS -->
+                </tbody>
+              </table>
+            </div>
+            <div class="empty-state-card" id="emptyPhotosMsg" style="display: none;">
+              <i class="fa-solid fa-images"></i>
+              <p>No photos captured in the last 24 hours.</p>
+            </div>
+          </div>
+
+          <!-- Column 2 (Requirement 4): Small checklist showing how many employees are working right now or today and their Punch In / Out times -->
+          <div class="glass-panel admin-card">
+            <div class="card-header">
+              <div class="header-icon icon-bg-blue">
+                <i class="fa-solid fa-clipboard-user"></i>
+              </div>
+              <div class="header-title">
+                <h3>Today's Staff Working Checklist</h3>
+                <p>Live active duty status &amp; today's punch in / out times</p>
+              </div>
+            </div>
+
+            <div class="checklist-summary-strip" id="checklistSummaryStrip">
+              <span><strong>Working Right Now:</strong> <span id="workingNowCount" class="text-success font-bold">0</span> Active</span>
+              <span><strong>Today's Punches:</strong> <span id="punchedTodayCount" class="text-primary font-bold">0</span> Staff</span>
+            </div>
+
+            <div class="today-staff-checklist" id="todayStaffChecklist">
+              <!-- Populated via JS -->
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ================= TAB 6: OFFICE GEOFENCE SETTINGS ================= -->
+      <section id="tab-geofence" class="tab-panel">
+        <div class="admin-split-grid">
+          
+          <div class="glass-panel admin-card">
+            <div class="card-header">
+              <div class="header-icon icon-bg-blue">
+                <i class="fa-solid fa-location-crosshairs"></i>
+              </div>
+              <div class="header-title">
+                <h3>Company Office Geofence Center</h3>
+                <p>Coordinates required for employees to be within &le; 500m to mark present</p>
+              </div>
+            </div>
+
+            <form id="adminGeofenceForm" class="box-form padding-form">
+              <div class="form-group">
+                <label for="adminOfficeName">Office / Headquarters Name</label>
+                <input type="text" id="adminOfficeName" required class="form-control" value="VKON Automation Tech Park">
+              </div>
+
+              <div class="form-row-2">
+                <div class="form-group">
+                  <label for="adminOfficeLat">Latitude</label>
+                  <input type="number" step="any" id="adminOfficeLat" required class="form-control" value="12.9716">
+                </div>
+                <div class="form-group">
+                  <label for="adminOfficeLng">Longitude</label>
+                  <input type="number" step="any" id="adminOfficeLng" required class="form-control" value="77.5946">
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="adminOfficeRadius">
+                  Geofence Radius: <strong class="text-primary" id="adminRadiusVal">500</strong> meters
+                </label>
+                <input type="range" id="adminOfficeRadius" min="100" max="2000" step="50" value="500" class="form-range">
+                <div class="range-marks">
+                  <span>100m</span>
+                  <span class="text-primary font-bold">500m (Company Standard)</span>
+                  <span>2000m</span>
+                </div>
+              </div>
+
+              <div class="settings-action-box">
+                <button type="button" id="adminCalibrateCurrentGpsBtn" class="btn btn-secondary btn-block">
+                  <i class="fa-solid fa-location-dot"></i> Calibrate to My Current Device GPS
+                </button>
+                <span class="form-hint">Instantly sets office coordinates to your physical current location.</span>
+              </div>
+
+              <button type="submit" class="btn btn-primary btn-block">
+                <i class="fa-solid fa-floppy-disk"></i> Save & Enforce Geofence Coordinates
+              </button>
+            </form>
+          </div>
+
+          <div class="glass-panel admin-card">
+            <div class="card-header">
+              <div class="header-icon icon-bg-green">
+                <i class="fa-solid fa-map-location-dot"></i>
+              </div>
+              <div class="header-title">
+                <h3>Live Geofence Boundary Map</h3>
+                <p>Enforced 500m perimeter around company center</p>
+              </div>
+            </div>
+
+            <div class="admin-map-wrap">
+              <div id="adminGeofenceMap" class="admin-leaflet-map"></div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ================= TAB 7: ADMIN ACCOUNT & SECURITY CREDENTIALS ================= -->
+      <section id="tab-account" class="tab-panel">
+        <div class="admin-panel glass-panel">
+          <div class="panel-header-toolbar">
+            <div class="toolbar-title-group">
+              <h2><i class="fa-solid fa-user-shield text-primary"></i> Administrator Account & Security Credentials</h2>
+              <p class="subtitle">Update executive master username, password, and manage console authentication settings.</p>
+            </div>
+            <div class="toolbar-actions-cluster">
+              <span class="label-tech" style="padding: 0.5rem 0.8rem; background: rgba(249, 115, 22, 0.12); border: 1px solid rgba(249, 115, 22, 0.3); border-radius: 6px; color: var(--color-primary);">
+                <i class="fa-solid fa-shield-halved"></i> Master Access Active
+              </span>
+            </div>
+          </div>
+
+          <div class="settings-grid">
+            
+            <!-- Left Card: Update Credentials Form -->
+            <div class="glass-panel admin-card">
+              <div class="card-header">
+                <div class="header-icon icon-bg-orange">
+                  <i class="fa-solid fa-key"></i>
+                </div>
+                <div class="header-title">
+                  <h3>Change Admin Username & Password</h3>
+                  <p>Credentials take effect immediately for future console sign-ins</p>
+                </div>
+              </div>
+
+              <!-- In-Page Success & Error Alerts for Admin Account Settings -->
+              <div id="adminAccountSuccessAlert" class="alert-box alert-success" style="display: none;" role="alert">
+                <i class="fa-solid fa-circle-check"></i>
+                <div class="alert-content">
+                  <strong style="color: #4ade80;">Credentials Updated Successfully!</strong>
+                  <span style="color: #bbf7d0;">Your new admin username and master password have been securely saved.</span>
+                </div>
+              </div>
+
+              <div id="adminAccountErrorAlert" class="alert-box alert-danger" style="display: none;" role="alert">
+                <i class="fa-solid fa-circle-xmark"></i>
+                <div class="alert-content">
+                  <strong id="adminAccountErrorTitle" style="color: #f87171;">Update Failed</strong>
+                  <span id="adminAccountErrorMessage" style="color: #fecaca;">Please check the fields and try again.</span>
+                </div>
+              </div>
+
+              <form id="changeAdminCredentialsForm" class="box-form padding-form" autocomplete="off">
+                <div class="form-group">
+                  <label for="currentAdminPassword">Current Master Password <span class="req">*</span></label>
+                  <div class="input-icon-wrap">
+                    <i class="fa-solid fa-lock input-icon"></i>
+                    <input type="password" id="currentAdminPassword" required class="form-control" placeholder="Enter current master password">
+                  </div>
+                  <span class="form-hint">Required for security verification before making changes.</span>
+                </div>
+
+                <div class="form-divider" style="margin: 1.25rem 0; border-top: 1px dashed var(--border-glass);"></div>
+
+                <div class="form-group">
+                  <label for="newAdminUsername">New Admin Username <span class="req">*</span></label>
+                  <div class="input-icon-wrap">
+                    <i class="fa-solid fa-user-shield input-icon"></i>
+                    <input type="text" id="newAdminUsername" required class="form-control" placeholder="e.g. admin, vkon_admin" minlength="3">
+                  </div>
+                  <span class="form-hint">Used for executive authentication on all portals.</span>
+                </div>
+
+                <div class="form-row-2">
+                  <div class="form-group">
+                    <label for="newAdminPassword">New Master Password <span class="req">*</span></label>
+                    <div class="input-icon-wrap">
+                      <i class="fa-solid fa-key input-icon"></i>
+                      <input type="password" id="newAdminPassword" required class="form-control" placeholder="Minimum 6 characters" minlength="6">
+                    </div>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="confirmAdminPassword">Confirm New Password <span class="req">*</span></label>
+                    <div class="input-icon-wrap">
+                      <i class="fa-solid fa-check-double input-icon"></i>
+                      <input type="password" id="confirmAdminPassword" required class="form-control" placeholder="Re-type new password" minlength="6">
+                    </div>
+                  </div>
+                </div>
+
+                <div class="settings-action-box" style="margin-top: 1rem;">
+                  <button type="submit" class="btn btn-warning btn-block">
+                    <i class="fa-solid fa-floppy-disk"></i> Save New Username & Password
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <!-- Right Card: Account Details & Security Information -->
+            <div class="glass-panel admin-card">
+              <div class="card-header">
+                <div class="header-icon icon-bg-blue">
+                  <i class="fa-solid fa-id-card-clip"></i>
+                </div>
+                <div class="header-title">
+                  <h3>Active Profile & Security Status</h3>
+                  <p>Current administrative authority details</p>
+                </div>
+              </div>
+
+              <div class="admin-account-summary">
+                <div class="summary-metric-row">
+                  <span class="metric-label"><i class="fa-solid fa-user"></i> Current Username:</span>
+                  <span class="metric-value font-mono font-bold text-primary" id="displayAdminUsername">admin</span>
+                </div>
+                <div class="summary-metric-row">
+                  <span class="metric-label"><i class="fa-solid fa-id-badge"></i> Assigned Role:</span>
+                  <span class="metric-value font-bold text-success">Executive System Administrator</span>
+                </div>
+                <div class="summary-metric-row">
+                  <span class="metric-label"><i class="fa-solid fa-clock-rotate-left"></i> Last Credential Update:</span>
+                  <span class="metric-value font-mono" id="displayAdminLastUpdated">2026-10-08</span>
+                </div>
+                <div class="summary-metric-row">
+                  <span class="metric-label"><i class="fa-solid fa-database"></i> Storage Key:</span>
+                  <span class="metric-value font-mono text-muted">vkon_admin_creds_v6</span>
+                </div>
+              </div>
+
+              <div class="security-info-box" style="margin-top: 1.5rem; padding: 1.2rem; background: rgba(0,0,0,0.2); border-radius: 12px; border: 1px solid var(--border-glass);">
+                <h4 style="font-size: 0.95rem; margin-bottom: 0.5rem; color: var(--color-primary); display: flex; align-items: center; gap: 0.5rem;">
+                  <i class="fa-solid fa-shield-virus"></i> Security Guidelines
+                </h4>
+                <ul style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.6; padding-left: 1.2rem;">
+                  <li>Keep master administrator credentials confidential.</li>
+                  <li>Use at least 6 characters with numbers or letters.</li>
+                  <li>Changes take effect immediately across all portals.</li>
+                </ul>
+              </div>
+
+              <div style="margin-top: 1.5rem;">
+                <button type="button" id="resetAdminCredsBtn" class="btn btn-ghost btn-sm text-danger btn-block" title="Reset to default admin credentials">
+                  <i class="fa-solid fa-arrow-rotate-left"></i> Reset to Factory Default Credentials (admin / admin123)
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <footer class="app-footer">
+      <p>VKON Automation Executive Management Console &bull; Confidential Admin Controls</p>
+    </footer>
+  </div>
+
+  <!-- ================= EDIT EMPLOYEE MODAL ================= -->
+  <div class="modal-backdrop" id="editEmployeeModal" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="modal-dialog glass-panel" style="max-width: 580px;">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <h3><i class="fa-solid fa-user-pen text-primary"></i> Edit Employee Profile</h3>
+          <span class="modal-status-badge" id="editEmpIdBadge">EMP001</span>
+        </div>
+        <button class="modal-close-btn" id="closeEditEmpModalBtn" aria-label="Close Modal">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <form id="editEmployeeForm" class="box-form">
+          <input type="hidden" id="editEmpId">
+
+          <div class="form-row-2">
+            <div class="form-group">
+              <label for="editEmpName">Full Name <span class="req">*</span></label>
+              <input type="text" id="editEmpName" required class="form-control">
+            </div>
+            <div class="form-group">
+              <label for="editEmpRole">Role / Designation <span class="req">*</span></label>
+              <input type="text" id="editEmpRole" required class="form-control">
+            </div>
+          </div>
+
+          <div class="form-row-2">
+            <div class="form-group">
+              <label for="editEmpUsername">Username <span class="req">*</span></label>
+              <input type="text" id="editEmpUsername" required class="form-control">
+            </div>
+            <div class="form-group">
+              <label for="editEmpPassword">Password <span class="req">*</span></label>
+              <input type="text" id="editEmpPassword" required class="form-control">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="editEmpGeofenceRule" class="font-bold">
+              <i class="fa-solid fa-location-crosshairs text-primary"></i> Geofence Rule Enforcement <span class="req">*</span>
+            </label>
+            <select id="editEmpGeofenceRule" class="form-control font-bold" required>
+              <option value="required">Geofence Applicable (Required &le; 500m Office Radius)</option>
+              <option value="exempt">Geofence OFF / Exempt (Allowed anywhere without distance limit)</option>
+            </select>
+            <span class="form-hint">Turn OFF to allow this employee to mark attendance from any location without 500m geofence restrictions.</span>
+          </div>
+
+          <!-- Master Photo Update -->
+          <div class="master-photo-box">
+            <label class="font-bold"><i class="fa-solid fa-camera"></i> Master Reference Photo (&ge; 70% Match Baseline)</label>
+            <div class="enroll-preview-frame">
+              <img id="editEmpPhotoPreview" src="" alt="Master Photo">
+            </div>
+
+            <div class="photo-capture-actions">
+              <button type="button" id="editCaptureCamBtn" class="btn btn-secondary btn-sm">
+                <i class="fa-solid fa-camera"></i> Webcam
+              </button>
+              <label class="btn btn-ghost btn-sm upload-label">
+                <i class="fa-solid fa-laptop"></i> Upload from Laptop
+                <input type="file" id="editPhotoFileInput" accept="image/*" class="sr-only">
+              </label>
+            </div>
+
+            <!-- In-line edit webcam -->
+            <div id="editCamInline" class="admin-cam-inline" style="display: none;">
+              <video id="editWebcamVideo" autoplay playsinline muted></video>
+              <div class="cam-inline-btns">
+                <button type="button" id="editSnapPhotoBtn" class="btn btn-primary btn-xs">
+                  <i class="fa-solid fa-circle-dot"></i> Snap New Photo
+                </button>
+                <button type="button" id="editCancelCamBtn" class="btn btn-ghost btn-xs text-danger">Cancel</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-footer" style="padding: 1rem 0 0; margin-top: 0.5rem;">
+            <button type="button" class="btn btn-ghost" id="cancelEditEmpBtn">Cancel</button>
+            <button type="submit" class="btn btn-primary">
+              <i class="fa-solid fa-floppy-disk"></i> Save Profile Changes
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= PHOTO LIGHTBOX MODAL (VIEW FULL RESOLUTION SNAPSHOT) ================= -->
+  <div class="modal-backdrop" id="photoLightboxModal" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-lg glass-panel">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <h3><i class="fa-solid fa-expand text-primary"></i> Full Attendance Photo Snapshot</h3>
+          <span class="preview-badge" id="lightboxStatusBadge"><i class="fa-solid fa-check"></i> Verified</span>
+        </div>
+        <button type="button" class="modal-close-btn" id="closeLightboxModalBtn" aria-label="Close Lightbox">&times;</button>
+      </div>
+
+      <div class="modal-body photo-lightbox-modal-body">
+        <div class="lightbox-photo-stage">
+          <img id="lightboxPhotoImg" src="" alt="Full Resolution Snapshot">
+        </div>
+
+        <div class="lightbox-details-panel">
+          <div class="lightbox-meta-row">
+            <span class="meta-label"><i class="fa-solid fa-user"></i> Employee</span>
+            <span class="meta-value font-bold" id="lightboxEmpName">--</span>
+          </div>
+          <div class="lightbox-meta-row">
+            <span class="meta-label"><i class="fa-solid fa-id-badge"></i> Employee ID</span>
+            <span class="meta-value font-mono" id="lightboxEmpId">--</span>
+          </div>
+          <div class="lightbox-meta-row">
+            <span class="meta-label"><i class="fa-solid fa-clock"></i> Punch Time</span>
+            <span class="meta-value font-mono" id="lightboxTimestamp">--</span>
+          </div>
+          <div class="lightbox-meta-row">
+            <span class="meta-label"><i class="fa-solid fa-dna"></i> Biometric Verification</span>
+            <span class="meta-value" id="lightboxBiometric">--</span>
+          </div>
+          <div class="lightbox-meta-row">
+            <span class="meta-label"><i class="fa-solid fa-location-dot"></i> GPS Distance</span>
+            <span class="meta-value font-mono" id="lightboxDistance">--</span>
+          </div>
+          <div class="lightbox-meta-row">
+            <span class="meta-label"><i class="fa-solid fa-location-crosshairs"></i> Geofence Rule</span>
+            <span class="meta-value" id="lightboxGeofence">--</span>
+          </div>
+          <div class="lightbox-meta-row">
+            <span class="meta-label"><i class="fa-solid fa-shield-halved"></i> Retention Policy</span>
+            <span class="meta-value text-muted" id="lightboxRetention">Stored for 24h</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <a id="lightboxDownloadBtn" download="attendance_snapshot.jpg" href="#" class="btn btn-secondary btn-sm">
+          <i class="fa-solid fa-download"></i> Download High-Res Image
+        </a>
+        <button type="button" class="btn btn-primary btn-sm" id="closeLightboxModalFooterBtn">Close Viewer</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="shared.js?v=20261013_ist"></script>
+  <script src="admin.js?v=20261013_ist"></script>
+</body>
+</html>
