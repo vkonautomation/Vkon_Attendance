@@ -1,0 +1,8 @@
+version: '3.8' 
+services: 
+  app: 
+    build: . 
+    container_name: vkon-attendance-app 
+    ports: 
+      - "8130:8000" 
+    restart: unless-stopped 
