@@ -1,4 +1,4 @@
-# Company Attendance System
+# Vkon Attendance System
 
 A comprehensive web-based attendance and verification platform designed to track employee check-ins, manage administrative workflows, and verify daily attendance logs in real time.
 
