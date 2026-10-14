@@ -35,7 +35,7 @@
           <img src="assets/vkon-logo-dark.png" alt="Vkon Automation" class="vkon-brand-logo-lg vkon-logo-dark">
           <img src="assets/vkon-logo-light.png" alt="Vkon Automation" class="vkon-brand-logo-lg vkon-logo-light">
         </div>
-        <p class="label-tech brand-tech-pill">Smart Attendance & Biometric Access System</p>
+        <p class="label-tech brand-tech-pill">Employee Attendance Portal</p>
       </div>
 
       <!-- On-Screen Login Error Alert -->
@@ -49,12 +49,12 @@
         </div>
       </div>
 
-      <!-- Single Employee Simulation Credential Info -->
+      <!-- Quick Fill Credentials Pill -->
       <div class="quick-credentials-hint" style="text-align: center; margin-bottom: 1.25rem;">
-        <span style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">Simulation Employee Account</span>
+        <span style="font-size: 0.78rem; color: var(--text-muted); font-weight: 500;">Default Account:</span>
         <div style="margin-top: 6px;">
-          <button type="button" class="btn btn-ghost btn-xs quick-fill-emp-btn" data-user="mukesh" data-pass="mukesh123" style="border: 1px dashed var(--accent-primary); padding: 6px 14px; border-radius: 8px; cursor: pointer; font-weight: 600; color: var(--accent-primary); background: rgba(234, 88, 12, 0.06); transition: all 0.2s ease;">
-            <i class="fa-solid fa-bolt text-primary"></i> Mukesh Sharma (EMP001) &bull; mukesh / mukesh123
+          <button type="button" class="btn btn-ghost btn-xs quick-fill-emp-btn" data-user="mukesh" data-pass="mukesh123" style="border: 1px solid var(--border-glass); padding: 5px 12px; border-radius: 6px; cursor: pointer; font-weight: 500; color: var(--text-muted); background: var(--bg-surface); transition: all 0.2s ease;">
+            <i class="fa-solid fa-user-check text-primary"></i> Mukesh Sharma &bull; mukesh / mukesh123
           </button>
         </div>
       </div>
@@ -143,10 +143,10 @@
         <span class="status-text font-bold" id="todayStatusText">Today: Not Punched In</span>
       </div>
       <div class="policy-badges-row">
-        <span class="policy-chip chip-present"><i class="fa-solid fa-location-crosshairs"></i> Geofence: <strong>&le; 500m</strong> + Live Photo (&ge; 70% Match)</span>
-        <span class="policy-chip chip-wfh"><i class="fa-solid fa-house-laptop"></i> Direct WFH: <strong id="headerWfhQuota">2 Days / Week</strong></span>
-        <span class="policy-chip chip-leave"><i class="fa-solid fa-umbrella-beach"></i> Personal Leave: <strong id="headerLeaveQuota">14 Days / Year</strong></span>
-        <span class="policy-chip chip-rh"><i class="fa-solid fa-calendar-check"></i> Restricted Holiday (RH): <strong id="headerRhQuota">2 / Month</strong></span>
+        <span class="policy-chip chip-present"><i class="fa-solid fa-location-dot"></i> Office Geofence: <strong>&le; 500m</strong> &bull; Photo Check</span>
+        <span class="policy-chip chip-wfh"><i class="fa-solid fa-house-laptop"></i> Hybrid Policy: <strong id="headerWfhQuota">2 Days / Week</strong></span>
+        <span class="policy-chip chip-leave"><i class="fa-solid fa-calendar-days"></i> Annual Leave: <strong id="headerLeaveQuota">14 Days / Year</strong></span>
+        <span class="policy-chip chip-rh"><i class="fa-solid fa-calendar-check"></i> Restricted Holidays: <strong id="headerRhQuota">2 / Month</strong></span>
       </div>
     </div>
 
@@ -207,8 +207,8 @@
             <div class="modal-title-group">
               <div class="box-icon icon-present"><i class="fa-solid fa-camera"></i></div>
               <div>
-                <h3>Mark Present &bull; Live Attendance Verification</h3>
-                <span class="box-policy-tag tag-present">Office Geofence (&le; 500m) + Live Photo Snapshot</span>
+                <h3>Mark Attendance</h3>
+                <span class="box-policy-tag tag-present">Office Location Check &bull; Photo Verification</span>
               </div>
             </div>
             <button type="button" class="modal-close-btn" id="closeCardMarkPresentBtn" aria-label="Close card">&times;</button>
@@ -222,7 +222,7 @@
               </div>
               <div class="punch-status-details">
                 <span class="punch-state-label" id="punchStateLabel">Status: Ready to Punch In</span>
-                <span class="punch-state-sub" id="punchStateSub">Camera opens upon clicking below. Snapshot is automatically sent to Admin.</span>
+                <span class="punch-state-sub" id="punchStateSub">Camera opens upon clicking below. Snapshot is submitted for verification.</span>
               </div>
             </div>
 
@@ -233,7 +233,7 @@
                 <span id="punchOutLockText">Minimum shift duration policy active.</span>
                 <div id="simulateShiftActionWrap" style="margin-top: 0.4rem; display: none;">
                   <button type="button" id="btnSimulateCompleteShift" class="btn btn-xs btn-outline-warning">
-                    <i class="fa-solid fa-clock-rotate-left"></i> [Test Simulation] Mark Minimum Duration Met
+                    <i class="fa-solid fa-clock-rotate-left"></i> Mark Required Shift Completed
                   </button>
                 </div>
               </div>
@@ -744,13 +744,13 @@
                 <span>Distance: <strong id="modalDistValue">--</strong> m from Office Center</span>
                 <span class="form-hint" id="modalOfficeCenterHint">VKON Automation Tech Park</span>
               </div>
-              <!-- Shortcut simulation for testing -->
+              <!-- Location Presets / Quick Location Picker -->
               <div class="modal-sim-shortcuts">
                 <button type="button" class="btn btn-xs btn-ghost sim-modal-btn" data-sim="inside">
-                  <i class="fa-solid fa-circle-check text-success"></i> Inside (40m)
+                  <i class="fa-solid fa-building-circle-check text-success"></i> Office Campus
                 </button>
                 <button type="button" class="btn btn-xs btn-ghost sim-modal-btn" data-sim="outside">
-                  <i class="fa-solid fa-circle-xmark text-danger"></i> Outside (1.2km)
+                  <i class="fa-solid fa-location-arrow text-muted"></i> Off-Campus
                 </button>
               </div>
             </div>

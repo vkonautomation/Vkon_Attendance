@@ -38,7 +38,7 @@
           <img src="assets/vkon-logo-dark.png" alt="Vkon Automation" class="vkon-brand-logo-lg vkon-logo-dark">
           <img src="assets/vkon-logo-light.png" alt="Vkon Automation" class="vkon-brand-logo-lg vkon-logo-light">
         </div>
-        <p class="label-tech brand-tech-pill">Executive Admin Verification</p>
+        <p class="label-tech brand-tech-pill">HR Administration Console</p>
       </div>
 
       <!-- On-Screen Admin Login Error Alert -->
@@ -70,16 +70,16 @@
         </div>
 
         <div class="quick-credentials-hint" style="text-align: center;">
-          <span>Default Master Credentials: <strong>admin</strong> / <strong>admin123</strong></span>
+          <span>Default Administrator: <strong>admin</strong> / <strong>admin123</strong></span>
           <div style="margin-top: 0.5rem;">
-            <button type="button" id="quickFillAdminBtn" class="btn btn-ghost btn-xs" style="border: 1px dashed var(--accent-warning); padding: 5px 12px; border-radius: 6px; cursor: pointer; color: var(--accent-warning);">
-              <i class="fa-solid fa-bolt"></i> Click to Auto-Fill Credentials
+            <button type="button" id="quickFillAdminBtn" class="btn btn-ghost btn-xs" style="border: 1px solid var(--border-glass); padding: 5px 12px; border-radius: 6px; cursor: pointer; color: var(--text-muted); background: var(--bg-surface);">
+              <i class="fa-solid fa-key"></i> Auto-Fill Credentials
             </button>
           </div>
         </div>
 
         <button type="submit" class="btn btn-warning btn-block">
-          <i class="fa-solid fa-unlock-keyhole"></i> Unlock Executive Console
+          <i class="fa-solid fa-unlock-keyhole"></i> Sign In to Admin Console
         </button>
 
         <a href="index.html" class="btn btn-ghost btn-block" style="margin-top: 0.5rem; text-align: center; text-decoration: none;">
@@ -299,8 +299,8 @@
 
               <!-- Master Reference Photo Enrollment (Webcam or Laptop Upload) -->
               <div class="master-photo-box">
-                <label class="font-bold"><i class="fa-solid fa-camera"></i> Master Baseline Photo (&ge; 70% Match Baseline) <span class="req">*</span></label>
-                <p class="form-hint">Set via webcam or upload an official photo from your laptop.</p>
+                <label class="font-bold"><i class="fa-solid fa-camera"></i> Profile Identification Photo <span class="req">*</span></label>
+                <p class="form-hint">Capture via webcam or upload an official photo from your computer.</p>
 
                 <div class="enroll-preview-frame">
                   <img id="newEmpPhotoPreview" src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80" alt="Master Reference Photo">
@@ -1009,7 +1009,7 @@
 
           <!-- Master Photo Update -->
           <div class="master-photo-box">
-            <label class="font-bold"><i class="fa-solid fa-camera"></i> Master Reference Photo (&ge; 70% Match Baseline)</label>
+            <label class="font-bold"><i class="fa-solid fa-camera"></i> Profile Reference Photo</label>
             <div class="enroll-preview-frame">
               <img id="editEmpPhotoPreview" src="" alt="Master Photo">
             </div>

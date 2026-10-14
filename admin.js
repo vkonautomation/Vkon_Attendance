@@ -1661,7 +1661,7 @@ function openMasterPhotoLightbox(empId) {
   document.getElementById("lightboxEmpName").textContent = emp.name;
   document.getElementById("lightboxEmpId").textContent = emp.id;
   document.getElementById("lightboxTimestamp").textContent = `Enrolled Baseline Photo (${emp.enrolledAt || '2026-01-10'})`;
-  document.getElementById("lightboxBiometric").innerHTML = `<span class="day-badge-pill badge-present"><i class="fa-solid fa-id-badge"></i> Master Baseline (&ge; 70% Target)</span>`;
+  document.getElementById("lightboxBiometric").innerHTML = `<span class="day-badge-pill badge-present"><i class="fa-solid fa-id-badge"></i> Verified Profile Photo</span>`;
   document.getElementById("lightboxDistance").textContent = "Official Reference Record";
   document.getElementById("lightboxGeofence").innerHTML = `<span class="day-badge-pill ${isExempt ? 'badge-rh-day' : 'badge-present'}">${isExempt ? 'Geofence OFF (Exempt)' : 'Geofence Applicable (500m)'}</span>`;
   document.getElementById("lightboxRetention").textContent = "Permanent Master Photo";

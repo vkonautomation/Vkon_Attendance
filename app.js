@@ -523,7 +523,7 @@ function openDayDetailsModal(dateStr, record, isWeekend, declaredHoliday) {
     if (modalWorkDuration) modalWorkDuration.textContent = record.duration || "Standard Shift";
     if (modalGpsDistance) modalGpsDistance.textContent = record.distance ? `${record.distance} meters` : "N/A";
     const scoreText = record.matchScore ? ` (${record.matchScore}% Match)` : "";
-    if (modalBioVerification) modalBioVerification.innerHTML = `<i class="fa-solid fa-circle-check"></i> Biometric Verified (&ge; 70%)${scoreText}`;
+    if (modalBioVerification) modalBioVerification.innerHTML = `<i class="fa-solid fa-circle-check"></i> Photo Verified${scoreText}`;
   } else if (isWeekend) {
     if (modalDayStatusBadge) modalDayStatusBadge.textContent = "Weekend Rest";
     if (modalSelfieImg && employeeState.currentEmployee) modalSelfieImg.src = employeeState.currentEmployee.avatar;
