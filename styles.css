@@ -7017,6 +7017,141 @@ body.light-theme {
   }
 }
 
+/* ==========================================================================
+   TYPOGRAPHY & CONTRAST TUNES (mini calendar, badges, policy pills, pending)
+   ========================================================================== */
+
+/* --- 1. Mini calendar: readable restricted/future cells on dark theme --- */
+.reg-cal-cell.reg-restricted {
+  opacity: 0.85;
+}
+
+.reg-cal-cell.reg-restricted.reg-future {
+  opacity: 1;
+  background: rgba(148, 163, 184, 0.06);
+  border-color: var(--border-glass);
+}
+
+.reg-cal-cell.reg-restricted.reg-future .cell-day-num {
+  color: #a3adbb;
+}
+
+.reg-cal-cell.reg-restricted.reg-future .cell-mini-pill {
+  background: rgba(148, 163, 184, 0.16);
+  color: #c2cbd6;
+}
+
+.reg-cal-cell.other-month {
+  opacity: 0.5;
+}
+
+.reg-cal-cell.reg-restricted .cell-mini-pill {
+  font-weight: 700;
+}
+
+body.light-theme .reg-cal-cell.reg-restricted {
+  opacity: 1;
+}
+
+body.light-theme .reg-cal-cell.reg-restricted .cell-day-num {
+  color: #475569;
+}
+
+body.light-theme .reg-cal-cell.reg-restricted .cell-mini-pill {
+  background: #eef1f5;
+  color: #475569;
+}
+
+body.light-theme .reg-cal-cell.other-month {
+  opacity: 0.6;
+}
+
+/* --- 2. Main calendar: festival/holiday labels ellipsize instead of clipping --- */
+.day-badge-pill {
+  display: inline-block;
+  width: auto;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  align-self: flex-start;
+  padding: 0.15rem 0.4rem;
+  font-size: 0.64rem;
+  line-height: 1.35;
+}
+
+.day-badge-pill i {
+  margin-right: 0.22rem;
+  font-size: 0.6rem;
+}
+
+.calendar-day-cell {
+  min-width: 0;
+}
+
+.calendar-day-cell > * {
+  min-width: 0;
+}
+
+/* --- 3. Pending Admin Approval: distinct sky shade + soft icon pulse --- */
+.status-badge-pending {
+  background: rgba(14, 165, 233, 0.14);
+  color: #7dd3fc;
+  border-color: rgba(14, 165, 233, 0.42);
+}
+
+.status-badge-pending i {
+  animation: pendingBlink 2.2s ease-in-out infinite;
+}
+
+@keyframes pendingBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+body.light-theme .status-badge-pending {
+  background: #f0f9ff;
+  color: #0369a1;
+  border-color: #bae6fd;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-badge-pending i {
+    animation: none;
+  }
+}
+
+/* --- 4. Header policy pills: grouped in a subtle container, tighter gaps --- */
+.policy-badges-row {
+  gap: 0.5rem;
+  padding: 0.42rem 0.65rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-lg);
+  row-gap: 0.4rem;
+}
+
+body.light-theme .policy-badges-row {
+  background: #ffffff;
+  box-shadow: var(--shadow-sm);
+}
+
+.policy-chip {
+  font-size: 0.7rem;
+  padding: 0.22rem 0.6rem;
+}
+
+/* --- 5. Card padding parity: regularisation section = calendar card --- */
+.regularisation-section {
+  padding: 1.5rem 1.75rem 1.75rem;
+}
+
+@media (max-width: 768px) {
+  .regularisation-section {
+    padding: 1rem 1.1rem 1.2rem;
+  }
+}
+
 
 
 
