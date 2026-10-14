@@ -17,7 +17,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="styles.css?v=20261013_ist">
+  <link rel="stylesheet" href="styles.css?v=20261014_design">
 </head>
 <body class="light-theme">
   
@@ -50,13 +50,11 @@
       </div>
 
       <!-- Quick Fill Credentials Pill -->
-      <div class="quick-credentials-hint" style="text-align: center; margin-bottom: 1.25rem;">
-        <span style="font-size: 0.78rem; color: var(--text-muted); font-weight: 500;">Default Account:</span>
-        <div style="margin-top: 6px;">
-          <button type="button" class="btn btn-ghost btn-xs quick-fill-emp-btn" data-user="mukesh" data-pass="mukesh123" style="border: 1px solid var(--border-glass); padding: 5px 12px; border-radius: 6px; cursor: pointer; font-weight: 500; color: var(--text-muted); background: var(--bg-surface); transition: all 0.2s ease;">
-            <i class="fa-solid fa-user-check text-primary"></i> Mukesh Sharma &bull; mukesh / mukesh123
-          </button>
-        </div>
+      <div class="quick-credentials-hint auth-quick-fill-wrap">
+        <span class="auth-quick-fill-label">Default Account</span>
+        <button type="button" class="quick-fill-emp-btn auth-quick-fill-btn" data-user="mukesh" data-pass="mukesh123">
+          <i class="fa-solid fa-user-check text-primary"></i> Mukesh Sharma (EMP001) &bull; mukesh / mukesh123
+        </button>
       </div>
 
       <!-- Employee Login Form -->
@@ -83,8 +81,8 @@
       </form>
 
       <!-- Executive Admin Direct Navigation Link -->
-      <div style="text-align: center; margin-top: 1.25rem; padding-top: 0.85rem; border-top: 1px solid var(--border-glass);">
-        <a href="admin.html" style="font-size: 0.8rem; color: var(--text-muted); text-decoration: none; display: inline-flex; align-items: center; gap: 6px; transition: color 0.2s ease;">
+      <div class="auth-admin-link-wrap">
+        <a href="admin.html" class="auth-admin-link">
           <i class="fa-solid fa-shield-halved"></i> Executive Admin Console &rarr;
         </a>
       </div>
@@ -156,6 +154,11 @@
       <!-- ================= TOP SECTION: EMPLOYEE ACTION HUB (BEFORE CALENDAR) ================= -->
       <section class="employee-action-hub">
         
+        <div class="action-hub-heading">
+          <h2><i class="fa-solid fa-bolt"></i> Today&rsquo;s Actions</h2>
+          <span class="action-hub-sub">Check in, book WFH or apply for leave &mdash; everything lands on your calendar instantly.</span>
+        </div>
+
         <!-- 1. Long Button from Left to Right: Mark Present -->
         <div class="mark-present-bar-wrapper">
           <button type="button" id="btnToggleMarkPresent" class="btn-long-mark-present">
@@ -488,7 +491,7 @@
               </button>
               <button id="todayJumpBtn" class="btn btn-ghost btn-sm">Jump to Today</button>
             </div>
-            <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+            <div class="calendar-today-row">
               <span class="calendar-subtitle">Attendance history & records for <strong id="calendarEmpNameDisplay" class="text-primary">Mukesh Sharma</strong></span>
               <span id="calendarTodayHeaderDate" class="today-header-pill"><i class="fa-solid fa-calendar-day"></i> Present Day: Loading IST...</span>
             </div>
@@ -562,7 +565,7 @@
           <form id="attendanceRegularisationForm" class="box-form glass-card-nested">
             <!-- Interactive Regularisation Calendar Section -->
             <div class="form-group reg-calendar-wrapper-group">
-              <div class="reg-cal-label-row" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+              <div class="reg-cal-label-row">
                 <label for="regularisationDate" style="margin: 0; font-weight: 600;">Missed Attendance Date <span class="req">*</span></label>
                 <span class="badge-mini text-primary" style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 6px; font-size: 0.75rem; background: rgba(234, 88, 12, 0.08);">
                   <i class="fa-solid fa-calendar-days"></i> Interactive Calendar
@@ -723,12 +726,12 @@
           <div class="verify-checklist-column">
             
             <!-- Snapshot Preview Box -->
-            <div class="master-comparison-card" style="padding: 1rem; text-align: center;">
-              <div style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 0.5rem;">Captured Attendance Photo:</div>
-              <div style="width: 120px; height: 120px; margin: 0 auto; border-radius: 12px; overflow: hidden; border: 2px solid var(--border-glass); background: #000;">
-                <img id="modalLiveAvatar" src="" alt="Live Captured Snapshot" style="width: 100%; height: 100%; object-fit: cover;">
+            <div class="master-comparison-card snapshot-preview-card">
+              <div class="snapshot-label">Captured Attendance Photo:</div>
+              <div class="snapshot-frame-lg">
+                <img id="modalLiveAvatar" src="" alt="Live Captured Snapshot">
               </div>
-              <div class="match-score-pill" style="margin-top: 0.75rem;">
+              <div class="match-score-pill">
                 <i class="fa-solid fa-camera text-primary"></i>
                 <span id="modalPhotoStatusText">Photo automatically sent to Admin</span>
               </div>
