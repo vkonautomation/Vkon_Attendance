@@ -6754,6 +6754,269 @@ body.light-theme .app-footer {
   .long-btn-icon { width: 42px; height: 42px; }
 }
 
+/* ==========================================================================
+   UX & ACCESSIBILITY POLISH (status badge, legend contrast, GPS pill,
+   camera fallback, touch targets, muted-text contrast)
+   ========================================================================== */
+
+/* --- 1. Today status badge on the action hub (color-coded via JS dot class) --- */
+.today-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-left: auto;
+  align-self: center;
+  padding: 0.55rem 1.1rem;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-glass);
+  background: var(--bg-card);
+  font-weight: 700;
+  font-size: 0.88rem;
+  letter-spacing: 0.01em;
+  color: var(--text-main);
+  box-shadow: var(--shadow-sm);
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.today-status-badge .status-indicator-dot {
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+}
+
+/* Red — not punched in / absent */
+.today-status-badge:has(.dot-pending),
+.today-status-badge:has(.dot-absent) {
+  background: rgba(220, 38, 38, 0.12);
+  border-color: rgba(220, 38, 38, 0.42);
+  color: #fca5a5;
+}
+
+/* Green — punched in */
+.today-status-badge:has(.dot-present) {
+  background: rgba(15, 157, 107, 0.13);
+  border-color: rgba(15, 157, 107, 0.45);
+  color: #6ee7b7;
+}
+
+/* Amber — WFH / on leave */
+.today-status-badge:has(.dot-wfh),
+.today-status-badge:has(.dot-leave) {
+  background: rgba(217, 119, 6, 0.14);
+  border-color: rgba(217, 119, 6, 0.48);
+  color: #fcd34d;
+}
+
+body.light-theme .today-status-badge:has(.dot-pending),
+body.light-theme .today-status-badge:has(.dot-absent) {
+  background: #fdf2f2;
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+
+body.light-theme .today-status-badge:has(.dot-present) {
+  background: #f0fdf6;
+  border-color: #bbf7d0;
+  color: #15803d;
+}
+
+body.light-theme .today-status-badge:has(.dot-wfh),
+body.light-theme .today-status-badge:has(.dot-leave) {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #b45309;
+}
+
+/* --- 2. Header: clear separation clock ↔ profile chip; mobile sub-header row --- */
+.navbar {
+  gap: 1.75rem;
+}
+
+.realtime-clock {
+  margin-right: 0.35rem;
+}
+
+.nav-controls {
+  gap: 1.1rem;
+}
+
+@media (max-width: 768px) {
+  .navbar {
+    flex-wrap: wrap;
+    row-gap: 0.55rem;
+  }
+  /* Clock collapses into its own sub-header row instead of crowding the logo */
+  .realtime-clock {
+    order: 10;
+    flex-basis: 100%;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-right: 0;
+    border-radius: var(--radius-md);
+    padding: 0.35rem 0.9rem;
+  }
+  .nav-controls {
+    margin-left: auto;
+  }
+}
+
+/* --- 3. Calendar legend: 7 high-contrast, mutually distinct states --- */
+.legend-dot {
+  box-shadow: none !important;
+}
+
+.legend-dot.dot-present { background: #0f9d6b; }
+.legend-dot.dot-wfh    { background: #7c3aed; }
+.legend-dot.dot-leave  { background: #d97706; }
+.legend-dot.dot-rh     { background: #db2777; }
+.legend-dot.dot-holiday { background: #2563eb; }
+.legend-dot.dot-absent { background: #dc2626; }
+.legend-dot.dot-weekend { background: #64748b; }
+
+body.light-theme .legend-dot {
+  border: 1px solid rgba(15, 23, 42, 0.18);
+}
+
+/* Same palette in light theme (beats legacy fuchsia/blue overrides) */
+body.light-theme .legend-dot.dot-present { background: #0f9d6b; box-shadow: none; }
+body.light-theme .legend-dot.dot-wfh    { background: #7c3aed; box-shadow: none; }
+body.light-theme .legend-dot.dot-leave  { background: #d97706; box-shadow: none; }
+body.light-theme .legend-dot.dot-rh     { background: #db2777; box-shadow: none; }
+body.light-theme .legend-dot.dot-holiday { background: #2563eb; box-shadow: none; }
+body.light-theme .legend-dot.dot-absent { background: #dc2626; box-shadow: none; }
+body.light-theme .legend-dot.dot-weekend { background: #64748b; box-shadow: none; }
+
+/* Match the calendar day badges to the legend palette */
+.day-badge-pill.badge-rh-day {
+  background: rgba(219, 39, 119, 0.14);
+  border: 1px solid rgba(219, 39, 119, 0.45);
+  color: #f9a8d4;
+}
+
+.day-badge-pill.badge-holiday-day {
+  background: rgba(37, 99, 235, 0.16);
+  border: 1px solid rgba(59, 130, 246, 0.45);
+  color: #93c5fd;
+}
+
+body.light-theme .day-badge-pill.badge-rh-day {
+  background: #fdf2f8;
+  border: 1px solid #fbcfe8;
+  color: #be185d;
+}
+
+body.light-theme .day-badge-pill.badge-holiday-day {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
+}
+
+/* --- 4. GPS "fetching" pill state --- */
+.verification-status-pill.pill-fetching {
+  background: rgba(37, 99, 235, 0.14);
+  border: 1px solid rgba(59, 130, 246, 0.45);
+  color: #93c5fd;
+}
+
+body.light-theme .verification-status-pill.pill-fetching {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
+}
+
+.verification-status-pill.pill-fetching i {
+  margin-right: 0.3rem;
+}
+
+/* --- 5. Camera fallback & photo-retention microcopy --- */
+.cam-fallback-title {
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--text-main);
+  margin: 0.25rem 0 0;
+}
+
+.cam-fallback-help {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  max-width: 34ch;
+  margin: 0.35rem auto 0;
+  line-height: 1.45;
+}
+
+.capture-retention-note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  margin: 0.55rem 0 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.capture-retention-note i {
+  color: #0f9d6b;
+}
+
+body.light-theme .capture-retention-note {
+  color: #576274;
+}
+
+/* --- 6. WCAG AA muted text --- */
+:root {
+  --text-muted: #9aa4b2;
+  --text-dim: #838d9b;
+}
+
+body.light-theme {
+  --text-muted: #55606f;
+  --text-dim: #64748b;
+}
+
+/* "Not punched in" pending state reads red, matching the badge treatment */
+.dot-pending {
+  background: #dc2626;
+  box-shadow: 0 0 8px rgba(220, 38, 38, 0.6);
+}
+
+/* --- 7. Touch targets ≥ 44px on mobile --- */
+@media (max-width: 768px) {
+  .btn {
+    min-height: 44px;
+  }
+  .btn-long-mark-present,
+  .btn-sub-action,
+  .btn-punch {
+    min-height: 44px;
+  }
+  .icon-btn,
+  .theme-toggle-btn,
+  .modal-close-btn {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .quick-fill-emp-btn {
+    min-height: 44px;
+  }
+  .reg-cal-cell {
+    min-height: 44px;
+  }
+  .calendar-nav-btn,
+  .btn-nav-arrow {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .modal-footer {
+    flex-wrap: wrap;
+  }
+  .modal-footer .btn {
+    flex: 1 1 auto;
+  }
+}
+
 
 
 

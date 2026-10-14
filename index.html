@@ -21,7 +21,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="styles.css?v=20261014_pro">
+  <link rel="stylesheet" href="styles.css?v=20261014_ux">
 </head>
 <body class="light-theme">
   
@@ -138,12 +138,8 @@
       </div>
     </header>
 
-    <!-- Sub-bar: Realtime Status & Policy Summary -->
+    <!-- Sub-bar: Policy Summary (today's status badge now lives on the action hub) -->
     <div class="sub-bar">
-      <div class="sub-status-item">
-        <span class="status-indicator-dot dot-pending" id="todayDot"></span>
-        <span class="status-text font-bold" id="todayStatusText">Today: Not Punched In</span>
-      </div>
       <div class="policy-badges-row">
         <span class="policy-chip chip-present"><i class="fa-solid fa-location-dot"></i> Office Geofence: <strong>&le; 500m</strong> &bull; Photo Check</span>
         <span class="policy-chip chip-wfh"><i class="fa-solid fa-house-laptop"></i> Hybrid Policy: <strong id="headerWfhQuota">2 Days / Week</strong></span>
@@ -161,6 +157,11 @@
         <div class="action-hub-heading">
           <h2><i class="fa-solid fa-bolt"></i> Today&rsquo;s Actions</h2>
           <span class="action-hub-sub">Check in, book WFH or apply for leave &mdash; everything lands on your calendar instantly.</span>
+          <!-- Prominent color-coded status badge (dot class is driven by app.js) -->
+          <div class="today-status-badge" id="todayStatusBadge" aria-live="polite">
+            <span class="status-indicator-dot dot-pending" id="todayDot"></span>
+            <span class="status-text font-bold" id="todayStatusText">Today: Not Punched In</span>
+          </div>
         </div>
 
         <!-- 1. Long Button from Left to Right: Mark Present -->
@@ -703,7 +704,9 @@
               <!-- Fallback if camera stream not active / permission needed -->
               <div class="camera-fallback-screen" id="verifyCamFallback">
                 <i class="fa-solid fa-camera-slash fallback-icon"></i>
+                <p class="cam-fallback-title">Camera permission needed to punch in</p>
                 <p id="camFallbackMsg">Requesting camera access...</p>
+                <p class="cam-fallback-help"><i class="fa-solid fa-circle-info"></i> Allow the camera prompt in your browser, or check that a webcam is connected. You can then retry below.</p>
                 <div class="fallback-btns">
                   <button type="button" id="verifyRetryCamBtn" class="btn btn-xs btn-primary">
                     <i class="fa-solid fa-video"></i> Allow Camera
@@ -717,6 +720,7 @@
               <button type="button" class="btn btn-primary btn-block btn-capture-action" id="modalSnapPhotoBtn">
                 <i class="fa-solid fa-camera"></i> <span id="snapBtnText">Capture Live Photo</span>
               </button>
+              <p class="capture-retention-note"><i class="fa-solid fa-shield-halved"></i> Photo stored securely for 24 hours for audit purposes &mdash; never shared.</p>
             </div>
 
             <!-- Guidance Note -->
@@ -745,7 +749,7 @@
             <div class="verify-check-item" id="checkGpsItem">
               <div class="check-item-header">
                 <span class="check-title"><i class="fa-solid fa-location-dot"></i> GPS Location Check</span>
-                <span class="verification-status-pill" id="modalGpsPill">Checking...</span>
+                <span class="verification-status-pill" id="modalGpsPill"><i class="fa-solid fa-spinner fa-spin"></i> Fetching GPS location&hellip;</span>
               </div>
               <div class="check-item-detail">
                 <span>Distance: <strong id="modalDistValue">--</strong> m from Office Center</span>

@@ -556,7 +556,20 @@ function openDayDetailsModal(dateStr, record, isWeekend, declaredHoliday) {
     if (modalBioVerification) modalBioVerification.innerHTML = `<span class="text-danger">Not Verified</span>`;
   }
 
-  if (modal) modal.classList.add("open");
+  if (modal) {
+    trapFocusActivate(modal);
+    modal.classList.add("open");
+    modal.setAttribute("aria-hidden", "false");
+  }
+}
+
+function closeDayDetailsModal() {
+  const modal = document.getElementById("dayDetailModal");
+  if (modal && modal.classList.contains("open")) {
+    modal.classList.remove("open");
+    modal.setAttribute("aria-hidden", "true");
+    trapFocusRelease(modal);
+  }
 }
 
 function initCalendarNav() {
@@ -588,15 +601,15 @@ function initCalendarNav() {
   const modal = document.getElementById("dayDetailModal");
   const closeDayBtn = document.getElementById("closeDayModalBtn");
   if (closeDayBtn && modal) {
-    closeDayBtn.addEventListener("click", () => modal.classList.remove("open"));
+    closeDayBtn.addEventListener("click", closeDayDetailsModal);
   }
   const closeFooterBtn = document.getElementById("closeDayModalFooterBtn");
   if (closeFooterBtn && modal) {
-    closeFooterBtn.addEventListener("click", () => modal.classList.remove("open"));
+    closeFooterBtn.addEventListener("click", closeDayDetailsModal);
   }
   if (modal) {
     modal.addEventListener("click", (e) => {
-      if (e.target === modal) modal.classList.remove("open");
+      if (e.target === modal) closeDayDetailsModal();
     });
   }
 }
@@ -672,7 +685,7 @@ function renderMyLeavesStatusList() {
   if (!container) return;
 
   if (countBadge) {
-    countBadge.textContent = `${myLeaves.length} Request${myLeaves.length === 1 ? '' : 's'}`;
+    countBadge.textContent = myLeaves.length === 0 ? "No pending requests" : `${myLeaves.length} Request${myLeaves.length === 1 ? '' : 's'}`;
   }
 
   container.innerHTML = "";
@@ -680,8 +693,8 @@ function renderMyLeavesStatusList() {
   if (myLeaves.length === 0) {
     container.innerHTML = `
       <div class="my-leaves-empty" style="text-align: center; padding: 1rem; color: var(--text-muted);">
-        <i class="fa-regular fa-calendar-xmark text-muted"></i>
-        <span>No leave or holiday requests submitted yet.</span>
+        <i class="fa-regular fa-calendar-check text-muted"></i>
+        <span>You're all set &mdash; no leave requests yet. Apply from "Leave Request" and track status here.</span>
       </div>
     `;
     return;
@@ -829,6 +842,11 @@ function initLeaveBox() {
   startInput.value = "2026-10-14";
   endInput.value = "2026-10-14";
 
+  // Inline validation: date pickers must not allow past dates
+  const leaveMinDateKey = getTodayKey();
+  startInput.min = leaveMinDateKey;
+  endInput.min = leaveMinDateKey;
+
   function populateRestrictedHolidayOptions() {
     if (!rhSelect) return;
     const rhs = getRestrictedHolidays();
@@ -944,6 +962,16 @@ function initLeaveBox() {
     const category = categorySelect.value;
     const isRh = category === "Restricted" || category === "RH";
     if (isRh) endInput.value = startInput.value;
+
+    // 0. Past-date guard (inline, before any other rule)
+    const todayGuardKey = getTodayKey();
+    if (startInput.value < todayGuardKey) {
+      daysNoticeText.textContent = "Start date cannot be in the past";
+      warningText.innerHTML = `<i class="fa-solid fa-calendar-day"></i> Requests can only start from <strong>today</strong> (${todayGuardKey}) onwards.`;
+      warningBox.style.display = "flex";
+      submitBtn.disabled = true;
+      return;
+    }
 
     const workingDays = isRh ? 1 : calculateWorkingDaysBetween(startInput.value, endInput.value);
     const empId = employeeState.currentEmployee.id;
@@ -1329,9 +1357,11 @@ function openVerificationModal(mode = "in") {
   }
 
   modal.classList.add("open");
+  modal.setAttribute("aria-hidden", "false");
+  trapFocusActivate(modal);
 
-  // Evaluate Geofence Location
-  evaluateModalLocation();
+  // Evaluate Geofence Location (with an explicit "fetching" state first)
+  startGpsFetch();
 
   // Start Camera ON-DEMAND immediately
   startModalCamera();
@@ -1339,7 +1369,9 @@ function openVerificationModal(mode = "in") {
 
 function closeVerificationModal() {
   const modal = document.getElementById("punchVerificationModal");
+  trapFocusRelease(modal);
   modal.classList.remove("open");
+  modal.setAttribute("aria-hidden", "true");
   capturedLiveSelfie = null;
   isLivePhotoVerified = false;
   const confirmBtn = document.getElementById("confirmVerificationBtn");
@@ -1372,8 +1404,8 @@ async function startModalCamera() {
   } catch (err) {
     console.warn("Camera permission error:", err);
     if (fallback) fallback.classList.add("show");
-    if (msg) msg.textContent = "Camera access denied or device not found. You can still snap an attendance photo card.";
-    showToast("Camera access optional/offline. Photo snapshot fallback is active.", "info");
+    if (msg) msg.textContent = "Camera permission needed to punch in. Enable the camera for this site, then retry below.";
+    showToast("Camera unavailable — allow permission to capture your attendance photo.", "warning");
   }
 }
 
@@ -1383,6 +1415,77 @@ function stopModalCamera() {
     liveVerifyStream = null;
   }
 }
+
+// ----------------------------------------------------------------------------
+// GPS fetch UX: show an explicit "Fetching GPS location..." state, then resolve
+// ----------------------------------------------------------------------------
+function startGpsFetch() {
+  const gpsPill = document.getElementById("modalGpsPill");
+  const distVal = document.getElementById("modalDistValue");
+  if (gpsPill) {
+    gpsPill.className = "verification-status-pill pill-fetching";
+    gpsPill.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Fetching GPS location\u2026`;
+  }
+  if (distVal) distVal.textContent = "\u2026";
+  // Brief visible fetch state before the geofence evaluation resolves
+  setTimeout(() => evaluateModalLocation(), 700);
+}
+
+// ----------------------------------------------------------------------------
+// Modal accessibility: focus trap + focus restore to the triggering control
+// ----------------------------------------------------------------------------
+const MODAL_FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+const modalTriggerMap = new WeakMap();
+const modalStack = [];
+
+function trapFocusActivate(modalEl) {
+  if (!modalStack.includes(modalEl)) {
+    modalTriggerMap.set(modalEl, document.activeElement);
+    modalStack.push(modalEl);
+  }
+  const focusables = modalEl.querySelectorAll(MODAL_FOCUSABLE);
+  if (focusables.length) focusables[0].focus();
+}
+
+function trapFocusRelease(modalEl) {
+  const idx = modalStack.indexOf(modalEl);
+  if (idx !== -1) modalStack.splice(idx, 1);
+  const trigger = modalTriggerMap.get(modalEl);
+  if (trigger && document.contains(trigger) && typeof trigger.focus === "function") trigger.focus();
+  modalTriggerMap.delete(modalEl);
+}
+
+function frontmostOpenModal() {
+  return modalStack.length ? modalStack[modalStack.length - 1] : null;
+}
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    const modal = frontmostOpenModal();
+    if (!modal) return;
+    e.preventDefault();
+    if (modal.id === "punchVerificationModal") closeVerificationModal();
+    else if (modal.id === "dayDetailModal") closeDayDetailsModal();
+    else closeActionCard(modal.id);
+  } else if (e.key === "Tab") {
+    const modal = frontmostOpenModal();
+    if (!modal) return;
+    const focusables = Array.from(modal.querySelectorAll(MODAL_FOCUSABLE)).filter(el => el.offsetParent !== null);
+    if (!focusables.length) return;
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+    if (!modal.contains(document.activeElement)) {
+      e.preventDefault();
+      first.focus();
+    } else if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
+});
 
 function evaluateModalLocation() {
   const settings = getStore(STORAGE_KEYS.SETTINGS, DEFAULT_OFFICE);
@@ -1717,14 +1820,14 @@ function initVerificationModal() {
 function openActionCard(modalId) {
   ["modalCardMarkPresent", "modalCardApplyLeave", "modalCardWfh"].forEach(id => {
     const el = document.getElementById(id);
-    if (el && id !== modalId) {
-      el.classList.remove("open");
-      el.setAttribute("aria-hidden", "true");
+    if (el && id !== modalId && el.classList.contains("open")) {
+      closeActionCard(id);
     }
   });
 
   const target = document.getElementById(modalId);
-  if (target) {
+  if (target && !target.classList.contains("open")) {
+    trapFocusActivate(target);
     target.classList.add("open");
     target.setAttribute("aria-hidden", "false");
   }
@@ -1732,9 +1835,10 @@ function openActionCard(modalId) {
 
 function closeActionCard(modalId) {
   const target = document.getElementById(modalId);
-  if (target) {
+  if (target && target.classList.contains("open")) {
     target.classList.remove("open");
     target.setAttribute("aria-hidden", "true");
+    trapFocusRelease(target);
   }
 }
 
@@ -1765,12 +1869,7 @@ function initActionHubToggles() {
     }
   });
 
-  // ESC key dismisses active card
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") {
-      ["modalCardMarkPresent", "modalCardApplyLeave", "modalCardWfh"].forEach(id => closeActionCard(id));
-    }
-  });
+  // ESC key handling is centralized in the modal accessibility manager above
 }
 
 // ============================================================================
@@ -1846,7 +1945,7 @@ function renderWfhBox() {
   const countBadge = document.getElementById("myWfhCountBadge");
 
   if (countBadge) {
-    countBadge.textContent = `${empWfh.length} Request${empWfh.length === 1 ? '' : 's'}`;
+    countBadge.textContent = empWfh.length === 0 ? "No pending requests" : `${empWfh.length} Request${empWfh.length === 1 ? '' : 's'}`;
   }
 
   if (listEl) {
@@ -1855,7 +1954,7 @@ function renderWfhBox() {
       listEl.innerHTML = `
         <div class="my-leaves-empty" style="text-align: center; padding: 1rem; color: var(--text-muted);">
           <i class="fa-solid fa-house-laptop text-muted"></i>
-          <span>No WFH requests submitted yet.</span>
+          <span>No WFH days booked &mdash; enjoy the office! Book remote days under the 2-day/week policy.</span>
         </div>
       `;
     } else {
@@ -2373,7 +2472,7 @@ function renderMyRegularisationsList() {
   if (!container) return;
 
   if (countBadge) {
-    countBadge.textContent = `${myRegs.length} Request${myRegs.length === 1 ? '' : 's'}`;
+    countBadge.textContent = myRegs.length === 0 ? "Nothing to regularise" : `${myRegs.length} Request${myRegs.length === 1 ? '' : 's'}`;
   }
 
   container.innerHTML = "";
@@ -2382,7 +2481,7 @@ function renderMyRegularisationsList() {
     container.innerHTML = `
       <div class="my-leaves-empty" style="text-align: center; padding: 1rem; color: var(--text-muted);">
         <i class="fa-solid fa-clipboard-check text-muted"></i>
-        <span>No regularisation requests submitted yet.</span>
+        <span>All clear &mdash; no regularisation requests. Missed punches you raise will appear here.</span>
       </div>
     `;
     return;
