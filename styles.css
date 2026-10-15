@@ -7625,6 +7625,202 @@ body.admin-page.light-theme .admin-split-grid > .glass-panel {
   }
 }
 
+/* ==========================================================================
+   EMPLOYEE PORTAL — same shell identity extended to index.html + login
+   ========================================================================== */
+
+/* --- Warm canvas + header for any page using the shell --- */
+body.light-theme .admin-main-col {
+  background: #f6f3ec;
+}
+
+body:not(.light-theme) .admin-main-col {
+  background: var(--bg-primary);
+}
+
+.admin-shell .navbar {
+  padding: 0.9rem 1.75rem;
+  gap: 1.5rem;
+  position: sticky;
+  top: 0;
+  z-index: 15;
+  border-bottom: 1px solid rgba(23, 34, 28, 0.09);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+body.light-theme .admin-shell .navbar {
+  background: rgba(246, 243, 236, 0.88);
+}
+
+body:not(.light-theme) .admin-shell .navbar {
+  background: rgba(16, 20, 24, 0.82);
+  border-bottom-color: var(--border-glass);
+}
+
+body:not(.light-theme) .admin-page-heading h2 {
+  color: var(--text-main);
+}
+
+body:not(.light-theme) .admin-view-sub {
+  color: var(--text-muted);
+}
+
+/* Policy chips strip sits flat on the canvas */
+.portal-shell .sub-bar {
+  background: transparent;
+  border-bottom: none;
+  padding: 0.55rem 1.75rem;
+}
+
+body.light-theme .portal-shell .sub-bar {
+  background: transparent;
+  border-bottom: none;
+}
+
+/* --- Sidebar section links (portal) --- */
+.portal-side-nav {
+  display: flex;
+  flex-direction: column;
+}
+
+.portal-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.68rem 0.85rem;
+  margin-bottom: 0.3rem;
+  border-radius: 10px;
+  color: #c6d1cb;
+  font-size: 0.84rem;
+  font-weight: 600;
+  text-decoration: none;
+  position: relative;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.portal-nav-link i {
+  width: 18px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.5);
+  transition: color 0.18s ease;
+}
+
+.portal-nav-link:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+}
+
+.portal-nav-link.active {
+  background: rgba(255, 255, 255, 0.11);
+  color: #ffffff;
+}
+
+.portal-nav-link.active i {
+  color: #e3b341;
+}
+
+.portal-nav-link.active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 22%;
+  bottom: 22%;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: #e3b341;
+}
+
+/* --- Cards on the warm canvas (calendar, regularisation, trackers) --- */
+body.light-theme .portal-shell .glass-panel {
+  background: #fffdf9;
+  border-color: #eae5d9;
+  box-shadow: 0 1px 3px rgba(23, 34, 28, 0.05);
+}
+
+body.light-theme .portal-shell .my-leaves-tracker-box {
+  background: #ffffff;
+  border-color: #eae5d9;
+}
+
+body.light-theme .portal-shell .today-metrics-strip,
+body.light-theme .portal-shell .snapshot-preview-card {
+  background: #faf8f2;
+  border-color: #eae5d9;
+}
+
+/* --- Login screen: warm canvas, dark-green primary action --- */
+body.light-theme .auth-screen-overlay {
+  background:
+    radial-gradient(circle at 18% 12%, rgba(53, 66, 61, 0.07), transparent 42%),
+    radial-gradient(circle at 84% 82%, rgba(209, 88, 10, 0.06), transparent 46%),
+    #f6f3ec;
+}
+
+body.light-theme .auth-card {
+  background: #ffffff;
+  border: 1px solid #eae5d9;
+  box-shadow: 0 24px 60px -20px rgba(23, 34, 28, 0.22);
+}
+
+body.light-theme .auth-card::before {
+  background: #35423d;
+}
+
+.auth-card .btn-primary {
+  background: #35423d;
+  border-color: #35423d;
+  color: #ffffff;
+}
+
+.auth-card .btn-primary:hover {
+  background: #2b3733;
+  border-color: #2b3733;
+}
+
+body:not(.light-theme) .auth-screen-overlay {
+  background:
+    radial-gradient(circle at 18% 12%, rgba(227, 179, 65, 0.05), transparent 42%),
+    rgba(10, 14, 20, 0.86);
+}
+
+/* Allow scrolling to the full card on short viewports (no clipped top) */
+.auth-screen-overlay {
+  overflow-y: auto;
+}
+
+.auth-card {
+  margin: auto;
+  flex-shrink: 0;
+}
+
+/* --- Mobile: sidebar becomes a compact horizontal top rail --- */
+@media (max-width: 900px) {
+  .portal-side-nav {
+    flex-direction: row;
+    overflow-x: auto;
+    padding: 0.2rem 0.85rem 0.8rem;
+  }
+  .portal-nav-link {
+    width: auto;
+    white-space: nowrap;
+    margin-bottom: 0;
+    margin-right: 0.3rem;
+  }
+  .portal-nav-link.active::before {
+    left: 0.6rem;
+    right: 0.6rem;
+    top: auto;
+    bottom: 2px;
+    width: auto;
+    height: 3px;
+    border-radius: 3px;
+  }
+  .sidebar-footer {
+    padding-top: 0.6rem;
+  }
+}
+
 
 
 

@@ -2633,13 +2633,67 @@ function initAttendanceRegularisation() {
 }
 
 // ============================================================================
-// 9. BOOTSTRAP
+// 9. PORTAL SIDEBAR SECTION NAV (smooth scroll + scroll spy + header title)
+// ============================================================================
+
+function initPortalSideNav() {
+  const links = Array.from(document.querySelectorAll(".portal-nav-link"));
+  if (!links.length) return;
+
+  const VIEW_META = {
+    portalTop: ["Attendance", "Your day at a glance \u2022 punch in, leave & WFH"],
+    sectionActions: ["Today\u2019s Actions", "Punch in, apply for leave or book a WFH day"],
+    sectionCalendar: ["Monthly Calendar", "Attendance history with status legend & day details"],
+    sectionAttendanceRegularisation: ["Regularisation", "Raise a missed punch with a reason for approval"]
+  };
+
+  const titleEl = document.getElementById("portalViewTitle");
+  const subEl = document.getElementById("portalViewSub");
+
+  function setActive(id) {
+    links.forEach(l => l.classList.toggle("active", l.dataset.target === id));
+    const meta = VIEW_META[id];
+    if (meta && titleEl && subEl) {
+      titleEl.textContent = meta[0];
+      subEl.textContent = meta[1];
+    }
+  }
+
+  links.forEach(link => {
+    link.addEventListener("click", (e) => {
+      e.preventDefault();
+      const target = document.getElementById(link.dataset.target);
+      if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+      setActive(link.dataset.target);
+    });
+  });
+
+  const sectionIds = links.map(l => l.dataset.target);
+  let ticking = false;
+  window.addEventListener("scroll", () => {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(() => {
+      ticking = false;
+      let currentId = sectionIds[0];
+      sectionIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (el && el.getBoundingClientRect().top <= 150) currentId = id;
+      });
+      setActive(currentId);
+    });
+  }, { passive: true });
+}
+
+// ============================================================================
+// 10. BOOTSTRAP
 // ============================================================================
 
 window.addEventListener("DOMContentLoaded", () => {
   try { initClock(); } catch (e) { console.error("Error in initClock:", e); }
   try { initTheme(); } catch (e) { console.error("Error in initTheme:", e); }
   try { initAuthSystem(); } catch (e) { console.error("Error in initAuthSystem:", e); }
+  try { initPortalSideNav(); } catch (e) { console.error("Error in initPortalSideNav:", e); }
   try { initActionHubToggles(); } catch (e) { console.error("Error in initActionHubToggles:", e); }
   try { initCalendarNav(); } catch (e) { console.error("Error in initCalendarNav:", e); }
   try { initLeaveBox(); } catch (e) { console.error("Error in initLeaveBox:", e); }

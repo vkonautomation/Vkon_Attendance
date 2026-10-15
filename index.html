@@ -21,7 +21,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="styles.css?v=20261015_admin">
+  <link rel="stylesheet" href="styles.css?v=20261015_portal2">
 </head>
 <body class="light-theme">
   
@@ -93,20 +93,56 @@
     </div>
   </div>
 
-  <!-- ================= MAIN APP WRAPPER ================= -->
-  <div class="app-wrapper" id="mainAppWrapper" style="display: none;">
+  <!-- ================= MAIN APP WRAPPER (sidebar shell, matches Admin Console) ================= -->
+  <div class="app-wrapper admin-shell portal-shell" id="mainAppWrapper" style="display: none;">
     
-    <!-- Top Navigation Bar (NO employee switcher dropdown, NO admin portal link) -->
-    <header class="navbar">
-      <div class="nav-brand">
+    <!-- ================= DARK SIDEBAR ================= -->
+    <aside class="admin-sidebar">
+      <div class="sidebar-brand">
         <div class="brand-logo-wrap">
-          <img src="assets/vkon-logo-dark.png" alt="Vkon Automation" class="vkon-brand-logo-nav vkon-logo-dark">
-          <img src="assets/vkon-logo-light.png" alt="Vkon Automation" class="vkon-brand-logo-nav vkon-logo-light">
+          <img src="assets/vkon-favicon.png" alt="Vkon Automation" class="sidebar-logo-img">
         </div>
         <div class="brand-text">
           <h1>VKON</h1>
           <span class="badge-sub"><span class="label-tech">Attendance Portal</span></span>
         </div>
+      </div>
+
+      <nav class="admin-side-nav portal-side-nav" aria-label="Portal sections">
+        <span class="side-nav-label">Menu</span>
+        <a href="#portalTop" class="portal-nav-link active" data-target="portalTop">
+          <i class="fa-solid fa-gauge-high"></i> Dashboard
+        </a>
+        <a href="#sectionActions" class="portal-nav-link" data-target="sectionActions">
+          <i class="fa-solid fa-bolt"></i> Today&rsquo;s Actions
+        </a>
+        <a href="#sectionCalendar" class="portal-nav-link" data-target="sectionCalendar">
+          <i class="fa-solid fa-calendar-days"></i> Monthly Calendar
+        </a>
+        <a href="#sectionAttendanceRegularisation" class="portal-nav-link" data-target="sectionAttendanceRegularisation">
+          <i class="fa-solid fa-clipboard-check"></i> Regularisation
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <!-- Theme Toggle -->
+        <button id="themeToggleBtn" class="icon-btn theme-toggle-btn sidebar-tool-btn" title="Toggle Theme" aria-label="Toggle Theme">
+          <i class="fa-solid fa-moon theme-toggle-icon" id="themeIcon"></i>
+        </button>
+
+        <!-- Logout Button -->
+        <button id="logoutBtn" class="btn btn-ghost btn-sm sidebar-logout-btn" title="Logout" aria-label="Logout">
+          <i class="fa-solid fa-right-from-bracket"></i> Log out
+        </button>
+      </div>
+    </aside>
+
+    <!-- ================= MAIN COLUMN ================= -->
+    <div class="admin-main-col">
+    <header class="navbar portal-navbar">
+      <div class="admin-page-heading">
+        <h2 id="portalViewTitle">Attendance</h2>
+        <p class="admin-view-sub" id="portalViewSub">Your day at a glance &bull; punch in, leave &amp; WFH</p>
       </div>
 
       <!-- Realtime Clock Widget -->
@@ -115,7 +151,7 @@
         <div class="clock-date" id="clockDate">Loading date...</div>
       </div>
 
-      <!-- User Profile & Action Tools -->
+      <!-- User Profile -->
       <div class="nav-controls">
         <!-- Logged-in Employee Display (Only changes upon true login) -->
         <div class="employee-chip" id="employeeChip">
@@ -125,16 +161,6 @@
             <span class="chip-role" id="currentEmpRole">Senior Full-Stack Engineer</span>
           </div>
         </div>
-
-        <!-- Theme Toggle -->
-        <button id="themeToggleBtn" class="icon-btn theme-toggle-btn" title="Toggle Theme" aria-label="Toggle Theme">
-          <i class="fa-solid fa-moon theme-toggle-icon" id="themeIcon"></i>
-        </button>
-
-        <!-- Logout Button -->
-        <button id="logoutBtn" class="btn btn-ghost btn-sm text-danger" title="Logout" aria-label="Logout">
-          <i class="fa-solid fa-right-from-bracket"></i> Logout
-        </button>
       </div>
     </header>
 
@@ -149,10 +175,10 @@
     </div>
 
     <!-- Main Content: Single Unified Window -->
-    <main class="main-content">
+    <main class="main-content" id="portalTop">
       
       <!-- ================= TOP SECTION: EMPLOYEE ACTION HUB (BEFORE CALENDAR) ================= -->
-      <section class="employee-action-hub">
+      <section class="employee-action-hub" id="sectionActions">
         
         <div class="action-hub-heading">
           <h2><i class="fa-solid fa-bolt"></i> Today&rsquo;s Actions</h2>
@@ -481,7 +507,7 @@
       </div>
       
       <!-- ================= SECTION 1: MONTHLY CALENDAR ================= -->
-      <section class="calendar-section glass-panel">
+      <section class="calendar-section glass-panel" id="sectionCalendar">
         
         <!-- Calendar Header Toolbar -->
         <div class="calendar-toolbar">
@@ -670,7 +696,8 @@
         <span class="footer-meta">Policies: Personal Leave &bull; Restricted Leave &bull; WFH with Admin Approval &bull; Attendance Regularisation</span>
       </div>
     </footer>
-  </div>
+    </div><!-- /.admin-main-col -->
+  </div><!-- /.admin-shell -->
 
   <!-- ================= ON-DEMAND CAMERA PHOTO CAPTURE MODAL (NO FACE VERIFICATION) ================= -->
   <div class="modal-backdrop" id="punchVerificationModal" role="dialog" aria-modal="true" aria-hidden="true">
@@ -850,7 +877,7 @@
 
   <!-- Shared Engine & App Controller -->
   <script src="shared.js?v=20261013_ist"></script>
-  <script src="app.js?v=20261013_ist"></script>
+  <script src="app.js?v=20261015_portal"></script>
 
   <!-- Present Day & Migration Guarantee -->
   <script>
