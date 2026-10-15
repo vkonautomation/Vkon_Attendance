@@ -7196,9 +7196,10 @@ body.admin-page:not(.light-theme) .admin-main-col {
 /* --- Sidebar brand --- */
 .sidebar-brand {
   display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 1.35rem 1.25rem 1.1rem;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.55rem;
+  padding: 1.25rem 1.25rem 1.1rem;
 }
 
 .sidebar-logo-img {
@@ -7208,6 +7209,32 @@ body.admin-page:not(.light-theme) .admin-main-col {
   object-fit: contain;
   background: #ffffff;
   padding: 3px;
+}
+
+/* Vkon Automation wordmark in the sidebar brand (theme-aware). */
+.sidebar-brand .brand-logo-wrap {
+  justify-content: flex-start;
+  width: 100%;
+}
+.sidebar-wordmark {
+  height: 34px;
+  width: auto;
+  max-width: 100%;
+}
+/* The sidebar surface stays dark in both themes, so in light theme the
+   black wordmark sits on a small white plate to remain legible. */
+body.light-theme .sidebar-brand .brand-logo-wrap {
+  width: auto;
+  background: #ffffff;
+  border-radius: 10px;
+  padding: 5px 10px;
+}
+body.light-theme .sidebar-wordmark {
+  height: 26px;
+}
+
+.sidebar-brand .brand-text {
+  line-height: 1.1;
 }
 
 .sidebar-brand .brand-text h1 {
@@ -8702,8 +8729,18 @@ body:not(.light-theme) .portal-burger-btn {
 @media (max-width: 900px) {
   .portal-shell .sidebar-brand {
     display: flex;
+    flex-direction: row;
     align-items: center;
     gap: 0.7rem;
+  }
+  .portal-shell .sidebar-brand .brand-text {
+    display: none;
+  }
+  body.light-theme .portal-shell .sidebar-brand .brand-logo-wrap {
+    padding: 4px 8px;
+  }
+  .portal-shell .sidebar-wordmark {
+    height: 28px;
   }
   .portal-drawer-close {
     display: inline-flex;
