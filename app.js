@@ -347,6 +347,27 @@ function renderMonthlyCalendar() {
   const holidayMap = {};
   holidays.forEach(h => { holidayMap[h.date] = h; });
 
+  // Dates with a submitted regularisation request awaiting admin review
+  const regPendingMap = {};
+  try {
+    getStore(STORAGE_KEYS.REGULARISATIONS, [])
+      .filter(r => employeeState.currentEmployee && r.employeeId === employeeState.currentEmployee.id && r.status === "Pending")
+      .forEach(r => { regPendingMap[r.date] = r; });
+  } catch (e) { console.warn("reg pending map err:", e); }
+
+  // "9h 05m" style worked-hours label from a punch record
+  const fmtHoursLabel = (dec) => `${Math.floor(dec)}h ${String(Math.round((dec - Math.floor(dec)) * 60)).padStart(2, "0")}m`;
+  const workedMeta = (record) => {
+    const dec = Number(record.hoursDecimal);
+    const hrs = (dec > 0) ? fmtHoursLabel(dec) : null;
+    const inT = record.checkInTime && record.checkInTime !== "-" ? record.checkInTime : null;
+    const outT = record.checkOutTime && record.checkOutTime !== "-" ? record.checkOutTime : null;
+    const span = inT && outT ? `${inT} \u2192 ${outT}` : (inT ? `${inT} \u2192 \u2014` : null);
+    if (hrs && span) return `<span class="day-meta-text"><span class="meta-hours">${hrs}</span> &bull; ${span}</span>`;
+    if (hrs) return `<span class="day-meta-text"><span class="meta-hours">${hrs}</span></span>`;
+    return `<span class="day-meta-text">${span || (inT || "Remote")}</span>`;
+  };
+
   // todayKey = formatDateKey(new Date())
   const todayDateObj = (typeof getPresentDate === "function") ? getPresentDate() : new Date();
   const todayKey = formatDateKey(todayDateObj);
@@ -401,9 +422,10 @@ function renderMonthlyCalendar() {
     let badgeHtml = "";
 
     if (declaredHoliday) {
+      const shortName = String(declaredHoliday.name).split(/\s+/)[0];
       badgeHtml = `
         <span class="day-badge-pill badge-holiday-day" title="${declaredHoliday.name}">
-          <i class="fa-solid fa-star"></i> <span class="pill-text">${declaredHoliday.name}</span>
+          <i class="fa-solid fa-star"></i> <span class="pill-text">${shortName}</span>
         </span>
       `;
     } else if (isWeekend) {
@@ -414,13 +436,13 @@ function renderMonthlyCalendar() {
           countPresent++;
           badgeHtml = `
             <span class="day-badge-pill badge-present"><i class="fa-solid fa-circle-check"></i> Present</span>
-            <span class="day-meta-text">${record.checkInTime}</span>
+            ${workedMeta(record)}
           `;
         } else if (record.status === "WFH") {
           countWfh++;
           badgeHtml = `
             <span class="day-badge-pill badge-wfh-day"><i class="fa-solid fa-house-laptop"></i> WFH</span>
-            <span class="day-meta-text">${record.checkInTime || "Remote"}</span>
+            ${workedMeta(record)}
           `;
         } else if (record.status === "Holiday" || record.status === "Leave") {
           countLeave++;
@@ -447,12 +469,20 @@ function renderMonthlyCalendar() {
         nowZero.setHours(0, 0, 0, 0);
 
         if (dayDate < nowZero && !isWeekend && !isBeforeEnrollment) {
-          // No punch, no leave, no WFH — this is NOT an absence, it needs regularisation
-          countNotMarked++;
-          badgeHtml = `
-            <span class="day-badge-pill badge-notmarked" title="No record for this working day &mdash; raise a regularisation if you were working"><i class="fa-solid fa-circle-question"></i> Not Marked</span>
-            <button type="button" class="cell-reg-quick" data-reg-date="${dateStr}" title="Request regularisation for ${dateStr}"><i class="fa-solid fa-wand-magic-sparkles"></i> Regularise</button>
-          `;
+          if (regPendingMap[dateStr]) {
+            // Request submitted & awaiting admin review — not a plain "Not Marked"
+            badgeHtml = `
+              <span class="day-badge-pill badge-regpending" title="Regularisation ${regPendingMap[dateStr].id} submitted &mdash; awaiting admin review"><i class="fa-solid fa-hourglass-half"></i> Reg. Pending</span>
+              <button type="button" class="cell-reg-view" data-reg-date="${dateStr}" title="View your regularisation request for ${dateStr}"><i class="fa-solid fa-eye"></i> View request</button>
+            `;
+          } else {
+            // No punch, no leave, no WFH, no pending request — needs regularisation
+            countNotMarked++;
+            badgeHtml = `
+              <span class="day-badge-pill badge-notmarked" title="Day closed with no record and no leave &mdash; raise a regularisation if you were working"><i class="fa-solid fa-circle-question"></i> Not Marked</span>
+              <button type="button" class="cell-reg-quick" data-reg-date="${dateStr}" title="Request regularisation for ${dateStr}"><i class="fa-solid fa-wand-magic-sparkles"></i> Regularise</button>
+            `;
+          }
         } else if (isToday && !declaredHoliday && !isWeekend) {
           badgeHtml = `
             <span class="day-badge-pill badge-today-active"><i class="fa-solid fa-clock"></i> Today (Active)</span>
@@ -480,6 +510,13 @@ function renderMonthlyCalendar() {
       btn.addEventListener("click", (e) => {
         e.stopPropagation();
         quickRegulariseDate(btn.dataset.regDate);
+      });
+    });
+
+    cell.querySelectorAll(".cell-reg-view").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        openRegularisationForDate(btn.dataset.regDate, true);
       });
     });
 
@@ -679,10 +716,10 @@ function renderLeaveBox() {
   const headerRhQuota = document.getElementById("headerRhQuota");
 
   if (personalRemainEl) personalRemainEl.textContent = personalRemaining;
-  if (headerLeaveQuota) headerLeaveQuota.textContent = `${personalUsed} used \u00b7 ${personalRemaining} left`;
+  if (headerLeaveQuota) headerLeaveQuota.textContent = `${personalRemaining} left of ${quota.personalLeave}`;
   if (rhUsedEl) rhUsedEl.textContent = rhUsed;
   if (rhRemainEl) rhRemainEl.textContent = rhRemaining;
-  if (headerRhQuota) headerRhQuota.textContent = `${rhUsed} used \u00b7 ${rhRemaining} left /mo`;
+  if (headerRhQuota) headerRhQuota.textContent = `${rhRemaining} left of ${quota.restrictedLeave} /mo`;
 
   renderMyLeavesStatusList();
 }
@@ -1912,9 +1949,9 @@ function renderWfhBox() {
   const statusText = document.getElementById("wfhStatusText");
   const headerWfhQuota = document.getElementById("headerWfhQuota");
 
-  if (counterEl) counterEl.textContent = `${approvedThisWeek} used \u00b7 ${Math.max(WEEKLY_WFH_ALLOWANCE - approvedThisWeek, 0)} left`;
+  if (counterEl) counterEl.textContent = `${approvedThisWeek} of ${WEEKLY_WFH_ALLOWANCE} used this week`;
   if (barEl) barEl.style.width = `${(approvedThisWeek / WEEKLY_WFH_ALLOWANCE) * 100}%`;
-  if (headerWfhQuota) headerWfhQuota.textContent = `${activeThisWeek} used \u00b7 ${Math.max(WEEKLY_WFH_ALLOWANCE - activeThisWeek, 0)} left /wk`;
+  if (headerWfhQuota) headerWfhQuota.textContent = `${activeThisWeek} of ${WEEKLY_WFH_ALLOWANCE} used this week`;
 
   if (statusText) {
     if (activeThisWeek >= WEEKLY_WFH_ALLOWANCE) {
@@ -2491,6 +2528,21 @@ function quickRegulariseDate(dateStr) {
   if (form) form.scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
+// Jump to the Regularisation view and highlight the existing request for a date.
+function openRegularisationForDate(dateStr) {
+  if (!dateStr) return;
+  if (window.__portalSwitchView) window.__portalSwitchView("regularisation");
+  const list = document.getElementById("myRegularisationsList");
+  if (!list) return;
+  const card = list.querySelector(`.leave-request-card[data-reg-date="${dateStr}"]`);
+  const target = card || list;
+  target.scrollIntoView({ behavior: "smooth", block: "center" });
+  if (card) {
+    card.classList.add("reg-card-flash");
+    setTimeout(() => card.classList.remove("reg-card-flash"), 2200);
+  }
+}
+
 function renderMyRegularisationsList() {
   if (!employeeState.currentEmployee) return;
   const empId = employeeState.currentEmployee.id;
@@ -2523,6 +2575,7 @@ function renderMyRegularisationsList() {
   myRegs.slice().reverse().forEach(req => {
     const card = document.createElement("div");
     card.className = "leave-request-card";
+    card.dataset.regDate = req.date;
 
     let statusClass = "status-badge-pending";
     let statusIcon = "fa-clock";
@@ -2582,6 +2635,7 @@ function renderMyRegularisationsList() {
         target.status = "Cancelled";
         setStore(STORAGE_KEYS.REGULARISATIONS, regs);
         renderMyRegularisationsList();
+        try { renderMonthlyCalendar(); } catch (e) { console.error(e); }
         showToast("Attendance regularisation request cancelled.", "info");
       }
     });
@@ -2661,6 +2715,7 @@ function initAttendanceRegularisation() {
 
     if (reasonInput) reasonInput.value = "";
     renderMyRegularisationsList();
+    try { renderMonthlyCalendar(); } catch (e) { console.error(e); }
     showToast(`Attendance Regularisation request for ${dateVal} submitted to Admin!`, "success");
   });
 }

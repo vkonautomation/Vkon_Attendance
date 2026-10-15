@@ -240,6 +240,9 @@ function renderMonthlyReport() {
   const employees = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
   const records = getStore(STORAGE_KEYS.RECORDS, {});
   const leaves = getStore(STORAGE_KEYS.LEAVES, []);
+  const holidays = getStore(STORAGE_KEYS.HOLIDAYS, DEFAULT_HOLIDAYS);
+  const holidaySet = new Set(holidays.map(h => h.date));
+  const nowZero = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
   const tableBody = document.getElementById("masterReportTableBody");
   tableBody.innerHTML = "";
@@ -272,6 +275,7 @@ function renderMonthlyReport() {
     let wfhCount = 0;
     let leaveCount = 0;
     let empTotalHours = 0;
+    let expectedUpToYesterday = 0;
 
     const empEnrolledDate = emp.enrolledAt ? new Date(emp.enrolledAt + "T00:00:00") : null;
     let empWorkingDaysElapsed = 0;
@@ -288,6 +292,13 @@ function renderMonthlyReport() {
       const dateStr = formatDateKey(dateObj);
       const rec = records[`${emp.id}_${dateStr}`];
 
+      // "Expected" = a completed working day the employee was scheduled to be in
+      // (not a weekend, not a declared holiday, not an approved leave/RH day).
+      const onLeave = rec && (rec.status === "Leave" || rec.status === "Holiday");
+      if (dateObj < nowZero && !holidaySet.has(dateStr) && !onLeave) {
+        expectedUpToYesterday++;
+      }
+
       if (rec) {
         if (rec.status === "Present") {
           presentCount++;
@@ -302,7 +313,6 @@ function renderMonthlyReport() {
         }
       } else {
         // Past working day with NO record: not an absence — it needs regularisation
-        const nowZero = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         if (dateObj < nowZero) {
           unmarkedCount++;
         }
@@ -313,10 +323,10 @@ function renderMonthlyReport() {
     const attended = presentCount + wfhCount;
     totalAttendedCount += attended;
 
-    // Attendance % is computed over TRACKED days only (present + marked absent), so a
-    // day nobody ever marked can't masquerade as an absence and tank the rate.
-    const trackedDays = attended + absentCount;
-    const rate = trackedDays > 0 ? Math.round((attended / trackedDays) * 100) : null;
+    // To-date attendance rate = (Present + WFH) \u00f7 expected working days, up to yesterday.
+    // Unmarked days sit in the denominator (they are expected-but-unmarked), which is why
+    // the separate "Not Marked" column exists so payroll never mistakes them for absences.
+    const rate = expectedUpToYesterday > 0 ? Math.round((attended / expectedUpToYesterday) * 100) : null;
     if (rate !== null) {
       companyRateSum += rate;
       companyRateCount++;
@@ -370,6 +380,11 @@ function renderMonthlyReport() {
     const leaveCellFormatted = `${annualLeavesTaken} / ${totalLeaveQuota}`;
 
     const tr = document.createElement("tr");
+    tr.className = "master-row-clickable";
+    tr.setAttribute("data-emp-id", emp.id);
+    tr.setAttribute("tabindex", "0");
+    tr.setAttribute("role", "button");
+    tr.setAttribute("aria-label", `Open ${emp.name}'s calendar`);
     tr.setAttribute("data-name", emp.name.toLowerCase());
     tr.setAttribute("data-dept", emp.department.toLowerCase());
     tr.setAttribute("data-rate", String(rate === null ? -1 : rate));
@@ -393,14 +408,16 @@ function renderMonthlyReport() {
       <td><span class="type-cell">${typeLabel}</span></td>
       <td><span class="today-pill ${pillClass}">${pillLabel}</span></td>
       <td><span class="text-success font-bold">${presentCount} Days</span></td>
-      <td>
-        <span class="text-danger font-bold">${absentCount} Days</span>
-        ${unmarkedCount > 0 ? `<span class="unmarked-note" title="${unmarkedCount} past working day(s) with no punch or request &mdash; needs regularisation, not counted as Absent">+${unmarkedCount} not marked</span>` : ""}
-      </td>
+      <td><span class="text-danger font-bold">${absentCount} Days</span></td>
+      <td><span class="unmarked-cell${unmarkedCount > 0 ? " has-unmarked" : ""}" title="${unmarkedCount} past working day(s) with no punch or request \u2014 needs regularisation, NOT counted as Absent">${unmarkedCount} Days</span></td>
       <td><span class="text-primary font-bold">${wfhCount} Days</span></td>
       <td><span class="day-badge-pill badge-neutral font-mono font-bold" title="Annual Leaves Taken / Total Leave Quota">${leaveCellFormatted}</span></td>
       <td class="font-mono">${empTotalHours.toFixed(1)} hrs</td>
     `;
+    tr.addEventListener("click", () => openEmpCalendar(emp.id));
+    tr.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openEmpCalendar(emp.id); }
+    });
     tableBody.appendChild(tr);
   });
 
@@ -413,8 +430,15 @@ function renderMonthlyReport() {
 
   const totalPossible = workingDaysElapsed * employees.length;
   const avgAttendance = companyRateCount > 0 ? Math.round(companyRateSum / companyRateCount) : 100;
+  const rateMonth = now.toLocaleDateString("en-US", { timeZone: "Asia/Kolkata", month: "short" });
+  const throughDay = Math.max(todayDay - 1, 0);
+  const rateLabelEl = document.getElementById("kpiAvgAttLabel");
   document.getElementById("kpiAvgAttendance").textContent = `${Math.min(avgAttendance, 100)}%`;
-  document.getElementById("kpiAvgAttLabel").textContent = `To-Date Rate (Oct 1-${todayDay} \u2022 tracked days only)`;
+  if (rateLabelEl) {
+    rateLabelEl.textContent = `To-Date Rate \u00b7 through ${rateMonth} ${throughDay}`;
+    const rateCard = rateLabelEl.closest(".kpi-card");
+    if (rateCard) rateCard.setAttribute("title", "(Present + WFH) \u00f7 expected days, up to yesterday");
+  }
 
   renderKpiDeltas(now, employees, records);
   renderAdminWeekStrip();
@@ -2143,6 +2167,155 @@ function initPhotoLightboxModal() {
 }
 
 // ============================================================================
+// EMPLOYEE CALENDAR MODAL (opened by clicking a master-sheet row)
+// ============================================================================
+const empCalState = { empId: null, viewDate: null };
+
+function openEmpCalendar(empId) {
+  const employees = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
+  const emp = employees.find(e => e.id === empId);
+  if (!emp) return;
+  const now = (typeof getPresentDate === "function") ? getPresentDate() : new Date();
+  empCalState.empId = empId;
+  if (!empCalState.viewDate) empCalState.viewDate = new Date(now.getFullYear(), now.getMonth(), 1);
+  const modal = document.getElementById("empCalendarModal");
+  document.getElementById("empCalTitle").textContent = `${emp.name}'s Calendar`;
+  document.getElementById("empCalSub").textContent = `${emp.id} \u2022 ${emp.department}`;
+  renderEmpCalendar();
+  if (modal) modal.classList.add("open");
+}
+
+function closeEmpCalendar() {
+  const modal = document.getElementById("empCalendarModal");
+  if (modal) modal.classList.remove("open");
+}
+
+function renderEmpCalendar() {
+  const grid = document.getElementById("empCalGrid");
+  const monthEl = document.getElementById("empCalMonth");
+  const summaryEl = document.getElementById("empCalSummary");
+  if (!grid || !empCalState.empId) return;
+
+  const now = (typeof getPresentDate === "function") ? getPresentDate() : new Date();
+  const nowZero = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const year = empCalState.viewDate.getFullYear();
+  const month = empCalState.viewDate.getMonth();
+  const monthNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  monthEl.textContent = `${monthNames[month]} ${year}`;
+
+  const records = getStore(STORAGE_KEYS.RECORDS, {});
+  const holidays = getStore(STORAGE_KEYS.HOLIDAYS, DEFAULT_HOLIDAYS);
+  const holidayMap = {};
+  holidays.forEach(h => { holidayMap[h.date] = h; });
+  const regPending = {};
+  try {
+    getStore(STORAGE_KEYS.REGULARISATIONS, [])
+      .filter(r => r.employeeId === empCalState.empId && r.status === "Pending")
+      .forEach(r => { regPending[r.date] = r; });
+  } catch (e) { /* ignore */ }
+
+  const employees = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
+  const emp = employees.find(e => e.id === empCalState.empId);
+  const empEnrolledDate = emp && emp.enrolledAt ? new Date(emp.enrolledAt + "T00:00:00") : null;
+  const todayKey = formatDateKey(now);
+
+  grid.innerHTML = "";
+  const firstDayIndex = new Date(year, month, 1).getDay();
+  const totalDays = new Date(year, month + 1, 0).getDate();
+  const prevTotal = new Date(year, month, 0).getDate();
+
+  for (let i = firstDayIndex - 1; i >= 0; i--) {
+    const cell = document.createElement("div");
+    cell.className = "calendar-day-cell other-month";
+    cell.innerHTML = `<div class="cell-top-row"><span class="day-number">${prevTotal - i}</span></div>`;
+    grid.appendChild(cell);
+  }
+
+  let s = { present: 0, wfh: 0, leave: 0, absent: 0, notmarked: 0 };
+  for (let d = 1; d <= totalDays; d++) {
+    const dateObj = new Date(year, month, d);
+    const dateStr = formatDateKey(dateObj);
+    const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
+    const isToday = dateStr === todayKey;
+    const declaredHoliday = holidayMap[dateStr];
+    const rec = records[`${empCalState.empId}_${dateStr}`];
+
+    let badge = "";
+    let cellClass = "calendar-day-cell";
+    if (isToday) cellClass += " is-today";
+
+    if (declaredHoliday) {
+      badge = `<span class="day-badge-pill badge-holiday-day" title="${declaredHoliday.name}"><i class="fa-solid fa-star"></i> ${String(declaredHoliday.name).split(/\s+/)[0]}</span>`;
+    } else if (isWeekend) {
+      badge = `<span class="day-badge-pill badge-weekend-day"><i class="fa-solid fa-mug-hot"></i> Weekend</span>`;
+    } else if (rec) {
+      if (rec.status === "Present") {
+        s.present++;
+        badge = `<span class="day-badge-pill badge-present"><i class="fa-solid fa-circle-check"></i> Present</span>`;
+      } else if (rec.status === "WFH") {
+        s.wfh++;
+        badge = `<span class="day-badge-pill badge-wfh-day"><i class="fa-solid fa-house-laptop"></i> WFH</span>`;
+      } else if (rec.status === "Holiday" || rec.status === "Leave") {
+        s.leave++;
+        const isRh = rec.locationType && rec.locationType.includes("RH");
+        badge = `<span class="day-badge-pill ${isRh ? 'badge-rh-day' : 'badge-leave-day'}"><i class="fa-solid ${isRh ? 'fa-calendar-check' : 'fa-umbrella-beach'}"></i> ${isRh ? 'RH' : 'Leave'}</span>`;
+      } else if (rec.status === "Absent") {
+        s.absent++;
+        badge = `<span class="day-badge-pill badge-absent-day"><i class="fa-solid fa-circle-xmark"></i> Absent</span>`;
+      }
+    } else {
+      const beforeEnroll = empEnrolledDate && dateObj < empEnrolledDate;
+      if (dateObj < nowZero && !beforeEnroll) {
+        if (regPending[dateStr]) {
+          badge = `<span class="day-badge-pill badge-regpending" title="Regularisation ${regPending[dateStr].id} \u2014 awaiting review"><i class="fa-solid fa-hourglass-half"></i> Reg. Pending</span>`;
+        } else {
+          s.notmarked++;
+          badge = `<span class="day-badge-pill badge-notmarked" title="Closed with no record \u2014 needs regularisation"><i class="fa-solid fa-circle-question"></i> Not Marked</span>`;
+        }
+      } else if (dateObj > nowZero) {
+        badge = `<span class="day-badge-pill badge-upcoming"><i class="fa-solid fa-circle-dot"></i> Upcoming</span>`;
+      } else if (isToday) {
+        badge = `<span class="day-badge-pill badge-today-active"><i class="fa-solid fa-clock"></i> Today</span>`;
+      }
+    }
+
+    const cell = document.createElement("div");
+    cell.className = cellClass;
+    cell.innerHTML = `
+      <div class="cell-top-row"><span class="day-number">${d}</span>${isToday ? '<span class="today-marker-chip"><i class="fa-solid fa-star"></i> Today</span>' : ''}</div>
+      <div class="cell-content">${badge}</div>
+    `;
+    grid.appendChild(cell);
+  }
+
+  if (summaryEl) {
+    summaryEl.innerHTML = `
+      <span class="emp-cal-chip chip-p"><i class="fa-solid fa-circle-check"></i> Present ${s.present}</span>
+      <span class="emp-cal-chip chip-w"><i class="fa-solid fa-house-laptop"></i> WFH ${s.wfh}</span>
+      <span class="emp-cal-chip chip-l"><i class="fa-solid fa-umbrella-beach"></i> Leave ${s.leave}</span>
+      <span class="emp-cal-chip chip-n"><i class="fa-solid fa-circle-question"></i> Not marked ${s.notmarked}</span>
+      <span class="emp-cal-chip chip-a"><i class="fa-solid fa-circle-xmark"></i> Absent ${s.absent}</span>
+    `;
+  }
+}
+
+function initEmpCalendarModal() {
+  const modal = document.getElementById("empCalendarModal");
+  const closeBtn = document.getElementById("closeEmpCalBtn");
+  const footerBtn = document.getElementById("closeEmpCalFooterBtn");
+  const prevBtn = document.getElementById("empCalPrevBtn");
+  const nextBtn = document.getElementById("empCalNextBtn");
+  if (closeBtn) closeBtn.addEventListener("click", closeEmpCalendar);
+  if (footerBtn) footerBtn.addEventListener("click", closeEmpCalendar);
+  if (modal) modal.addEventListener("click", (e) => { if (e.target === modal) closeEmpCalendar(); });
+  if (prevBtn) prevBtn.addEventListener("click", () => { empCalState.viewDate = new Date(empCalState.viewDate.getFullYear(), empCalState.viewDate.getMonth() - 1, 1); renderEmpCalendar(); });
+  if (nextBtn) nextBtn.addEventListener("click", () => { empCalState.viewDate = new Date(empCalState.viewDate.getFullYear(), empCalState.viewDate.getMonth() + 1, 1); renderEmpCalendar(); });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && modal && modal.classList.contains("open")) closeEmpCalendar();
+  });
+}
+
+// ============================================================================
 // 7. TAB 6: OFFICE GEOFENCE SETTINGS (ADMIN ONLY)
 // ============================================================================
 
@@ -2822,6 +2995,7 @@ function startAdminConsole() {
   renderAttendancePhotosTable();
   initAdminGeofence();
   initPhotoLightboxModal();
+  initEmpCalendarModal();
   initAdminAccountForm();
   renderAdminAccountTab();
 

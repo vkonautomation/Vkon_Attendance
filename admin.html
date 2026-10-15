@@ -24,7 +24,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="styles.css?v=20261015_calcs1">
+  <link rel="stylesheet" href="styles.css?v=20261015_clarity1">
 </head>
 <body class="light-theme admin-page">
 
@@ -516,6 +516,7 @@
                   <th>Today</th>
                   <th>Present Days</th>
                   <th>Absent Days</th>
+                  <th title="Past working days with no punch or request &mdash; needs regularisation, not a confirmed absence">Not Marked</th>
                   <th>WFH Days</th>
                   <th>Leave</th>
                   <th>Total Work Time</th>
@@ -1408,11 +1409,47 @@
     </div>
   </div>
 
+  <!-- ================= EMPLOYEE CALENDAR MODAL (row click in master sheet) ================= -->
+  <div class="modal-backdrop" id="empCalendarModal" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-lg glass-panel emp-cal-dialog">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <h3><i class="fa-solid fa-calendar-days text-primary"></i> <span id="empCalTitle">Employee Calendar</span></h3>
+          <span class="modal-status-badge" id="empCalSub">&mdash;</span>
+        </div>
+        <div class="emp-cal-nav">
+          <button type="button" class="pager-btn" id="empCalPrevBtn" aria-label="Previous month"><i class="fa-solid fa-chevron-left"></i></button>
+          <span class="emp-cal-month font-bold" id="empCalMonth">&mdash;</span>
+          <button type="button" class="pager-btn" id="empCalNextBtn" aria-label="Next month"><i class="fa-solid fa-chevron-right"></i></button>
+          <button type="button" class="modal-close-btn" id="closeEmpCalBtn" aria-label="Close calendar">&times;</button>
+        </div>
+      </div>
+      <div class="modal-body">
+        <div class="emp-cal-summary" id="empCalSummary"></div>
+        <div class="calendar-grid-box">
+          <div class="calendar-weekdays-row">
+            <div class="weekday-header">Sun</div>
+            <div class="weekday-header">Mon</div>
+            <div class="weekday-header">Tue</div>
+            <div class="weekday-header">Wed</div>
+            <div class="weekday-header">Thu</div>
+            <div class="weekday-header">Fri</div>
+            <div class="weekday-header">Sat</div>
+          </div>
+          <div class="calendar-days-grid" id="empCalGrid"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary btn-sm" id="closeEmpCalFooterBtn">Close</button>
+      </div>
+    </div>
+  </div>
+
   <div class="toast-container" id="toastContainer"></div>
 
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <script src="shared.js?v=20261013_ist"></script>
-  <script src="admin.js?v=20261015_calcs1"></script>
+  <script src="shared.js?v=20261013_ist_clarity1"></script>
+  <script src="admin.js?v=20261015_clarity1"></script>
 </body>
 </html>

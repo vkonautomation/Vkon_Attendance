@@ -1099,7 +1099,7 @@ function initializeDatabase() {
         id: "REG-301",
         employeeId: "EMP001",
         employeeName: "Mukesh Sharma",
-        date: `${year}-10-07`,
+        date: `${year}-10-08`,
         type: "Missed Punch-Out",
         inTime: "09:10 AM",
         outTime: "06:15 PM",
@@ -1109,6 +1109,25 @@ function initializeDatabase() {
       }
     ]);
   }
+
+  // One-time migration: a PENDING regularisation must not sit on a day that already
+  // has a resolved Present/WFH punch (that was a seed inconsistency). Move the sample
+  // REG-301 off 2026-10-07 onto the unmarked 2026-10-08 so it renders as "Reg. Pending".
+  try {
+    const regs = getStore(STORAGE_KEYS.REGULARISATIONS, []);
+    const recs = getStore(STORAGE_KEYS.RECORDS, {});
+    let regChanged = false;
+    regs.forEach(r => {
+      if (r && r.id === "REG-301" && r.status === "Pending" && r.date === "2026-10-07") {
+        const conflict = recs[`${r.employeeId}_2026-10-07`];
+        if (conflict && (conflict.status === "Present" || conflict.status === "WFH")) {
+          r.date = "2026-10-08";
+          regChanged = true;
+        }
+      }
+    });
+    if (regChanged) setStore(STORAGE_KEYS.REGULARISATIONS, regs);
+  } catch (e) { /* ignore */ }
 
   // Normalize holidays in storage to strictly "Declared Holiday" or "Restricted Holiday"
   try {

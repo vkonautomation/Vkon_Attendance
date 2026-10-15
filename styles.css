@@ -8962,6 +8962,256 @@ body.light-theme .legend-item {
 }
 
 
+/* ==========================================================================
+   CLARITY LAYER 2 (2026-10-15): worked hours, amber Not-marked,
+   Reg-pending / Upcoming states, >=12px AA text, employee calendar modal
+   ========================================================================== */
+
+/* --- Raise status text to >=12px with stronger weight --- */
+.day-badge-pill {
+  font-size: 0.8rem;      /* 12.8px */
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.day-meta-text {
+  font-size: 0.78rem;     /* 12.5px */
+  font-weight: 600;
+  color: #334155;
+}
+
+body.light-theme .day-meta-text {
+  color: #1f2937;
+}
+
+.meta-hours {
+  font-weight: 800;
+  color: #0f172a;
+}
+
+body.light-theme .meta-hours {
+  color: #0f172a;
+}
+
+/* --- "Not marked" is amber (needs action), NOT a red absence --- */
+.day-badge-pill.badge-notmarked {
+  background: #fffbeb;
+  color: #b45309;
+  border: 1px dashed #d97706;
+}
+
+body.light-theme .day-badge-pill.badge-notmarked {
+  background: #fffbeb;
+  color: #92400e;
+  border: 1px dashed #d97706;
+}
+
+body:not(.light-theme) .day-badge-pill.badge-notmarked {
+  background: rgba(245, 158, 11, 0.14);
+  color: #fbbf24;
+  border: 1px dashed rgba(251, 191, 36, 0.6);
+}
+
+.calendar-day-cell:has(.badge-notmarked) {
+  background: rgba(245, 158, 11, 0.06);
+  border-color: rgba(217, 119, 6, 0.32);
+}
+
+body.light-theme .calendar-day-cell:has(.badge-notmarked) {
+  background: #fffdf5;
+  border-color: #fcd9a3;
+}
+
+.legend-dot.dot-notmarked {
+  background: #f59e0b;
+  border: 1.5px dashed #b45309;
+}
+
+body.light-theme .legend-dot.dot-notmarked {
+  background: #fbbf24;
+  border: 1.5px dashed #92400e;
+}
+
+.quick-stat-badge.stat-slate {
+  background: #fffbeb;
+  color: #92400e;
+  border: 1px solid #fcd9a3;
+}
+
+.quick-stat-badge.stat-slate .q-num {
+  color: #b45309;
+}
+
+body.light-theme .quick-stat-badge.stat-slate {
+  background: #fffbeb;
+  color: #92400e;
+  border-color: #fcd9a3;
+}
+
+body.light-theme .quick-stat-badge.stat-slate .q-num {
+  color: #b45309;
+}
+
+/* --- Regularisation pending (amber, softer) + Upcoming (faint gray) --- */
+.day-badge-pill.badge-regpending {
+  background: #fff7ed;
+  color: #c2410c;
+  border: 1px dashed #fdba74;
+}
+
+body:not(.light-theme) .day-badge-pill.badge-regpending {
+  background: rgba(249, 115, 22, 0.12);
+  color: #fdba74;
+  border: 1px dashed rgba(253, 186, 116, 0.55);
+}
+
+.day-badge-pill.badge-upcoming {
+  background: rgba(100, 116, 139, 0.08);
+  color: #94a3b8;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  font-weight: 600;
+}
+
+body.light-theme .day-badge-pill.badge-upcoming {
+  background: #f8fafc;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+}
+
+/* --- View-request action button (matches Regularise quick button family) --- */
+.cell-reg-view {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.35rem;
+  padding: 0.28rem 0.6rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(180, 83, 9, 0.5);
+  background: rgba(245, 158, 11, 0.12);
+  color: #b45309;
+  font-family: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.cell-reg-view:hover {
+  background: rgba(245, 158, 11, 0.24);
+  transform: translateY(-1px);
+}
+
+body:not(.light-theme) .cell-reg-view {
+  background: rgba(249, 115, 22, 0.14);
+  border-color: rgba(253, 186, 116, 0.5);
+  color: #fdba74;
+}
+
+/* --- Admin master sheet: dedicated Not Marked column + clickable rows --- */
+.unmarked-cell {
+  font-weight: 700;
+  color: #94a3b8;
+}
+
+.unmarked-cell.has-unmarked {
+  color: #b45309;
+}
+
+body:not(.light-theme) .unmarked-cell.has-unmarked {
+  color: #fbbf24;
+}
+
+.master-row-clickable {
+  cursor: pointer;
+  transition: background 0.12s ease, box-shadow 0.12s ease;
+}
+
+.master-row-clickable:hover {
+  background: rgba(234, 88, 12, 0.06);
+  box-shadow: inset 3px 0 0 var(--color-primary, #ea580c);
+}
+
+.master-row-clickable:focus-visible {
+  outline: 2px solid var(--color-primary, #ea580c);
+  outline-offset: -2px;
+}
+
+body.light-theme .master-row-clickable:hover {
+  background: #fff7ed;
+}
+
+/* --- Employee calendar modal --- */
+.emp-cal-dialog {
+  max-width: 720px;
+}
+
+.emp-cal-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.emp-cal-month {
+  min-width: 150px;
+  text-align: center;
+  font-size: 0.95rem;
+}
+
+.emp-cal-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.9rem;
+}
+
+.emp-cal-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: var(--radius-full);
+  font-size: 0.8rem;
+  font-weight: 700;
+  border: 1px solid var(--border-glass);
+  background: rgba(148, 163, 184, 0.1);
+  color: #475569;
+}
+
+.emp-cal-chip.chip-p { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
+.emp-cal-chip.chip-w { background: #f5f3ff; color: #6d28d9; border-color: #ddd6fe; }
+.emp-cal-chip.chip-l { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
+.emp-cal-chip.chip-n { background: #fffbeb; color: #92400e; border-color: #fcd9a3; }
+.emp-cal-chip.chip-a { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
+
+body:not(.light-theme) .emp-cal-chip { background: rgba(148, 163, 184, 0.14); color: #cbd5e1; }
+body:not(.light-theme) .emp-cal-chip.chip-p { background: rgba(16, 185, 129, 0.14); color: #34d399; }
+body:not(.light-theme) .emp-cal-chip.chip-w { background: rgba(124, 58, 237, 0.18); color: #c4b5fd; }
+body:not(.light-theme) .emp-cal-chip.chip-l { background: rgba(37, 99, 235, 0.18); color: #93c5fd; }
+body:not(.light-theme) .emp-cal-chip.chip-n { background: rgba(245, 158, 11, 0.16); color: #fbbf24; }
+body:not(.light-theme) .emp-cal-chip.chip-a { background: rgba(239, 68, 68, 0.16); color: #f87171; }
+
+/* --- Flash highlight when jumping to an existing request --- */
+.reg-card-flash {
+  animation: regCardFlash 2.2s ease;
+  border-radius: var(--radius-md);
+}
+
+@keyframes regCardFlash {
+  0%   { box-shadow: 0 0 0 0 rgba(234, 88, 12, 0.55); background: rgba(234, 88, 12, 0.14); }
+  70%  { box-shadow: 0 0 0 6px rgba(234, 88, 12, 0); background: rgba(234, 88, 12, 0.08); }
+  100% { box-shadow: 0 0 0 0 rgba(234, 88, 12, 0); background: transparent; }
+}
+
+@media (max-width: 768px) {
+  .day-badge-pill {
+    font-size: 0.75rem;   /* keep >=12px on mobile */
+  }
+  .day-meta-text {
+    font-size: 0.72rem;
+  }
+}
+
+
 
 
 
