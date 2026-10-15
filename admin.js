@@ -143,13 +143,18 @@ function initAdminTabs() {
 
   // Header heading per view (Onboardly-style top bar)
   const VIEW_META = {
-    "tab-monthly-sheet": ["Attendance", "Company-wide overview \u2022 Excel-ready master sheet"],
+    "tab-dashboard": ["Dashboard", "Today at a glance \u2022 who is in and what needs you"],
+    "tab-recruitment": ["Recruitment", "Candidate pipeline from application to offer"],
     "tab-roster": ["Employees", "Member accounts, roles & biometric enrollment"],
+    "tab-monthly-sheet": ["Attendance", "Company-wide overview \u2022 Excel-ready master sheet"],
+    "tab-task": ["Tasks", "Assign work and track due dates"],
+    "tab-payroll": ["Payroll", "Base salaries and monthly payout status"],
     "tab-approvals": ["Approvals", "Leave, WFH & regularisation awaiting review"],
     "tab-holidays": ["Holidays", "Declared company & restricted holiday calendar"],
     "tab-photos": ["Attendance Photos", "Rolling 24-hour check-in snapshot audit trail"],
-    "tab-geofence": ["Geofence", "Office location radius & calibration"],
-    "tab-account": ["Admin Security", "Credentials and access control"]
+    "tab-geofence": ["Settings", "Office location radius & calibration"],
+    "tab-account": ["Admin Security", "Credentials and access control"],
+    "tab-help": ["Help & Support", "Policy FAQ and support tickets"]
   };
 
   tabs.forEach(tab => {
@@ -158,6 +163,7 @@ function initAdminTabs() {
 
       tabs.forEach(t => t.classList.toggle("active", t === tab));
       panels.forEach(p => p.classList.toggle("active", p.id === targetId));
+      renderDeptNav();
 
       const meta = VIEW_META[targetId];
       const titleEl = document.getElementById("adminViewTitle");
@@ -169,6 +175,16 @@ function initAdminTabs() {
 
       if (targetId === "tab-monthly-sheet") {
         renderMonthlyReport();
+      } else if (targetId === "tab-dashboard") {
+        renderDashboard();
+      } else if (targetId === "tab-recruitment") {
+        renderCandidateTable();
+      } else if (targetId === "tab-task") {
+        renderTaskTable();
+      } else if (targetId === "tab-payroll") {
+        renderPayrollTable();
+      } else if (targetId === "tab-help") {
+        renderTicketList();
       } else if (targetId === "tab-roster") {
         renderRosterTable();
       } else if (targetId === "tab-approvals") {
@@ -2354,6 +2370,416 @@ function initAdminAccountForm() {
 
 let isConsoleStarted = false;
 
+// ============================================================================
+// 7.9 EXTRA MENU MODULES — Dashboard, Recruitment, Task, Payroll, Help, Departments
+// ============================================================================
+
+const EXTRA_KEYS = {
+  RECRUITMENT: "vkon_recruitment_v1",
+  TASKS: "vkon_tasks_v1",
+  PAY_RATES: "vkon_pay_rates_v1",
+  PAY_RUNS: "vkon_pay_runs_v1",
+  TICKETS: "vkon_tickets_v1"
+};
+
+const DEFAULT_CANDIDATES = [
+  { id: "C1001", name: "Rahul Verma", role: "Sr Product Designer", stage: "Interview", addedAt: "2026-10-08" },
+  { id: "C1002", name: "Sneha Iyer", role: "Frontend Engineer", stage: "Applied", addedAt: "2026-10-11" },
+  { id: "C1003", name: "Devraj Singh", role: "DevOps Engineer", stage: "Offered", addedAt: "2026-10-02" }
+];
+
+const CANDIDATE_STAGES = ["Applied", "Screening", "Interview", "Offered", "Hired"];
+const TASK_STATUSES = ["Open", "In Progress", "Done"];
+const DEPT_DOT_COLORS = ["#e3b341", "#7c3aed", "#0ea5e9", "#22c55e", "#db2777", "#f97316", "#64748b"];
+const DEFAULT_PAY_BY_DEPT = { Engineering: 85000, Product: 78000, Operations: 92000, Infrastructure: 88000 };
+const LATE_CUTOFF_MIN_DASH = 10 * 60; // 10:00 AM IST grace (matches master sheet)
+
+function switchAdminTab(targetId) {
+  const btn = document.querySelector(`.admin-sidebar .nav-tab[data-tab="${targetId}"]`);
+  if (btn) btn.click();
+}
+
+function setTextSafe(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val;
+}
+
+// --- Department quick-nav (sidebar): live from the roster ---
+function renderDeptNav() {
+  const list = document.getElementById("deptNavList");
+  if (!list) return;
+  const employees = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
+  const counts = {};
+  employees.forEach(e => { counts[e.department] = (counts[e.department] || 0) + 1; });
+  const depts = Object.keys(counts).sort();
+  list.innerHTML = depts.map((d, i) => `
+    <button type="button" class="dept-nav-item" data-dept="${d}">
+      <span class="dept-dot" style="background:${DEPT_DOT_COLORS[i % DEPT_DOT_COLORS.length]}"></span>
+      <span class="dept-name">${d}</span>
+      <span class="dept-count">${counts[d]}</span>
+    </button>
+  `).join("");
+}
+
+// --- Dashboard: today at a glance (all values computed from live data) ---
+function renderDashboard() {
+  const now = (typeof getPresentDate === "function") ? getPresentDate() : new Date();
+  const employees = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
+  const records = getStore(STORAGE_KEYS.RECORDS, {});
+  const leaves = getStore(STORAGE_KEYS.LEAVES, []);
+  const wfhList = getStore(STORAGE_KEYS.WFH, []);
+  const regs = getStore(STORAGE_KEYS.REGULARISATIONS, []);
+  const todayKey = formatDateKey(now);
+
+  setTextSafe("dashDateLabel", now.toLocaleDateString("en-US", {
+    timeZone: "Asia/Kolkata", weekday: "long", month: "long", day: "numeric", year: "numeric"
+  }));
+
+  let inToday = 0, late = 0, onLeave = 0;
+  const rows = [];
+  employees.forEach(emp => {
+    const rec = records[`${emp.id}_${todayKey}`];
+    if (!rec) return;
+    if (rec.status === "Present" || rec.status === "WFH") {
+      const inMin = rec.checkInTime && rec.checkInTime !== "-" ? parseAmPmToMinutes(rec.checkInTime) : null;
+      const isLate = inMin !== null && inMin > LATE_CUTOFF_MIN_DASH;
+      inToday++;
+      if (isLate) late++;
+      rows.push(`
+        <tr>
+          <td><div class="table-emp-cell"><img src="${emp.avatar}" class="table-avatar" alt="${emp.name}"><span class="font-bold">${emp.name}</span></div></td>
+          <td class="font-mono">${rec.checkInTime && rec.checkInTime !== "-" ? rec.checkInTime : "--"}</td>
+          <td class="font-mono">${rec.checkOutTime && rec.checkOutTime !== "-" ? rec.checkOutTime : "On shift"}</td>
+          <td><span class="type-cell">${rec.status === "WFH" ? "Remote" : "In house"}</span></td>
+          <td><span class="today-pill ${isLate ? "pill-late" : "pill-on-time"}">${isLate ? "Late" : "On Time"}</span></td>
+        </tr>`);
+    } else if (rec.status === "Leave" || rec.status === "Holiday") {
+      onLeave++;
+    }
+  });
+
+  const pending =
+    leaves.filter(l => l.status === "Pending").length +
+    wfhList.filter(w => w.status === "Pending").length +
+    regs.filter(r => r.status === "Pending").length;
+
+  setTextSafe("dashStatPresent", inToday);
+  setTextSafe("dashStatLate", late);
+  setTextSafe("dashStatLeave", onLeave);
+  setTextSafe("dashStatPending", pending);
+
+  const tbody = document.getElementById("dashTodayTableBody");
+  if (tbody) {
+    tbody.innerHTML = rows.join("");
+    const wrap = tbody.closest(".table-responsive");
+    if (wrap) wrap.style.display = rows.length ? "" : "none";
+  }
+  const emptyNote = document.getElementById("dashEmptyToday");
+  if (emptyNote) emptyNote.style.display = rows.length ? "none" : "";
+
+  const items = [
+    ...leaves.filter(l => l.status === "Pending").map(l => ({ kind: "Leave", who: l.employeeName || l.employeeId, when: l.dates || l.startDate || "", icon: "fa-umbrella-beach" })),
+    ...wfhList.filter(w => w.status === "Pending").map(w => ({ kind: "WFH", who: w.employeeName || w.employeeId, when: w.date || "", icon: "fa-house-laptop" })),
+    ...regs.filter(r => r.status === "Pending").map(r => ({ kind: "Regularisation", who: r.employeeName || r.employeeId, when: r.date || "", icon: "fa-clock-rotate-left" }))
+  ].slice(0, 6);
+
+  const listEl = document.getElementById("dashRecentRequests");
+  if (listEl) {
+    listEl.innerHTML = items.map(it => `
+      <div class="dash-request-item">
+        <i class="fa-solid ${it.icon}"></i>
+        <span class="dr-kind">${it.kind}</span>
+        <span class="dr-who">${it.who}</span>
+        <span class="dr-when font-mono">${it.when || ""}</span>
+        <button type="button" class="btn btn-ghost btn-sm dr-go" data-go="tab-approvals">Review</button>
+      </div>`).join("");
+    listEl.style.display = items.length ? "" : "none";
+  }
+  const emptyReq = document.getElementById("dashEmptyRequests");
+  if (emptyReq) emptyReq.style.display = items.length ? "none" : "";
+}
+
+// --- Recruitment pipeline ---
+function getCandidates() {
+  return getStore(EXTRA_KEYS.RECRUITMENT, DEFAULT_CANDIDATES);
+}
+
+function renderCandidateTable() {
+  const cands = getCandidates();
+  const tbody = document.getElementById("candidateTableBody");
+  const empty = document.getElementById("emptyCandidateMsg");
+  if (!tbody) return;
+  tbody.innerHTML = cands.map(c => {
+    const stageIdx = CANDIDATE_STAGES.indexOf(c.stage);
+    const pill = c.stage === "Hired" ? "pill-on-time" : c.stage === "Offered" ? "pill-remote" : c.stage === "Interview" ? "pill-leave" : "pill-notin";
+    return `
+    <tr>
+      <td class="font-bold">${c.name}</td>
+      <td>${c.role}</td>
+      <td><span class="today-pill ${pill}">${c.stage}</span></td>
+      <td>
+        ${stageIdx < CANDIDATE_STAGES.length - 1
+          ? `<button type="button" class="btn btn-ghost btn-sm cand-advance" data-id="${c.id}"><i class="fa-solid fa-arrow-right"></i> ${CANDIDATE_STAGES[stageIdx + 1]}</button>`
+          : `<span class="text-success font-bold"><i class="fa-solid fa-circle-check"></i> Joined</span>`}
+        <button type="button" class="btn btn-ghost btn-sm text-danger cand-remove" data-id="${c.id}" title="Remove candidate"><i class="fa-solid fa-xmark"></i></button>
+      </td>
+    </tr>`;
+  }).join("");
+  if (empty) empty.style.display = cands.length ? "none" : "";
+}
+
+// --- Task board ---
+function renderTaskTable() {
+  const employees = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
+  const sel = document.getElementById("taskAssigneeSelect");
+  if (sel && sel.options.length !== employees.length) {
+    sel.innerHTML = employees.map(e => `<option value="${e.id}">${e.name}</option>`).join("");
+  }
+  const tasks = getStore(EXTRA_KEYS.TASKS, []);
+  const todayKey = formatDateKey((typeof getPresentDate === "function") ? getPresentDate() : new Date());
+  const tbody = document.getElementById("taskTableBody");
+  const empty = document.getElementById("emptyTaskMsg");
+  if (!tbody) return;
+  tbody.innerHTML = tasks.map(t => {
+    const overdue = t.due && t.due < todayKey && t.status !== "Done";
+    return `
+    <tr>
+      <td><span class="font-bold">${t.title}</span>${overdue ? ' <span class="today-pill pill-late">Overdue</span>' : ""}</td>
+      <td>${t.assigneeName}</td>
+      <td class="font-mono">${t.due || "\u2014"}</td>
+      <td><select class="form-control task-status-select" data-id="${t.id}">${TASK_STATUSES.map(s => `<option${s === t.status ? " selected" : ""}>${s}</option>`).join("")}</select></td>
+      <td><button type="button" class="btn btn-ghost btn-sm text-danger task-remove" data-id="${t.id}" title="Delete task"><i class="fa-solid fa-trash"></i></button></td>
+    </tr>`;
+  }).join("");
+  if (empty) empty.style.display = tasks.length ? "none" : "";
+}
+
+// --- Payroll ---
+function getPayRates() {
+  const employees = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
+  const saved = getStore(EXTRA_KEYS.PAY_RATES, {});
+  const rates = {};
+  employees.forEach(e => { rates[e.id] = saved[e.id] || DEFAULT_PAY_BY_DEPT[e.department] || 70000; });
+  return rates;
+}
+
+function renderPayrollTable() {
+  const monthEl = document.getElementById("payrollMonthInput");
+  const now = (typeof getPresentDate === "function") ? getPresentDate() : new Date();
+  const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  if (monthEl && !monthEl.value) monthEl.value = defaultMonth;
+  const month = monthEl && monthEl.value ? monthEl.value : defaultMonth;
+
+  const employees = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
+  const rates = getPayRates();
+  const runs = getStore(EXTRA_KEYS.PAY_RUNS, {});
+  const monthRuns = runs[month] || {};
+
+  const tbody = document.getElementById("payrollTableBody");
+  if (!tbody) return;
+  tbody.innerHTML = employees.map(e => {
+    const paid = monthRuns[e.id];
+    return `
+    <tr>
+      <td><div class="table-emp-cell"><img src="${e.avatar}" class="table-avatar" alt="${e.name}"><span class="font-bold">${e.name}</span></div></td>
+      <td>${e.department}</td>
+      <td><input type="number" min="0" step="1000" class="form-control pay-rate-input" data-id="${e.id}" value="${rates[e.id]}" aria-label="Base salary for ${e.name}"></td>
+      <td><span class="today-pill ${paid ? "pill-on-time" : "pill-notin"}">${paid ? `Paid ${paid.paidOn}` : "Unpaid"}</span></td>
+      <td>${paid
+        ? `<span class="text-success font-bold"><i class="fa-solid fa-circle-check"></i> Settled</span>`
+        : `<button type="button" class="btn btn-ghost btn-sm pay-mark" data-id="${e.id}"><i class="fa-solid fa-money-bill-wave"></i> Mark Paid</button>`}</td>
+    </tr>`;
+  }).join("");
+}
+
+function markEmployeesPaid(ids, wholeRun) {
+  const monthEl = document.getElementById("payrollMonthInput");
+  const month = monthEl && monthEl.value ? monthEl.value : formatDateKey(new Date()).slice(0, 7);
+  const runs = getStore(EXTRA_KEYS.PAY_RUNS, {});
+  const monthRuns = runs[month] || (runs[month] = {});
+  const day = formatDateKey(new Date()).slice(8);
+  ids.forEach(id => {
+    if (!monthRuns[id]) monthRuns[id] = { status: "Paid", paidOn: `${day}/${month.slice(5)}` };
+  });
+  setStore(EXTRA_KEYS.PAY_RUNS, runs);
+  renderPayrollTable();
+  showToast(wholeRun ? `Payroll run completed for ${month}.` : "Payment marked as paid.", "success");
+}
+
+// --- Help & Support tickets ---
+function renderTicketList() {
+  const tickets = getStore(EXTRA_KEYS.TICKETS, []);
+  const list = document.getElementById("ticketList");
+  const empty = document.getElementById("emptyTicketMsg");
+  if (!list) return;
+  list.innerHTML = tickets.slice().reverse().map(t => `
+    <div class="dash-request-item">
+      <i class="fa-solid fa-ticket"></i>
+      <span class="dr-kind">Ticket</span>
+      <span class="dr-who">${t.subject}</span>
+      <span class="dr-when font-mono">${t.at}</span>
+      <span class="today-pill ${t.status === "Open" ? "pill-leave" : "pill-on-time"}">${t.status}</span>
+    </div>`).join("");
+  list.style.display = tickets.length ? "" : "none";
+  if (empty) empty.style.display = tickets.length ? "none" : "";
+}
+
+function initExtraModules() {
+  renderDeptNav();
+
+  const deptList = document.getElementById("deptNavList");
+  if (deptList) {
+    deptList.addEventListener("click", (e) => {
+      const item = e.target.closest(".dept-nav-item");
+      if (!item) return;
+      switchAdminTab("tab-monthly-sheet");
+      const deptSel = document.getElementById("masterDeptFilter");
+      if (deptSel) {
+        deptSel.value = item.getAttribute("data-dept");
+        masterTableState.page = 1;
+        applyMasterTableView();
+      }
+    });
+  }
+  const deptAdd = document.getElementById("deptAddBtn");
+  if (deptAdd) deptAdd.addEventListener("click", () => switchAdminTab("tab-roster"));
+
+  // Recruitment
+  const candForm = document.getElementById("candidateAddForm");
+  if (candForm) {
+    candForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const name = document.getElementById("candidateNameInput").value.trim();
+      const role = document.getElementById("candidateRoleInput").value.trim();
+      if (!name || !role) return;
+      const cands = getCandidates();
+      cands.push({ id: "C" + Date.now().toString().slice(-6), name, role, stage: "Applied", addedAt: formatDateKey(new Date()) });
+      setStore(EXTRA_KEYS.RECRUITMENT, cands);
+      candForm.reset();
+      renderCandidateTable();
+      showToast(`Candidate ${name} added to the pipeline.`, "success");
+    });
+  }
+  const candBody = document.getElementById("candidateTableBody");
+  if (candBody) {
+    candBody.addEventListener("click", (e) => {
+      const adv = e.target.closest(".cand-advance");
+      const rem = e.target.closest(".cand-remove");
+      if (!adv && !rem) return;
+      const cands = getCandidates();
+      if (adv) {
+        const c = cands.find(x => x.id === adv.dataset.id);
+        if (c) c.stage = CANDIDATE_STAGES[Math.min(CANDIDATE_STAGES.length - 1, CANDIDATE_STAGES.indexOf(c.stage) + 1)];
+      } else if (rem) {
+        cands.splice(cands.findIndex(x => x.id === rem.dataset.id), 1);
+      }
+      setStore(EXTRA_KEYS.RECRUITMENT, cands);
+      renderCandidateTable();
+    });
+  }
+
+  // Tasks
+  const taskForm = document.getElementById("taskAddForm");
+  if (taskForm) {
+    taskForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const title = document.getElementById("taskTitleInput").value.trim();
+      if (!title) return;
+      const employees = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
+      const assigneeSel = document.getElementById("taskAssigneeSelect");
+      const emp = employees.find(x => x.id === assigneeSel.value) || employees[0];
+      const tasks = getStore(EXTRA_KEYS.TASKS, []);
+      tasks.push({
+        id: "T" + Date.now().toString().slice(-7),
+        title,
+        assigneeId: emp ? emp.id : "",
+        assigneeName: emp ? emp.name : "\u2014",
+        due: document.getElementById("taskDueInput").value || "",
+        status: "Open"
+      });
+      setStore(EXTRA_KEYS.TASKS, tasks);
+      document.getElementById("taskTitleInput").value = "";
+      renderTaskTable();
+      showToast("Task assigned.", "success");
+    });
+  }
+  const taskBody = document.getElementById("taskTableBody");
+  if (taskBody) {
+    taskBody.addEventListener("change", (e) => {
+      const sel = e.target.closest(".task-status-select");
+      if (!sel) return;
+      const tasks = getStore(EXTRA_KEYS.TASKS, []);
+      const t = tasks.find(x => x.id === sel.dataset.id);
+      if (t) t.status = sel.value;
+      setStore(EXTRA_KEYS.TASKS, tasks);
+      renderTaskTable();
+    });
+    taskBody.addEventListener("click", (e) => {
+      const rm = e.target.closest(".task-remove");
+      if (!rm) return;
+      setStore(EXTRA_KEYS.TASKS, getStore(EXTRA_KEYS.TASKS, []).filter(x => x.id !== rm.dataset.id));
+      renderTaskTable();
+    });
+  }
+
+  // Payroll
+  const payrollMonth = document.getElementById("payrollMonthInput");
+  if (payrollMonth) payrollMonth.addEventListener("change", renderPayrollTable);
+  const payBody = document.getElementById("payrollTableBody");
+  if (payBody) {
+    payBody.addEventListener("change", (e) => {
+      const inp = e.target.closest(".pay-rate-input");
+      if (!inp) return;
+      const saved = getStore(EXTRA_KEYS.PAY_RATES, {});
+      saved[inp.dataset.id] = Math.max(0, parseInt(inp.value, 10) || 0);
+      setStore(EXTRA_KEYS.PAY_RATES, saved);
+      showToast("Base salary updated.", "success");
+    });
+    payBody.addEventListener("click", (e) => {
+      const btn = e.target.closest(".pay-mark");
+      if (!btn) return;
+      markEmployeesPaid([btn.dataset.id], false);
+    });
+  }
+  const runBtn = document.getElementById("runPayrollBtn");
+  if (runBtn) {
+    runBtn.addEventListener("click", () => {
+      const employees = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
+      markEmployeesPaid(employees.map(e => e.id), true);
+    });
+  }
+
+  // Help tickets
+  const ticketForm = document.getElementById("ticketAddForm");
+  if (ticketForm) {
+    ticketForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const subject = document.getElementById("ticketSubjectInput").value.trim();
+      const msg = document.getElementById("ticketMsgInput").value.trim();
+      if (!subject || !msg) return;
+      const tickets = getStore(EXTRA_KEYS.TICKETS, []);
+      tickets.push({ subject, msg, status: "Open", at: `${formatTimeString(new Date())} \u2022 ${formatDateKey(new Date())}` });
+      setStore(EXTRA_KEYS.TICKETS, tickets);
+      ticketForm.reset();
+      renderTicketList();
+      showToast("Support ticket submitted.", "success");
+    });
+  }
+
+  // Dashboard "Review" shortcuts
+  const recent = document.getElementById("dashRecentRequests");
+  if (recent) {
+    recent.addEventListener("click", (e) => {
+      const go = e.target.closest("[data-go]");
+      if (go) switchAdminTab(go.getAttribute("data-go"));
+    });
+  }
+}
+
+// ============================================================================
+// 8. BOOTSTRAP
+// ============================================================================
+
 function startAdminConsole() {
   if (isConsoleStarted) return;
   isConsoleStarted = true;
@@ -2361,6 +2787,7 @@ function startAdminConsole() {
   initAdminClock();
   initAdminTabs();
   initMasterTableSearch();
+  initExtraModules();
   renderMonthlyReport();
   renderRosterTable();
   initEnrollmentForm();

@@ -24,7 +24,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="styles.css?v=20261015_data">
+  <link rel="stylesheet" href="styles.css?v=20261015_menu2">
 </head>
 <body class="light-theme admin-page">
 
@@ -110,26 +110,58 @@
       <nav class="admin-side-nav" aria-label="Admin sections">
         <span class="side-nav-label">Menu</span>
         <div class="nav-tabs" role="tablist">
-          <button class="nav-tab active" data-tab="tab-monthly-sheet">
-            <i class="fa-solid fa-file-excel"></i> Monthly Sheet & Excel
+          <button class="nav-tab" data-tab="tab-dashboard">
+            <i class="fa-solid fa-gauge-high"></i> Dashboard
+          </button>
+          <button class="nav-tab" data-tab="tab-recruitment">
+            <i class="fa-solid fa-user-plus"></i> Recruitment
           </button>
           <button class="nav-tab" data-tab="tab-roster">
-            <i class="fa-solid fa-users-gear"></i> Member Accounts & Biometrics
+            <i class="fa-solid fa-users-gear"></i> Employee
           </button>
+          <button class="nav-tab active" data-tab="tab-monthly-sheet">
+            <i class="fa-solid fa-file-excel"></i> Attendance
+          </button>
+          <button class="nav-tab" data-tab="tab-task">
+            <i class="fa-solid fa-list-check"></i> Task
+          </button>
+          <button class="nav-tab" data-tab="tab-payroll">
+            <i class="fa-solid fa-sack-dollar"></i> Payroll
+          </button>
+        </div>
+
+        <span class="side-nav-label">Requests</span>
+        <div class="nav-tabs">
           <button class="nav-tab" data-tab="tab-approvals">
-            <i class="fa-solid fa-clipboard-check"></i> Approvals Center <span class="badge-bubble" id="pendingRequestsBadge" style="display: none;">0</span>
+            <i class="fa-solid fa-calendar-check"></i> Approvals <span class="badge-bubble" id="pendingRequestsBadge" style="display: none;">0</span>
           </button>
           <button class="nav-tab" data-tab="tab-holidays">
-            <i class="fa-solid fa-calendar-star"></i> Company Holidays
+            <i class="fa-solid fa-calendar-star"></i> Holidays
           </button>
           <button class="nav-tab" data-tab="tab-photos">
-            <i class="fa-solid fa-images"></i> 24h Attendance Photos
+            <i class="fa-solid fa-images"></i> Attendance Photos
           </button>
+        </div>
+
+        <span class="side-nav-label side-nav-label-row">Department
+          <button type="button" class="dept-add-btn" id="deptAddBtn" title="Add a new team member (opens Employee)">
+            <i class="fa-solid fa-plus"></i>
+          </button>
+        </span>
+        <div class="dept-nav-list" id="deptNavList">
+          <!-- Departments rendered by admin.js from the live roster -->
+        </div>
+
+        <span class="side-nav-label">Others</span>
+        <div class="nav-tabs">
           <button class="nav-tab" data-tab="tab-geofence">
-            <i class="fa-solid fa-location-dot"></i> Office Geofence (500m)
+            <i class="fa-solid fa-location-dot"></i> Settings
           </button>
           <button class="nav-tab" data-tab="tab-account" id="navTabAccount">
-            <i class="fa-solid fa-user-shield"></i> Admin Account & Security
+            <i class="fa-solid fa-user-shield"></i> Admin Security
+          </button>
+          <button class="nav-tab" data-tab="tab-help">
+            <i class="fa-solid fa-circle-question"></i> Help &amp; Support
           </button>
         </div>
       </nav>
@@ -170,6 +202,185 @@
 
     <!-- Admin Main Body -->
     <main class="main-content">
+
+      <!-- ================= TAB: DASHBOARD (today at a glance) ================= -->
+      <section id="tab-dashboard" class="tab-panel">
+        <div class="admin-panel glass-panel">
+          <div class="panel-header-toolbar">
+            <div class="toolbar-title-group">
+              <h2><i class="fa-solid fa-gauge-high text-primary"></i> Today At A Glance</h2>
+              <p class="subtitle">Live company snapshot for <strong id="dashDateLabel">--</strong> (IST)</p>
+            </div>
+          </div>
+
+          <div class="kpi-grid">
+            <div class="kpi-card">
+              <div class="kpi-icon icon-bg-green"><i class="fa-solid fa-user-check"></i></div>
+              <div class="kpi-data">
+                <span class="kpi-num text-success" id="dashStatPresent">0</span>
+                <span class="kpi-lbl">In Today (Office + Remote)</span>
+              </div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-icon icon-bg-amber"><i class="fa-solid fa-clock"></i></div>
+              <div class="kpi-data">
+                <span class="kpi-num" id="dashStatLate">0</span>
+                <span class="kpi-lbl">Late Check-Ins</span>
+              </div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-icon icon-bg-purple"><i class="fa-solid fa-umbrella-beach"></i></div>
+              <div class="kpi-data">
+                <span class="kpi-num" id="dashStatLeave">0</span>
+                <span class="kpi-lbl">On Leave / Holiday</span>
+              </div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-icon icon-bg-blue"><i class="fa-solid fa-inbox"></i></div>
+              <div class="kpi-data">
+                <span class="kpi-num" id="dashStatPending">0</span>
+                <span class="kpi-lbl">Requests Awaiting You</span>
+              </div>
+            </div>
+          </div>
+
+          <h3 class="dash-sub-heading"><i class="fa-solid fa-right-to-bracket"></i> Check-Ins Today</h3>
+          <div class="table-responsive master-table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr><th>Employee</th><th>Check-In</th><th>Check-Out</th><th>Type</th><th>Status</th></tr>
+              </thead>
+              <tbody id="dashTodayTableBody"></tbody>
+            </table>
+          </div>
+          <p class="dash-empty-note" id="dashEmptyToday" style="display: none;"><i class="fa-regular fa-mug-hot"></i> Nobody has punched in yet today &mdash; the list fills up as the team checks in.</p>
+
+          <h3 class="dash-sub-heading"><i class="fa-solid fa-inbox"></i> Latest Requests</h3>
+          <div class="dash-request-list" id="dashRecentRequests"></div>
+          <p class="dash-empty-note" id="dashEmptyRequests" style="display: none;"><i class="fa-regular fa-face-smile"></i> Nothing pending &mdash; you are all caught up.</p>
+        </div>
+      </section>
+
+      <!-- ================= TAB: RECRUITMENT (candidate pipeline) ================= -->
+      <section id="tab-recruitment" class="tab-panel">
+        <div class="admin-panel glass-panel">
+          <div class="panel-header-toolbar">
+            <div class="toolbar-title-group">
+              <h2><i class="fa-solid fa-user-plus text-primary"></i> Recruitment Pipeline</h2>
+              <p class="subtitle">Track candidates from application to offer, then move hires into the Employee roster.</p>
+            </div>
+          </div>
+
+          <form id="candidateAddForm" class="inline-add-form">
+            <input type="text" id="candidateNameInput" class="form-control" placeholder="Candidate name" required>
+            <input type="text" id="candidateRoleInput" class="form-control" placeholder="Position (e.g. Frontend Engineer)" required>
+            <button type="submit" class="btn btn-primary"><i class="fa-solid fa-plus"></i> Add Candidate</button>
+          </form>
+
+          <div class="table-responsive master-table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr><th>Candidate</th><th>Position</th><th>Stage</th><th>Actions</th></tr>
+              </thead>
+              <tbody id="candidateTableBody"></tbody>
+            </table>
+          </div>
+          <div class="empty-state-card" id="emptyCandidateMsg" style="display: none;">
+            <i class="fa-solid fa-user-plus"></i>
+            <p>No candidates in the pipeline yet. Add your first candidate above.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= TAB: TASK (assign & track work) ================= -->
+      <section id="tab-task" class="tab-panel">
+        <div class="admin-panel glass-panel">
+          <div class="panel-header-toolbar">
+            <div class="toolbar-title-group">
+              <h2><i class="fa-solid fa-list-check text-primary"></i> Task Board</h2>
+              <p class="subtitle">Assign work to team members and follow up on due dates.</p>
+            </div>
+          </div>
+
+          <form id="taskAddForm" class="inline-add-form">
+            <input type="text" id="taskTitleInput" class="form-control" placeholder="Task title" required>
+            <select id="taskAssigneeSelect" class="form-control"></select>
+            <input type="date" id="taskDueInput" class="form-control">
+            <button type="submit" class="btn btn-primary"><i class="fa-solid fa-plus"></i> Assign Task</button>
+          </form>
+
+          <div class="table-responsive master-table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr><th>Task</th><th>Assignee</th><th>Due</th><th>Status</th><th>Action</th></tr>
+              </thead>
+              <tbody id="taskTableBody"></tbody>
+            </table>
+          </div>
+          <div class="empty-state-card" id="emptyTaskMsg" style="display: none;">
+            <i class="fa-solid fa-list-check"></i>
+            <p>No tasks assigned yet. Create one above.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= TAB: PAYROLL (monthly pay status) ================= -->
+      <section id="tab-payroll" class="tab-panel">
+        <div class="admin-panel glass-panel">
+          <div class="panel-header-toolbar">
+            <div class="toolbar-title-group">
+              <h2><i class="fa-solid fa-sack-dollar text-primary"></i> Payroll</h2>
+              <p class="subtitle">Base salaries and monthly payout status for every team member.</p>
+            </div>
+            <div class="toolbar-actions-cluster">
+              <div class="date-selector-group">
+                <label for="payrollMonthInput" class="sr-only">Pay month</label>
+                <input type="month" id="payrollMonthInput" class="form-control select-month">
+              </div>
+              <button id="runPayrollBtn" class="btn btn-warning">
+                <i class="fa-solid fa-money-check-dollar"></i> Run Payroll
+              </button>
+            </div>
+          </div>
+
+          <div class="table-responsive master-table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr><th>Employee</th><th>Department</th><th>Base Salary (&#8377;)</th><th>Status</th><th>Action</th></tr>
+              </thead>
+              <tbody id="payrollTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= TAB: HELP & SUPPORT (FAQ + tickets) ================= -->
+      <section id="tab-help" class="tab-panel">
+        <div class="admin-panel glass-panel">
+          <div class="panel-header-toolbar">
+            <div class="toolbar-title-group">
+              <h2><i class="fa-solid fa-circle-question text-primary"></i> Help &amp; Support</h2>
+              <p class="subtitle">Policy answers at a glance &bull; raise a ticket and track it right here.</p>
+            </div>
+          </div>
+
+          <div class="help-faq-grid">
+            <div class="help-faq-card"><h4><i class="fa-solid fa-location-dot"></i> Geofence check-in</h4><p>Employees must be within <strong>500 m</strong> of the office and pass a live selfie check to punch in.</p></div>
+            <div class="help-faq-card"><h4><i class="fa-solid fa-house-laptop"></i> WFH policy</h4><p>Hybrid work is capped at <strong>2 days per week</strong> and needs your approval in the Approvals tab.</p></div>
+            <div class="help-faq-card"><h4><i class="fa-solid fa-calendar-days"></i> Leave quota</h4><p>Every member gets <strong>14 annual leaves</strong>; Restricted Holidays are limited to <strong>2 per month</strong>.</p></div>
+            <div class="help-faq-card"><h4><i class="fa-solid fa-camera"></i> Photo retention</h4><p>Check-in snapshots are stored for <strong>24 hours</strong> for audit, then removed automatically.</p></div>
+          </div>
+
+          <h3 class="dash-sub-heading"><i class="fa-solid fa-headset"></i> Raise A Support Ticket</h3>
+          <form id="ticketAddForm" class="inline-add-form">
+            <input type="text" id="ticketSubjectInput" class="form-control" placeholder="Subject" required>
+            <input type="text" id="ticketMsgInput" class="form-control" placeholder="Describe the issue" required>
+            <button type="submit" class="btn btn-primary"><i class="fa-solid fa-paper-plane"></i> Submit Ticket</button>
+          </form>
+          <div class="dash-request-list" id="ticketList"></div>
+          <p class="dash-empty-note" id="emptyTicketMsg" style="display: none;"><i class="fa-regular fa-envelope"></i> No tickets raised from this console yet.</p>
+        </div>
+      </section>
 
       <!-- ================= TAB 1: MONTHLY ATTENDANCE MASTER SHEET & EXCEL ================= -->
       <section id="tab-monthly-sheet" class="tab-panel active">
@@ -1202,6 +1413,6 @@
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="shared.js?v=20261013_ist"></script>
-  <script src="admin.js?v=20261015_data"></script>
+  <script src="admin.js?v=20261015_menu"></script>
 </body>
 </html>
