@@ -24,7 +24,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="styles.css?v=20261015_static">
+  <link rel="stylesheet" href="styles.css?v=20261015_data">
 </head>
 <body class="light-theme admin-page">
 
@@ -211,6 +211,7 @@
               <div class="kpi-data">
                 <span class="kpi-num text-success" id="kpiAvgAttendance">--%</span>
                 <span class="kpi-lbl" id="kpiAvgAttLabel">To-Date Rate (Oct 1-8)</span>
+                              <span class="kpi-delta" id="kpiAvgAttDelta"></span>
               </div>
             </div>
             <div class="kpi-card">
@@ -218,6 +219,7 @@
               <div class="kpi-data">
                 <span class="kpi-num text-primary" id="kpiTotalHours">0 hrs</span>
                 <span class="kpi-lbl">Total Work Hours</span>
+                              <span class="kpi-delta" id="kpiHoursDelta"></span>
               </div>
             </div>
             <div class="kpi-card">
@@ -229,17 +231,66 @@
             </div>
           </div>
 
-          <!-- This Week At A Glance (rendered by admin.js) -->
-          <div class="week-strip" id="adminWeekStrip" aria-label="This week at a glance"></div>
+          <!-- This Week At A Glance (rendered by admin.js, navigable) -->
+          <div class="week-strip-wrap">
+            <button type="button" class="week-nav-btn" id="weekStripPrevBtn" title="Previous week" aria-label="Previous week">
+              <i class="fa-solid fa-chevron-left"></i>
+            </button>
+            <div class="week-strip" id="adminWeekStrip" aria-label="Week at a glance"></div>
+            <button type="button" class="week-nav-btn" id="weekStripNextBtn" title="Next week" aria-label="Next week">
+              <i class="fa-solid fa-chevron-right"></i>
+            </button>
+            <button type="button" class="week-jump-today" id="weekStripTodayBtn" title="Jump to this week">
+              <i class="fa-regular fa-calendar-day"></i> This week
+            </button>
+          </div>
 
-          <!-- Table toolbar: search + live row count -->
+          <!-- Table toolbar: search + sort/filter controls + live row count -->
           <div class="table-toolbar-row">
             <div class="table-search-wrap">
               <i class="fa-solid fa-magnifying-glass"></i>
               <input type="search" id="masterSearchInput" class="form-control table-search" placeholder="Search employee by name, ID or department" aria-label="Search master sheet">
             </div>
+            <div class="table-toolbar-actions">
+              <button type="button" class="btn btn-ghost btn-sm more-filters-btn" id="masterMoreFiltersBtn">
+                <i class="fa-solid fa-sliders"></i> More Filters
+              </button>
+              <div class="table-filter-popover" id="masterFilterPopover" style="display: none;">
+                <label class="filter-pop-field">
+                  <span>Sort By</span>
+                  <select id="masterSortSelect" class="form-control">
+                    <option value="">Default (sheet order)</option>
+                    <option value="rate-desc">Attendance % (High to Low)</option>
+                    <option value="rate-asc">Attendance % (Low to High)</option>
+                    <option value="hours-desc">Total Hours (High to Low)</option>
+                    <option value="present-desc">Present Days (High to Low)</option>
+                    <option value="checkin-desc">Latest Check-In First</option>
+                  </select>
+                </label>
+                <label class="filter-pop-field">
+                  <span>Department</span>
+                  <select id="masterDeptFilter" class="form-control">
+                    <option value="">All Departments</option>
+                  </select>
+                </label>
+                <label class="filter-pop-field">
+                  <span>Today Status</span>
+                  <select id="masterTodayFilter" class="form-control">
+                    <option value="">Everyone</option>
+                    <option value="on-time">On Time</option>
+                    <option value="late">Late</option>
+                    <option value="remote">Remote (WFH)</option>
+                    <option value="leave">Leave / Holiday</option>
+                    <option value="not-in">Not Punched In</option>
+                  </select>
+                </label>
+              </div>
+            </div>
             <span class="table-toolbar-count" id="masterTableCount"></span>
           </div>
+
+          <!-- Active sort/filter chips (rendered by admin.js) -->
+          <div class="table-chips-row" id="masterTableChips"></div>
 
           <!-- Master Attendance Table -->
           <div class="table-responsive master-table-wrap">
@@ -249,6 +300,9 @@
                   <th>Employee</th>
                   <th>Emp ID</th>
                   <th>Department</th>
+                  <th>Check-In &amp; Out</th>
+                  <th>Type</th>
+                  <th>Today</th>
                   <th>Present Days</th>
                   <th>Absent Days</th>
                   <th>WFH Days</th>
@@ -260,6 +314,19 @@
                 <!-- Populated via JS -->
               </tbody>
             </table>
+          </div>
+
+          <!-- Pagination (rendered by admin.js) -->
+          <div class="table-pager-row">
+            <label class="pager-size-label">Rows
+              <select id="masterPageSizeSelect" class="form-control pager-size-select" aria-label="Rows per page">
+                <option value="5">5</option>
+                <option value="10" selected>10</option>
+                <option value="25">25</option>
+                <option value="50">50</option>
+              </select>
+            </label>
+            <div class="pager" id="masterPager"></div>
           </div>
         </div>
       </section>
@@ -1135,6 +1202,6 @@
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="shared.js?v=20261013_ist"></script>
-  <script src="admin.js?v=20261015_admin"></script>
+  <script src="admin.js?v=20261015_data"></script>
 </body>
 </html>

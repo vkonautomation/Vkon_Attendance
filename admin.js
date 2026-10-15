@@ -228,6 +228,19 @@ function renderMonthlyReport() {
   const tableBody = document.getElementById("masterReportTableBody");
   tableBody.innerHTML = "";
 
+  // Populate department filter options once
+  const deptSel = document.getElementById("masterDeptFilter");
+  if (deptSel && deptSel.options.length <= 1) {
+    [...new Set(employees.map(e => e.department))].sort().forEach(d => {
+      const opt = document.createElement("option");
+      opt.value = d;
+      opt.textContent = d;
+      deptSel.appendChild(opt);
+    });
+  }
+
+  const todayKey = formatDateKey(now);
+
   // Official Working Days Elapsed Up To Today's Date
   const workingDaysElapsed = calculateWorkingDaysElapsed(currentYear, selectedMonth, todayDay);
 
@@ -285,6 +298,47 @@ function renderMonthlyReport() {
     // Strict percentage calculation as per elapsed days after employee enrollment
     const rate = empWorkingDaysElapsed > 0 ? Math.round((attended / empWorkingDaysElapsed) * 100) : 100;
 
+    // --- Today snapshot: check-in & out pair, work type, on-time/late pill ---
+    const todayRec = records[`${emp.id}_${todayKey}`] || null;
+    const LATE_CUTOFF_MIN = 10 * 60; // 10:00 AM IST (9:30 start + 30 min grace)
+    let checkinCell = `<span class="ci-none">&mdash;</span>`;
+    let typeLabel = "&mdash;";
+    let todayStatus = "not-in";
+    let pillClass = "pill-notin";
+    let pillLabel = "Not Punched In";
+    let checkinMin = null;
+
+    if (todayRec && (todayRec.status === "Present" || todayRec.status === "WFH")) {
+      const inStr = todayRec.checkInTime && todayRec.checkInTime !== "-" ? todayRec.checkInTime : null;
+      const outStr = todayRec.checkOutTime && todayRec.checkOutTime !== "-" ? todayRec.checkOutTime : null;
+      checkinMin = inStr ? parseAmPmToMinutes(inStr) : null;
+      const isLate = checkinMin !== null && checkinMin > LATE_CUTOFF_MIN;
+      const dur = inStr && !outStr ? "In Progress" : (todayRec.duration && todayRec.duration !== "In Progress" ? todayRec.duration : "\u2014");
+      checkinCell = `
+        <span class="ci-pair${isLate ? " is-late" : ""}">
+          <span class="ci-in">${inStr || "--:--"}</span>
+          <span class="ci-dur">${dur}</span>
+          <span class="ci-out">${outStr || "\u2014"}</span>
+        </span>`;
+      typeLabel = todayRec.status === "WFH" ? "Remote" : "In house";
+      if (isLate) {
+        todayStatus = "late"; pillClass = "pill-late"; pillLabel = "Late";
+      } else if (todayRec.status === "WFH") {
+        todayStatus = "remote"; pillClass = "pill-remote"; pillLabel = "Remote";
+      } else {
+        todayStatus = "on-time"; pillClass = "pill-on-time"; pillLabel = "On Time";
+      }
+    } else if (todayRec && (todayRec.status === "Leave" || todayRec.status === "Holiday")) {
+      todayStatus = "leave";
+      pillClass = todayRec.status === "Leave" ? "pill-leave" : "pill-remote";
+      pillLabel = todayRec.status === "Leave" ? "On Leave" : "Holiday";
+      typeLabel = todayRec.status;
+    } else if (todayRec && todayRec.status === "Absent") {
+      pillClass = "pill-late";
+      pillLabel = "Absent";
+      typeLabel = "Absent";
+    }
+
     // Requirement 4: Leave taken for the whole year (not for the month): "number of leave taken / total number of leave given"
     const empApprovedLeaves = leaves.filter(l => l.employeeId === emp.id && l.status === "Approved");
     const annualLeavesTaken = empApprovedLeaves.reduce((sum, l) => sum + (parseInt(l.daysCount, 10) || 1), 0);
@@ -292,6 +346,13 @@ function renderMonthlyReport() {
     const leaveCellFormatted = `${annualLeavesTaken} / ${totalLeaveQuota}`;
 
     const tr = document.createElement("tr");
+    tr.setAttribute("data-name", emp.name.toLowerCase());
+    tr.setAttribute("data-dept", emp.department.toLowerCase());
+    tr.setAttribute("data-rate", String(rate));
+    tr.setAttribute("data-hours", empTotalHours.toFixed(2));
+    tr.setAttribute("data-present", String(attended));
+    tr.setAttribute("data-checkin", checkinMin === null ? "-1" : String(checkinMin));
+    tr.setAttribute("data-today", todayStatus);
     tr.innerHTML = `
       <td>
         <div class="table-emp-cell">
@@ -304,6 +365,9 @@ function renderMonthlyReport() {
       </td>
       <td><span class="day-badge-pill badge-primary font-mono">${emp.id}</span></td>
       <td>${emp.department}</td>
+      <td>${checkinCell}</td>
+      <td><span class="type-cell">${typeLabel}</span></td>
+      <td><span class="today-pill ${pillClass}">${pillLabel}</span></td>
       <td><span class="text-success font-bold">${presentCount} Days</span></td>
       <td><span class="text-danger font-bold">${absentCount} Days</span></td>
       <td><span class="text-primary font-bold">${wfhCount} Days</span></td>
@@ -325,13 +389,17 @@ function renderMonthlyReport() {
   document.getElementById("kpiAvgAttendance").textContent = `${Math.min(avgAttendance, 100)}%`;
   document.getElementById("kpiAvgAttLabel").textContent = `To-Date Rate (Oct 1-${todayDay}, ${workingDaysElapsed} working days)`;
 
+  renderKpiDeltas(now, employees, records);
   renderAdminWeekStrip();
-  applyMasterTableFilter();
+  applyMasterTableView();
 }
 
 // ----------------------------------------------------------------------------
-// Week strip: current Sun-Sat with how many members were in on each day
+// Week strip: Sun-Sat at a glance with how many members were in each day
+// adminWeekOffset: 0 = this week, -1 = last week, ...
 // ----------------------------------------------------------------------------
+let adminWeekOffset = 0;
+
 function renderAdminWeekStrip() {
   const strip = document.getElementById("adminWeekStrip");
   if (!strip) return;
@@ -342,7 +410,7 @@ function renderAdminWeekStrip() {
   const todayKey = formatDateKey(now);
   const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const sunday = new Date(dayStart);
-  sunday.setDate(dayStart.getDate() - dayStart.getDay());
+  sunday.setDate(dayStart.getDate() - dayStart.getDay() + adminWeekOffset * 7);
 
   const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
   let html = "";
@@ -356,7 +424,9 @@ function renderAdminWeekStrip() {
     const isWeekend = d.getDay() === 0 || d.getDay() === 6;
 
     let foot;
-    if (isFuture) {
+    if (isToday) {
+      foot = "Today";
+    } else if (isFuture) {
       foot = "Upcoming";
     } else if (isWeekend) {
       foot = "Weekend";
@@ -373,42 +443,274 @@ function renderAdminWeekStrip() {
       <div class="week-pill${isToday ? " is-today" : ""}${isWeekend && !isToday ? " is-off" : ""}${isFuture ? " is-future" : ""}">
         <span class="week-pill-day">${String(d.getDate()).padStart(2, "0")}</span>
         <span class="week-pill-name">${dayNames[d.getDay()].slice(0, 3)}</span>
-        <span class="week-pill-foot">${isToday ? "Today" : foot}</span>
+        <span class="week-pill-foot">${foot}</span>
       </div>
     `;
   }
   strip.innerHTML = html;
+
+  const nextBtn = document.getElementById("weekStripNextBtn");
+  if (nextBtn) nextBtn.disabled = adminWeekOffset >= 0;
 }
 
 // ----------------------------------------------------------------------------
-// Master sheet live search (name / ID / department)
+// KPI deltas: this week vs last week (attendance rate + work hours)
 // ----------------------------------------------------------------------------
-function applyMasterTableFilter() {
-  const input = document.getElementById("masterSearchInput");
+function weekStartFor(offsetWeeks, now) {
+  const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const sunday = new Date(dayStart);
+  sunday.setDate(dayStart.getDate() - dayStart.getDay() + offsetWeeks * 7);
+  return sunday;
+}
+
+function computeWeekStats(weekStart, employees, records, now) {
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  let attended = 0, possible = 0, hours = 0;
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(weekStart);
+    d.setDate(weekStart.getDate() + i);
+    if (d.getDay() === 0 || d.getDay() === 6) continue; // weekends excluded
+    if (d > todayStart) continue;                       // only elapsed days
+    possible += employees.length;
+    employees.forEach(emp => {
+      const rec = records[`${emp.id}_${formatDateKey(d)}`];
+      if (rec && (rec.status === "Present" || rec.status === "WFH")) {
+        attended++;
+        hours += (rec.hoursDecimal || 9);
+      }
+    });
+  }
+  return { attended, possible, hours };
+}
+
+function renderKpiDeltas(now, employees, records) {
+  const thisW = computeWeekStats(weekStartFor(0, now), employees, records, now);
+  const lastW = computeWeekStats(weekStartFor(-1, now), employees, records, now);
+
+  const attEl = document.getElementById("kpiAvgAttDelta");
+  if (attEl) {
+    const rateThis = thisW.possible ? Math.round((thisW.attended / thisW.possible) * 100) : null;
+    const rateLast = lastW.possible ? Math.round((lastW.attended / lastW.possible) * 100) : null;
+    if (rateThis === null || rateLast === null) {
+      attEl.textContent = "";
+      attEl.className = "kpi-delta";
+    } else {
+      const diff = rateThis - rateLast;
+      attEl.textContent = diff === 0 ? "Same as last week" : `${diff > 0 ? "+" : "\u2212"}${Math.abs(diff)}% vs last week`;
+      attEl.className = `kpi-delta ${diff > 0 ? "is-up" : diff < 0 ? "is-down" : "is-flat"}`;
+    }
+  }
+
+  const hrsEl = document.getElementById("kpiHoursDelta");
+  if (hrsEl) {
+    if (!lastW.hours) {
+      hrsEl.textContent = thisW.hours ? "New this week" : "";
+      hrsEl.className = "kpi-delta";
+    } else {
+      const pct = Math.round(((thisW.hours - lastW.hours) / lastW.hours) * 100);
+      hrsEl.textContent = pct === 0 ? "Same hours as last week" : `${pct > 0 ? "+" : "\u2212"}${Math.abs(pct)}% hrs vs last week`;
+      hrsEl.className = `kpi-delta ${pct > 0 ? "is-up" : pct < 0 ? "is-down" : "is-flat"}`;
+    }
+  }
+}
+
+// ----------------------------------------------------------------------------
+// Master sheet view pipeline: search + sort + filters + removable chips +
+// pagination (all client-side over the rendered rows)
+// ----------------------------------------------------------------------------
+const masterTableState = { page: 1, pageSize: 10 };
+
+const MASTER_SORT_LABELS = {
+  "rate-desc": "Attendance % High to Low",
+  "rate-asc": "Attendance % Low to High",
+  "hours-desc": "Total Hours High to Low",
+  "present-desc": "Present Days High to Low",
+  "checkin-desc": "Latest Check-In First"
+};
+
+const MASTER_TODAY_LABELS = {
+  "on-time": "On Time",
+  "late": "Late",
+  "remote": "Remote",
+  "leave": "Leave / Holiday",
+  "not-in": "Not Punched In"
+};
+
+function parseAmPmToMinutes(str) {
+  const m = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i.exec((str || "").trim());
+  if (!m) return null;
+  let h = parseInt(m[1], 10) % 12;
+  if (/pm/i.test(m[3])) h += 12;
+  return h * 60 + parseInt(m[2], 10);
+}
+
+function applyMasterTableView() {
   const tableBody = document.getElementById("masterReportTableBody");
-  const countEl = document.getElementById("masterTableCount");
   if (!tableBody) return;
 
-  const q = input ? input.value.trim().toLowerCase() : "";
-  const rows = tableBody.querySelectorAll("tr");
-  let visible = 0;
+  const searchEl = document.getElementById("masterSearchInput");
+  const sortEl = document.getElementById("masterSortSelect");
+  const deptEl = document.getElementById("masterDeptFilter");
+  const todayEl = document.getElementById("masterTodayFilter");
 
-  rows.forEach(tr => {
-    const match = !q || tr.textContent.toLowerCase().includes(q);
-    tr.style.display = match ? "" : "none";
-    if (match) visible++;
+  const q = searchEl ? searchEl.value.trim().toLowerCase() : "";
+  const sort = sortEl ? sortEl.value : "";
+  const dept = deptEl ? deptEl.value : "";
+  const todayF = todayEl ? todayEl.value : "";
+
+  const rows = Array.from(tableBody.querySelectorAll("tr"));
+  const filtered = rows.filter(tr => {
+    if (q && !tr.textContent.toLowerCase().includes(q)) return false;
+    if (dept && tr.getAttribute("data-dept") !== dept.toLowerCase()) return false;
+    if (todayF && tr.getAttribute("data-today") !== todayF) return false;
+    return true;
   });
 
+  const sorters = {
+    "rate-desc": (a, b) => b.dataset.rate - a.dataset.rate,
+    "rate-asc": (a, b) => a.dataset.rate - b.dataset.rate,
+    "hours-desc": (a, b) => b.dataset.hours - a.dataset.hours,
+    "present-desc": (a, b) => b.dataset.present - a.dataset.present,
+    "checkin-desc": (a, b) => (b.dataset.checkin | 0) - (a.dataset.checkin | 0)
+  };
+  if (sort && sorters[sort]) filtered.sort(sorters[sort]);
+  filtered.forEach(tr => tableBody.appendChild(tr));
+
+  const pageSize = masterTableState.pageSize;
+  const pages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  if (masterTableState.page > pages) masterTableState.page = pages;
+  const start = (masterTableState.page - 1) * pageSize;
+
+  rows.forEach(tr => { tr.style.display = "none"; });
+  filtered.forEach((tr, i) => {
+    tr.style.display = (i >= start && i < start + pageSize) ? "" : "none";
+  });
+
+  renderMasterTableChips(sort, dept, todayF);
+  renderMasterPager(pages);
+
+  const countEl = document.getElementById("masterTableCount");
   if (countEl) {
-    countEl.textContent = q
-      ? `${visible} of ${rows.length} employees match`
-      : `${rows.length} employee${rows.length === 1 ? "" : "s"} on sheet`;
+    if (!filtered.length) {
+      countEl.textContent = q || dept || todayF ? "No employees match the current filters" : "No employees on sheet";
+    } else {
+      countEl.textContent = `Showing ${start + 1}-${Math.min(start + pageSize, filtered.length)} of ${filtered.length} employee${filtered.length === 1 ? "" : "s"}`;
+    }
   }
+}
+
+// Legacy hook (search input) kept for any external callers
+function applyMasterTableFilter() {
+  applyMasterTableView();
+}
+
+function renderMasterTableChips(sort, dept, todayF) {
+  const wrap = document.getElementById("masterTableChips");
+  if (!wrap) return;
+  let html = "";
+  if (sort) {
+    html += `<button type="button" class="table-chip" data-clear="sort"><i class="fa-solid fa-arrow-down-wide-short"></i> Sort By: ${MASTER_SORT_LABELS[sort] || sort} <span class="chip-x">&times;</span></button>`;
+  }
+  if (dept) {
+    html += `<button type="button" class="table-chip" data-clear="dept"><i class="fa-solid fa-building"></i> Department: ${dept} <span class="chip-x">&times;</span></button>`;
+  }
+  if (todayF) {
+    html += `<button type="button" class="table-chip" data-clear="today"><i class="fa-solid fa-user-check"></i> Today: ${MASTER_TODAY_LABELS[todayF] || todayF} <span class="chip-x">&times;</span></button>`;
+  }
+  wrap.innerHTML = html;
+}
+
+function renderMasterPager(pages) {
+  const pager = document.getElementById("masterPager");
+  if (!pager) return;
+  const cur = masterTableState.page;
+  let html = `<button type="button" class="pager-btn" data-page="prev"${cur === 1 ? " disabled" : ""} aria-label="Previous page"><i class="fa-solid fa-chevron-left"></i></button>`;
+  const nums = [];
+  for (let p = 1; p <= pages; p++) {
+    if (pages <= 7 || p === 1 || p === pages || Math.abs(p - cur) <= 1) nums.push(p);
+    else if (nums[nums.length - 1] !== "dots") nums.push("dots");
+  }
+  nums.forEach(n => {
+    html += n === "dots"
+      ? `<span class="pager-dots">&hellip;</span>`
+      : `<button type="button" class="pager-btn${n === cur ? " is-active" : ""}" data-page="${n}">${n}</button>`;
+  });
+  html += `<button type="button" class="pager-btn" data-page="next"${cur === pages ? " disabled" : ""} aria-label="Next page"><i class="fa-solid fa-chevron-right"></i></button>`;
+  pager.innerHTML = html;
 }
 
 function initMasterTableSearch() {
   const input = document.getElementById("masterSearchInput");
-  if (input) input.addEventListener("input", applyMasterTableFilter);
+  if (input) input.addEventListener("input", () => { masterTableState.page = 1; applyMasterTableView(); });
+
+  const sortSel = document.getElementById("masterSortSelect");
+  const deptSel = document.getElementById("masterDeptFilter");
+  const todaySel = document.getElementById("masterTodayFilter");
+  [sortSel, deptSel, todaySel].forEach(sel => {
+    if (sel) sel.addEventListener("change", () => { masterTableState.page = 1; applyMasterTableView(); });
+  });
+
+  // More Filters popover toggle (closes on outside click)
+  const moreBtn = document.getElementById("masterMoreFiltersBtn");
+  const pop = document.getElementById("masterFilterPopover");
+  if (moreBtn && pop) {
+    moreBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      pop.style.display = pop.style.display === "none" ? "" : "none";
+    });
+    document.addEventListener("click", (e) => {
+      if (pop.style.display !== "none" && !pop.contains(e.target) && !moreBtn.contains(e.target)) {
+        pop.style.display = "none";
+      }
+    });
+  }
+
+  // Chip removal (click delegation)
+  const chips = document.getElementById("masterTableChips");
+  if (chips) {
+    chips.addEventListener("click", (e) => {
+      const chip = e.target.closest(".table-chip");
+      if (!chip) return;
+      const which = chip.getAttribute("data-clear");
+      if (which === "sort" && sortSel) sortSel.value = "";
+      if (which === "dept" && deptSel) deptSel.value = "";
+      if (which === "today" && todaySel) todaySel.value = "";
+      masterTableState.page = 1;
+      applyMasterTableView();
+    });
+  }
+
+  // Rows-per-page select
+  const sizeSel = document.getElementById("masterPageSizeSelect");
+  if (sizeSel) {
+    sizeSel.addEventListener("change", () => {
+      masterTableState.pageSize = parseInt(sizeSel.value, 10) || 10;
+      masterTableState.page = 1;
+      applyMasterTableView();
+    });
+  }
+
+  // Pager buttons
+  const pager = document.getElementById("masterPager");
+  if (pager) {
+    pager.addEventListener("click", (e) => {
+      const btn = e.target.closest(".pager-btn");
+      if (!btn || btn.disabled) return;
+      const p = btn.getAttribute("data-page");
+      if (p === "prev") masterTableState.page = Math.max(1, masterTableState.page - 1);
+      else if (p === "next") masterTableState.page = masterTableState.page + 1;
+      else masterTableState.page = parseInt(p, 10) || 1;
+      applyMasterTableView();
+    });
+  }
+
+  // Week strip navigation
+  const prevW = document.getElementById("weekStripPrevBtn");
+  const nextW = document.getElementById("weekStripNextBtn");
+  const thisW = document.getElementById("weekStripTodayBtn");
+  if (prevW) prevW.addEventListener("click", () => { adminWeekOffset--; renderAdminWeekStrip(); });
+  if (nextW) nextW.addEventListener("click", () => { if (adminWeekOffset < 0) { adminWeekOffset++; renderAdminWeekStrip(); } });
+  if (thisW) thisW.addEventListener("click", () => { adminWeekOffset = 0; renderAdminWeekStrip(); });
 }
 
 function exportMonthlyExcel() {
