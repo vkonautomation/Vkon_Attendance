@@ -138,8 +138,19 @@ function initAdminClock() {
 }
 
 function initAdminTabs() {
-  const tabs = document.querySelectorAll(".admin-sub-bar .nav-tab");
+  const tabs = document.querySelectorAll(".admin-sidebar .nav-tab, .admin-sub-bar .nav-tab");
   const panels = document.querySelectorAll(".tab-panel");
+
+  // Header heading per view (Onboardly-style top bar)
+  const VIEW_META = {
+    "tab-monthly-sheet": ["Attendance", "Company-wide overview \u2022 Excel-ready master sheet"],
+    "tab-roster": ["Employees", "Member accounts, roles & biometric enrollment"],
+    "tab-approvals": ["Approvals", "Leave, WFH & regularisation awaiting review"],
+    "tab-holidays": ["Holidays", "Declared company & restricted holiday calendar"],
+    "tab-photos": ["Attendance Photos", "Rolling 24-hour check-in snapshot audit trail"],
+    "tab-geofence": ["Geofence", "Office location radius & calibration"],
+    "tab-account": ["Admin Security", "Credentials and access control"]
+  };
 
   tabs.forEach(tab => {
     tab.addEventListener("click", () => {
@@ -147,6 +158,14 @@ function initAdminTabs() {
 
       tabs.forEach(t => t.classList.toggle("active", t === tab));
       panels.forEach(p => p.classList.toggle("active", p.id === targetId));
+
+      const meta = VIEW_META[targetId];
+      const titleEl = document.getElementById("adminViewTitle");
+      const subEl = document.getElementById("adminViewSub");
+      if (meta && titleEl && subEl) {
+        titleEl.textContent = meta[0];
+        subEl.textContent = meta[1];
+      }
 
       if (targetId === "tab-monthly-sheet") {
         renderMonthlyReport();
@@ -305,6 +324,91 @@ function renderMonthlyReport() {
   const avgAttendance = totalPossible > 0 ? Math.round((totalAttendedCount / totalPossible) * 100) : 100;
   document.getElementById("kpiAvgAttendance").textContent = `${Math.min(avgAttendance, 100)}%`;
   document.getElementById("kpiAvgAttLabel").textContent = `To-Date Rate (Oct 1-${todayDay}, ${workingDaysElapsed} working days)`;
+
+  renderAdminWeekStrip();
+  applyMasterTableFilter();
+}
+
+// ----------------------------------------------------------------------------
+// Week strip: current Sun-Sat with how many members were in on each day
+// ----------------------------------------------------------------------------
+function renderAdminWeekStrip() {
+  const strip = document.getElementById("adminWeekStrip");
+  if (!strip) return;
+
+  const now = (typeof getPresentDate === "function") ? getPresentDate() : new Date();
+  const records = getStore(STORAGE_KEYS.RECORDS, {});
+  const employees = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
+  const todayKey = formatDateKey(now);
+  const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const sunday = new Date(dayStart);
+  sunday.setDate(dayStart.getDate() - dayStart.getDay());
+
+  const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  let html = "";
+
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(sunday);
+    d.setDate(sunday.getDate() + i);
+    const key = formatDateKey(d);
+    const isToday = key === todayKey;
+    const isFuture = key > todayKey;
+    const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+
+    let foot;
+    if (isFuture) {
+      foot = "Upcoming";
+    } else if (isWeekend) {
+      foot = "Weekend";
+    } else {
+      let inCount = 0;
+      employees.forEach(emp => {
+        const rec = records[`${emp.id}_${key}`];
+        if (rec && (rec.status === "Present" || rec.status === "WFH")) inCount++;
+      });
+      foot = `${inCount} of ${employees.length} in`;
+    }
+
+    html += `
+      <div class="week-pill${isToday ? " is-today" : ""}${isWeekend && !isToday ? " is-off" : ""}${isFuture ? " is-future" : ""}">
+        <span class="week-pill-day">${String(d.getDate()).padStart(2, "0")}</span>
+        <span class="week-pill-name">${dayNames[d.getDay()].slice(0, 3)}</span>
+        <span class="week-pill-foot">${isToday ? "Today" : foot}</span>
+      </div>
+    `;
+  }
+  strip.innerHTML = html;
+}
+
+// ----------------------------------------------------------------------------
+// Master sheet live search (name / ID / department)
+// ----------------------------------------------------------------------------
+function applyMasterTableFilter() {
+  const input = document.getElementById("masterSearchInput");
+  const tableBody = document.getElementById("masterReportTableBody");
+  const countEl = document.getElementById("masterTableCount");
+  if (!tableBody) return;
+
+  const q = input ? input.value.trim().toLowerCase() : "";
+  const rows = tableBody.querySelectorAll("tr");
+  let visible = 0;
+
+  rows.forEach(tr => {
+    const match = !q || tr.textContent.toLowerCase().includes(q);
+    tr.style.display = match ? "" : "none";
+    if (match) visible++;
+  });
+
+  if (countEl) {
+    countEl.textContent = q
+      ? `${visible} of ${rows.length} employees match`
+      : `${rows.length} employee${rows.length === 1 ? "" : "s"} on sheet`;
+  }
+}
+
+function initMasterTableSearch() {
+  const input = document.getElementById("masterSearchInput");
+  if (input) input.addEventListener("input", applyMasterTableFilter);
 }
 
 function exportMonthlyExcel() {
@@ -1954,6 +2058,7 @@ function startAdminConsole() {
 
   initAdminClock();
   initAdminTabs();
+  initMasterTableSearch();
   renderMonthlyReport();
   renderRosterTable();
   initEnrollmentForm();

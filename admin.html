@@ -24,7 +24,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="styles.css?v=20261014_tune">
+  <link rel="stylesheet" href="styles.css?v=20261015_admin">
 </head>
 <body class="light-theme admin-page">
 
@@ -93,19 +93,63 @@
     </div>
   </div>
 
-  <div class="app-wrapper">
+  <div class="app-wrapper admin-shell">
     
-    <!-- Top Navbar -->
-    <header class="navbar admin-navbar">
-      <div class="nav-brand">
+    <!-- ================= DARK SIDEBAR (Onboardly-style) ================= -->
+    <aside class="admin-sidebar">
+      <div class="sidebar-brand">
         <div class="brand-logo-wrap">
-          <img src="assets/vkon-logo-dark.png" alt="Vkon Automation" class="vkon-brand-logo-nav vkon-logo-dark">
-          <img src="assets/vkon-logo-light.png" alt="Vkon Automation" class="vkon-brand-logo-nav vkon-logo-light">
+          <img src="assets/vkon-favicon.png" alt="Vkon Automation" class="sidebar-logo-img">
         </div>
         <div class="brand-text">
-          <h1>VKON Admin</h1>
-          <span class="badge-sub text-warning"><span class="label-tech">Executive Console</span></span>
+          <h1>VKON</h1>
+          <span class="badge-sub"><span class="label-tech">Admin Console</span></span>
         </div>
+      </div>
+
+      <nav class="admin-side-nav" aria-label="Admin sections">
+        <span class="side-nav-label">Menu</span>
+        <div class="nav-tabs" role="tablist">
+          <button class="nav-tab active" data-tab="tab-monthly-sheet">
+            <i class="fa-solid fa-file-excel"></i> Monthly Sheet & Excel
+          </button>
+          <button class="nav-tab" data-tab="tab-roster">
+            <i class="fa-solid fa-users-gear"></i> Member Accounts & Biometrics
+          </button>
+          <button class="nav-tab" data-tab="tab-approvals">
+            <i class="fa-solid fa-clipboard-check"></i> Approvals Center <span class="badge-bubble" id="pendingRequestsBadge" style="display: none;">0</span>
+          </button>
+          <button class="nav-tab" data-tab="tab-holidays">
+            <i class="fa-solid fa-calendar-star"></i> Company Holidays
+          </button>
+          <button class="nav-tab" data-tab="tab-photos">
+            <i class="fa-solid fa-images"></i> 24h Attendance Photos
+          </button>
+          <button class="nav-tab" data-tab="tab-geofence">
+            <i class="fa-solid fa-location-dot"></i> Office Geofence (500m)
+          </button>
+          <button class="nav-tab" data-tab="tab-account" id="navTabAccount">
+            <i class="fa-solid fa-user-shield"></i> Admin Account & Security
+          </button>
+        </div>
+      </nav>
+
+      <div class="sidebar-footer">
+        <button id="themeToggleBtn" class="icon-btn theme-toggle-btn sidebar-tool-btn" title="Toggle Theme" aria-label="Toggle Theme">
+          <i class="fa-solid fa-moon theme-toggle-icon" id="themeIcon"></i>
+        </button>
+        <button id="adminLogoutBtn" class="btn btn-ghost btn-sm sidebar-logout-btn" title="Logout">
+          <i class="fa-solid fa-right-from-bracket"></i> Log out
+        </button>
+      </div>
+    </aside>
+
+    <!-- ================= MAIN COLUMN ================= -->
+    <div class="admin-main-col">
+    <header class="navbar admin-navbar">
+      <div class="admin-page-heading">
+        <h2 id="adminViewTitle">Attendance</h2>
+        <p class="admin-view-sub" id="adminViewSub">Company-wide overview &bull; Excel-ready master sheet</p>
       </div>
 
       <div class="realtime-clock" id="liveClockWidget">
@@ -121,43 +165,8 @@
             <span class="chip-role text-success">Full System Access</span>
           </div>
         </div>
-
-        <button id="themeToggleBtn" class="icon-btn theme-toggle-btn" title="Toggle Theme" aria-label="Toggle Theme">
-          <i class="fa-solid fa-moon theme-toggle-icon" id="themeIcon"></i>
-        </button>
-
-        <button id="adminLogoutBtn" class="btn btn-ghost btn-sm text-danger" title="Logout">
-          <i class="fa-solid fa-right-from-bracket"></i> Logout
-        </button>
       </div>
     </header>
-
-    <!-- Admin Navigation Tabs -->
-    <div class="sub-bar admin-sub-bar">
-      <div class="nav-tabs" role="tablist">
-        <button class="nav-tab active" data-tab="tab-monthly-sheet">
-          <i class="fa-solid fa-file-excel"></i> Monthly Sheet & Excel
-        </button>
-        <button class="nav-tab" data-tab="tab-roster">
-          <i class="fa-solid fa-users-gear"></i> Member Accounts & Biometrics
-        </button>
-        <button class="nav-tab" data-tab="tab-approvals">
-          <i class="fa-solid fa-clipboard-check"></i> Approvals Center <span class="badge-bubble" id="pendingRequestsBadge" style="display: none;">0</span>
-        </button>
-        <button class="nav-tab" data-tab="tab-holidays">
-          <i class="fa-solid fa-calendar-star"></i> Company Holidays
-        </button>
-        <button class="nav-tab" data-tab="tab-photos">
-          <i class="fa-solid fa-images"></i> 24h Attendance Photos
-        </button>
-        <button class="nav-tab" data-tab="tab-geofence">
-          <i class="fa-solid fa-location-dot"></i> Office Geofence (500m)
-        </button>
-        <button class="nav-tab" data-tab="tab-account" id="navTabAccount">
-          <i class="fa-solid fa-user-shield"></i> Admin Account & Security
-        </button>
-      </div>
-    </div>
 
     <!-- Admin Main Body -->
     <main class="main-content">
@@ -218,6 +227,18 @@
                 <span class="kpi-lbl">Pending Leave Requests</span>
               </div>
             </div>
+          </div>
+
+          <!-- This Week At A Glance (rendered by admin.js) -->
+          <div class="week-strip" id="adminWeekStrip" aria-label="This week at a glance"></div>
+
+          <!-- Table toolbar: search + live row count -->
+          <div class="table-toolbar-row">
+            <div class="table-search-wrap">
+              <i class="fa-solid fa-magnifying-glass"></i>
+              <input type="search" id="masterSearchInput" class="form-control table-search" placeholder="Search employee by name, ID or department" aria-label="Search master sheet">
+            </div>
+            <span class="table-toolbar-count" id="masterTableCount"></span>
           </div>
 
           <!-- Master Attendance Table -->
@@ -961,7 +982,8 @@
     <footer class="app-footer">
       <p>VKON Automation Executive Management Console &bull; Confidential Admin Controls</p>
     </footer>
-  </div>
+    </div><!-- /.admin-main-col -->
+  </div><!-- /.admin-shell -->
 
   <!-- ================= EDIT EMPLOYEE MODAL ================= -->
   <div class="modal-backdrop" id="editEmployeeModal" role="dialog" aria-modal="true" aria-hidden="true">
@@ -1113,6 +1135,6 @@
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="shared.js?v=20261013_ist"></script>
-  <script src="admin.js?v=20261013_ist"></script>
+  <script src="admin.js?v=20261015_admin"></script>
 </body>
 </html>
