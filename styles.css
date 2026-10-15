@@ -4520,6 +4520,25 @@ body.light-theme .reg-calendar-box {
   background: var(--color-primary, #ea580c) !important;
   color: #ffffff !important;
 }
+/* Keep the full "Selected" label visible inside the narrow cell */
+.reg-cal-cell.reg-selected {
+  padding-left: 2px;
+  padding-right: 2px;
+}
+.reg-cal-cell .cell-mini-pill.pill-selected {
+  width: 100%;
+  justify-content: center;
+  gap: 2px;
+  padding: 2px 2px;
+  font-size: 0.56rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  max-width: none;
+  overflow: visible;
+}
+.reg-cal-cell .cell-mini-pill.pill-selected i {
+  font-size: 0.72em;
+}
 
 /* Selected Date Banner */
 .reg-selected-date-banner {
