@@ -118,6 +118,7 @@ html, body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
+  overflow-x: clip; /* clip blocks horizontal overflow WITHOUT killing position: sticky */
   position: relative;
 }
 
@@ -7818,6 +7819,29 @@ body:not(.light-theme) .auth-screen-overlay {
   }
   .sidebar-footer {
     padding-top: 0.6rem;
+  }
+}
+
+/* --- Insurance: the dark sidebar column always spans the full document
+       height, so no empty strip can appear at the left bottom --- */
+.admin-shell::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 252px;
+  background: #35423d;
+  z-index: 0;
+}
+
+.admin-shell .admin-sidebar {
+  z-index: 5;
+}
+
+@media (max-width: 900px) {
+  .admin-shell::before {
+    display: none;
   }
 }
 
