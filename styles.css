@@ -4383,13 +4383,17 @@ body.light-theme .reg-calendar-box {
   font-weight: 600;
   padding: 2px 4px;
   border-radius: 4px;
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  white-space: nowrap;
+  display: block;
+  width: 100%;
   max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  box-sizing: border-box;
+  text-align: center;
+  white-space: normal;
+  overflow: visible;
+  line-height: 1.15;
+  overflow-wrap: break-word;
+  word-break: normal;
+  hyphens: auto;
 }
 
 /* Other Month Padding */
