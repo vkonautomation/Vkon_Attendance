@@ -4537,7 +4537,7 @@ body.light-theme .reg-calendar-box {
   overflow: visible;
 }
 .reg-cal-cell .cell-mini-pill.pill-selected i {
-  font-size: 0.72em;
+  font-size: 0.72rem;
 }
 
 /* Selected Date Banner */
@@ -9264,6 +9264,91 @@ body:not(.light-theme) .emp-cal-chip.chip-a { background: rgba(239, 68, 68, 0.16
   }
   .day-meta-text {
     font-size: 0.72rem;
+  }
+}
+
+/* ==========================================================================
+   MOBILE (<=600px): COMPACT CALENDAR CELLS
+   Seven weekday columns leave only ~39px per cell on a phone, so the status
+   text and the "Regularise" / "View request" buttons could not fit and were
+   overflowing into neighbouring cells (overlapping tap targets, clipped
+   "P..." pills, the "Today" chip covering the next date). Render them as tidy
+   icon-only chips instead: colour + icon + the legend above the calendar still
+   convey meaning, and every element keeps its title tooltip for long-press.
+   ========================================================================== */
+@media (max-width: 600px) {
+  /* --- Main monthly calendar --- */
+  .calendar-days-grid {
+    gap: 4px;
+  }
+  .calendar-day-cell {
+    overflow: hidden;
+    min-height: 70px;
+    padding: 0.35rem 0.15rem;
+  }
+  .calendar-day-cell.is-today {
+    min-height: 78px;
+  }
+  .calendar-day-cell .cell-top-row {
+    justify-content: center;
+  }
+  .calendar-day-cell .day-number {
+    font-size: 0.82rem;
+  }
+  /* Drop the "Today" text chip; the orange border already marks today */
+  .calendar-day-cell .today-marker-chip {
+    display: none;
+  }
+  /* Status pill -> icon-only, full-width, never clipped */
+  .calendar-day-cell .day-badge-pill {
+    font-size: 0;
+    line-height: 0;
+    gap: 0;
+    padding: 4px 0;
+    width: 100%;
+    max-width: 100%;
+    justify-content: center;
+    text-overflow: clip;
+  }
+  .calendar-day-cell .day-badge-pill .pill-text {
+    display: none;
+  }
+  .calendar-day-cell .day-badge-pill i,
+  .calendar-day-cell .day-badge-pill .fa-solid {
+    font-size: 0.85rem;
+    line-height: 1;
+  }
+  /* Action buttons -> icon-only so they fit inside their own cell */
+  .calendar-day-cell .cell-reg-quick,
+  .calendar-day-cell .cell-reg-view {
+    font-size: 0;
+    line-height: 0;
+    gap: 0;
+    padding: 4px 0;
+    width: 100%;
+    max-width: 100%;
+    justify-content: center;
+  }
+  .calendar-day-cell .cell-reg-quick i,
+  .calendar-day-cell .cell-reg-view i {
+    font-size: 0.8rem;
+    line-height: 1;
+  }
+
+  /* --- Regularisation picker calendar --- */
+  /* Most picker pills are plain text with no icon, so at ~30px cells they
+     can't be shown as icon-only. Rely on the coloured cell tint + the legend
+     and hide the mini-pill entirely to keep the grid clean. */
+  .reg-calendar-grid {
+    gap: 4px;
+  }
+  .reg-cal-cell {
+    min-height: 40px;
+    padding: 5px 2px;
+    justify-content: center;
+  }
+  .reg-cal-cell .cell-mini-pill {
+    display: none;
   }
 }
 

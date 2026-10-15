@@ -429,26 +429,26 @@ function renderMonthlyCalendar() {
         </span>
       `;
     } else if (isWeekend) {
-      badgeHtml = `<span class="day-badge-pill badge-weekend-day"><i class="fa-solid fa-mug-hot"></i> Weekend</span>`;
+      badgeHtml = `<span class="day-badge-pill badge-weekend-day" title="Weekend"><i class="fa-solid fa-mug-hot"></i> Weekend</span>`;
     } else {
       if (record) {
         if (record.status === "Present") {
           countPresent++;
           badgeHtml = `
-            <span class="day-badge-pill badge-present"><i class="fa-solid fa-circle-check"></i> Present</span>
+            <span class="day-badge-pill badge-present" title="Present"><i class="fa-solid fa-circle-check"></i> Present</span>
             ${workedMeta(record)}
           `;
         } else if (record.status === "WFH") {
           countWfh++;
           badgeHtml = `
-            <span class="day-badge-pill badge-wfh-day"><i class="fa-solid fa-house-laptop"></i> WFH</span>
+            <span class="day-badge-pill badge-wfh-day" title="Work from Home"><i class="fa-solid fa-house-laptop"></i> WFH</span>
             ${workedMeta(record)}
           `;
         } else if (record.status === "Holiday" || record.status === "Leave") {
           countLeave++;
           const isRh = record.locationType && record.locationType.includes("RH");
           badgeHtml = `
-            <span class="day-badge-pill ${isRh ? 'badge-rh-day' : 'badge-leave-day'}">
+            <span class="day-badge-pill ${isRh ? 'badge-rh-day' : 'badge-leave-day'}" title="${isRh ? 'Restricted Holiday' : 'Leave'} (Approved)">
               <i class="fa-solid ${isRh ? 'fa-calendar-check' : 'fa-umbrella-beach'}"></i> ${isRh ? 'RH' : 'Leave'}
             </span>
             <span class="day-meta-text">Approved</span>
@@ -456,7 +456,7 @@ function renderMonthlyCalendar() {
         } else if (record.status === "Absent") {
           countAbsent++;
           badgeHtml = `
-            <span class="day-badge-pill badge-absent-day"><i class="fa-solid fa-circle-xmark"></i> Absent</span>
+            <span class="day-badge-pill badge-absent-day" title="Absent"><i class="fa-solid fa-circle-xmark"></i> Absent</span>
           `;
         }
       } else {
@@ -485,7 +485,7 @@ function renderMonthlyCalendar() {
           }
         } else if (isToday && !declaredHoliday && !isWeekend) {
           badgeHtml = `
-            <span class="day-badge-pill badge-today-active"><i class="fa-solid fa-clock"></i> Today (Active)</span>
+            <span class="day-badge-pill badge-today-active" title="Today &ndash; ready to punch in"><i class="fa-solid fa-clock"></i> Today (Active)</span>
             <span class="day-meta-text">Ready to Punch</span>
           `;
         }
