@@ -8453,6 +8453,296 @@ body.admin-page.light-theme #tab-roster .table-responsive .data-table tr:hover t
   background: transparent;
 }
 
+/* ==========================================================================
+   EMPLOYEE MENU VIEWS — dedicated sidebar views (Dashboard / Attendance /
+   Regularisation), clearer active accent pill, personal stats cards,
+   roomier policy bar, and an off-canvas burger drawer on mobile.
+   ========================================================================== */
+
+/* --- View switching: only the active view's sections are shown --- */
+.portal-view {
+  display: none !important;
+}
+
+.portal-view.portal-view-active {
+  display: block !important;
+}
+
+.employee-action-hub.portal-view.portal-view-active {
+  display: flex !important;
+}
+
+/* --- Active menu item: clear orange accent pill (matches Admin highlight) --- */
+.portal-nav-link.active {
+  background: linear-gradient(135deg, #ea580c, #f97316);
+  color: #ffffff;
+  box-shadow: 0 6px 16px rgba(234, 88, 12, 0.38);
+}
+
+.portal-nav-link.active i {
+  color: #ffffff;
+}
+
+.portal-nav-link.active::before {
+  content: none;
+}
+
+.portal-nav-link {
+  border-radius: 10px;
+  margin-bottom: 0.2rem;
+}
+
+/* --- Roomier policy pill bar so chips never touch the card edge --- */
+body.light-theme .portal-shell .sub-bar {
+  padding: 0.95rem 1.75rem;
+}
+
+.portal-shell .sub-bar {
+  padding: 0.95rem 1.75rem;
+}
+
+.portal-shell .policy-badges-row {
+  gap: 0.7rem;
+  row-gap: 0.55rem;
+}
+
+.portal-shell .policy-chip {
+  padding: 0.36rem 0.85rem;
+}
+
+/* --- Dashboard personal stats cards --- */
+.dashboard-stats-section {
+  margin-top: 0.25rem;
+}
+
+.dash-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+}
+
+.dash-stat-card {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 1.1rem 1.15rem;
+  border-radius: 16px;
+  background: #fffdf9;
+  border: 1px solid #eae5d9;
+  box-shadow: 0 1px 3px rgba(23, 34, 28, 0.05);
+}
+
+body:not(.light-theme) .dash-stat-card {
+  background: var(--bg-card);
+  border-color: var(--border-glass);
+}
+
+.dash-stat-icon {
+  width: 46px;
+  height: 46px;
+  flex-shrink: 0;
+  border-radius: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.15rem;
+  color: #fff;
+}
+
+.stat-present .dash-stat-icon { background: #16a34a; }
+.stat-wfh .dash-stat-icon { background: #7c3aed; }
+.stat-leave .dash-stat-icon { background: #0284c7; }
+.stat-hours .dash-stat-icon { background: #ea580c; }
+
+.dash-stat-body {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+  min-width: 0;
+}
+
+.dash-stat-value {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--text-main, #17221c);
+}
+
+body:not(.light-theme) .dash-stat-value { color: var(--text-main); }
+
+.dash-stat-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-main, #17221c);
+}
+
+body:not(.light-theme) .dash-stat-label { color: var(--text-main); }
+
+.dash-stat-sub {
+  font-size: 0.72rem;
+  color: var(--text-muted, #64748b);
+}
+
+/* --- Burger button (hidden on desktop) + drawer scrim --- */
+.portal-burger-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  border: 1px solid rgba(23, 34, 28, 0.12);
+  background: #ffffff;
+  color: #17221c;
+  font-size: 1.05rem;
+  cursor: pointer;
+}
+
+.portal-burger-btn:hover { background: #f3efe4; }
+
+body:not(.light-theme) .portal-burger-btn {
+  background: var(--bg-card);
+  color: var(--text-main);
+  border-color: var(--border-glass);
+}
+
+.portal-drawer-overlay {
+  display: none;
+}
+
+/* --- Mobile: sidebar becomes an off-canvas drawer toggled by the burger --- */
+@media (max-width: 900px) {
+  .portal-shell {
+    flex-direction: row;
+  }
+
+  .portal-shell .admin-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 264px;
+    height: 100vh;
+    transform: translateX(-100%);
+    transition: transform 0.28s ease;
+    z-index: 60;
+    overflow-y: auto;
+    flex-direction: column;
+  }
+
+  .portal-shell.portal-nav-open .admin-sidebar {
+    transform: translateX(0);
+    box-shadow: 0 0 44px rgba(0, 0, 0, 0.45);
+  }
+
+  .portal-shell .admin-side-nav,
+  .portal-shell .portal-side-nav {
+    flex-direction: column;
+    overflow-x: visible;
+    padding: 0.5rem 0.85rem;
+  }
+
+  .portal-shell .portal-nav-link {
+    width: auto;
+    white-space: normal;
+    margin-bottom: 0.2rem;
+    margin-right: 0;
+  }
+
+  .portal-shell .side-nav-label {
+    display: block;
+  }
+
+  .portal-burger-btn {
+    display: inline-flex;
+  }
+
+  .portal-drawer-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(8, 12, 10, 0.5);
+    z-index: 55;
+  }
+
+  .portal-shell.portal-nav-open .portal-drawer-overlay {
+    display: block;
+  }
+
+  .dash-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 460px) {
+  .dash-stats-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* --- Drawer close button (mobile only) --- */
+.portal-drawer-close {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  margin-left: auto;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+.portal-drawer-close:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+@media (max-width: 900px) {
+  .portal-shell .sidebar-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+  }
+  .portal-drawer-close {
+    display: inline-flex;
+  }
+  /* Trim the sticky header height on small screens */
+  .portal-shell .navbar .admin-view-sub {
+    display: none;
+  }
+  .portal-shell .navbar {
+    flex-wrap: nowrap;
+    gap: 0.6rem;
+    padding: 0.55rem 0.9rem;
+  }
+  .portal-shell .navbar .admin-page-heading {
+    min-width: 0;
+  }
+  .portal-shell .navbar .admin-page-heading h2 {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 1.05rem;
+  }
+  .portal-shell .navbar .nav-controls {
+    display: none;
+  }
+  .portal-shell .navbar .realtime-clock {
+    flex: 0 0 auto;
+    order: 0;
+    margin-left: auto;
+    flex-shrink: 0;
+    text-align: right;
+  }
+  .portal-shell .navbar .clock-date {
+    display: none;
+  }
+}
+
+
+
 
 
 

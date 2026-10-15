@@ -326,6 +326,8 @@ function renderMonthlyCalendar() {
   const monthTitle = document.getElementById("calendarMonthTitle");
   if (!grid || !employeeState.currentEmployee) return;
 
+  try { renderDashboardStats(); } catch (e) { console.error("renderDashboardStats err:", e); }
+
   const currentYear = employeeState.calendarCurrentDate.getFullYear();
   const currentMonth = employeeState.calendarCurrentDate.getMonth();
 
@@ -2633,56 +2635,113 @@ function initAttendanceRegularisation() {
 }
 
 // ============================================================================
-// 9. PORTAL SIDEBAR SECTION NAV (smooth scroll + scroll spy + header title)
+// 9. PORTAL SIDEBAR NAV (dedicated views: Dashboard / Attendance / Regularisation)
 // ============================================================================
 
 function initPortalSideNav() {
-  const links = Array.from(document.querySelectorAll(".portal-nav-link"));
+  const links = Array.from(document.querySelectorAll(".portal-nav-link[data-view]"));
   if (!links.length) return;
 
   const VIEW_META = {
-    portalTop: ["Attendance", "Your day at a glance \u2022 punch in, leave & WFH"],
-    sectionActions: ["Today\u2019s Actions", "Punch in, apply for leave or book a WFH day"],
-    sectionCalendar: ["Monthly Calendar", "Attendance history with status legend & day details"],
-    sectionAttendanceRegularisation: ["Regularisation", "Raise a missed punch with a reason for approval"]
+    dashboard: ["Dashboard", "Your day at a glance \u2022 punch in, leave & WFH"],
+    attendance: ["My Attendance & Leaves", "Full calendar history, leave applications & WFH"],
+    regularisation: ["Regularisation Requests", "Raise & track missed-punch fixes"]
   };
 
   const titleEl = document.getElementById("portalViewTitle");
   const subEl = document.getElementById("portalViewSub");
+  const views = Array.from(document.querySelectorAll(".portal-view"));
+  const burger = document.getElementById("portalBurgerBtn");
+  const overlay = document.getElementById("portalDrawerOverlay");
+  const shell = document.querySelector(".portal-shell");
 
-  function setActive(id) {
-    links.forEach(l => l.classList.toggle("active", l.dataset.target === id));
-    const meta = VIEW_META[id];
+  function closeMobileDrawer() {
+    if (shell) shell.classList.remove("portal-nav-open");
+    if (burger) burger.setAttribute("aria-expanded", "false");
+  }
+
+  function switchView(viewId) {
+    links.forEach(l => l.classList.toggle("active", l.dataset.view === viewId));
+    views.forEach(v => v.classList.toggle("portal-view-active", v.dataset.portalView === viewId));
+    const meta = VIEW_META[viewId];
     if (meta && titleEl && subEl) {
       titleEl.textContent = meta[0];
       subEl.textContent = meta[1];
     }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    closeMobileDrawer();
   }
 
   links.forEach(link => {
     link.addEventListener("click", (e) => {
       e.preventDefault();
-      const target = document.getElementById(link.dataset.target);
-      if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
-      setActive(link.dataset.target);
+      switchView(link.dataset.view);
     });
   });
 
-  const sectionIds = links.map(l => l.dataset.target);
-  let ticking = false;
-  window.addEventListener("scroll", () => {
-    if (ticking) return;
-    ticking = true;
-    requestAnimationFrame(() => {
-      ticking = false;
-      let currentId = sectionIds[0];
-      sectionIds.forEach(id => {
-        const el = document.getElementById(id);
-        if (el && el.getBoundingClientRect().top <= 150) currentId = id;
-      });
-      setActive(currentId);
+  // Mobile burger: slide the sidebar in as an off-canvas drawer
+  if (burger) {
+    burger.addEventListener("click", () => {
+      const open = shell && shell.classList.contains("portal-nav-open");
+      if (open) { closeMobileDrawer(); }
+      else {
+        if (shell) shell.classList.add("portal-nav-open");
+        burger.setAttribute("aria-expanded", "true");
+      }
     });
-  }, { passive: true });
+  }
+  if (overlay) overlay.addEventListener("click", closeMobileDrawer);
+
+  const drawerClose = document.getElementById("portalDrawerCloseBtn");
+  if (drawerClose) drawerClose.addEventListener("click", closeMobileDrawer);
+
+  switchView("dashboard");
+  window.__portalSwitchView = switchView;
+}
+
+// ----------------------------------------------------------------------------
+// Dashboard personal stats cards (present days, WFH, leaves, hours)
+// ----------------------------------------------------------------------------
+function setDashText(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val;
+}
+
+function renderDashboardStats() {
+  if (!employeeState.currentEmployee) return;
+  const emp = employeeState.currentEmployee;
+  const records = getStore(STORAGE_KEYS.RECORDS, {});
+  const now = (typeof getPresentDate === "function") ? getPresentDate() : new Date();
+  const year = employeeState.calendarCurrentDate.getFullYear();
+  const month = employeeState.calendarCurrentDate.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  let present = 0;
+  let hours = 0;
+  for (let d = 1; d <= daysInMonth; d++) {
+    const rec = records[`${emp.id}_${formatDateKey(new Date(year, month, d))}`];
+    if (rec && rec.status === "Present") { present++; hours += (rec.hoursDecimal || 0); }
+    else if (rec && rec.status === "WFH") { hours += (rec.hoursDecimal || 0); }
+  }
+
+  const weekKey = getWeekKey(now);
+  const allWfh = getStore(STORAGE_KEYS.WFH, []);
+  const wfhUsed = allWfh.filter(w => w.employeeId === emp.id && w.weekKey === weekKey && w.status === "Approved").length;
+  const wfhRemaining = Math.max((typeof WEEKLY_WFH_ALLOWANCE !== "undefined" ? WEEKLY_WFH_ALLOWANCE : 2) - wfhUsed, 0);
+
+  const quota = getEmployeeLeaveQuota(emp.id);
+  const leaveRemaining = Math.max(quota.personalLeave - calculatePersonalLeavesUsed(emp.id), 0);
+
+  const monthName = employeeState.calendarCurrentDate.toLocaleDateString("en-US", { month: "long", timeZone: "Asia/Kolkata" });
+
+  setDashText("dashStatDaysPresent", present);
+  setDashText("dashStatPresentSub", monthName);
+  setDashText("dashStatWfh", `${wfhUsed} / ${typeof WEEKLY_WFH_ALLOWANCE !== "undefined" ? WEEKLY_WFH_ALLOWANCE : 2}`);
+  setDashText("dashStatWfhSub", `${wfhRemaining} remaining`);
+  setDashText("dashStatLeaves", leaveRemaining);
+  setDashText("dashStatLeaveSub", `of ${quota.personalLeave} / year`);
+  setDashText("dashStatHours", Math.round(hours));
+  setDashText("dashStatHoursSub", monthName);
 }
 
 // ============================================================================

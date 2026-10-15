@@ -21,7 +21,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="styles.css?v=20261015_zoomfix3">
+  <link rel="stylesheet" href="styles.css?v=20261015_views4">
 </head>
 <body class="light-theme">
   
@@ -106,21 +106,21 @@
           <h1>VKON</h1>
           <span class="badge-sub"><span class="label-tech">Attendance Portal</span></span>
         </div>
+        <button type="button" class="portal-drawer-close" id="portalDrawerCloseBtn" aria-label="Close menu">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
       </div>
 
       <nav class="admin-side-nav portal-side-nav" aria-label="Portal sections">
         <span class="side-nav-label">Menu</span>
-        <a href="#portalTop" class="portal-nav-link active" data-target="portalTop">
+        <a href="#" class="portal-nav-link active" data-view="dashboard" role="button">
           <i class="fa-solid fa-gauge-high"></i> Dashboard
         </a>
-        <a href="#sectionActions" class="portal-nav-link" data-target="sectionActions">
-          <i class="fa-solid fa-bolt"></i> Today&rsquo;s Actions
+        <a href="#" class="portal-nav-link" data-view="attendance" role="button">
+          <i class="fa-solid fa-calendar-days"></i> My Attendance &amp; Leaves
         </a>
-        <a href="#sectionCalendar" class="portal-nav-link" data-target="sectionCalendar">
-          <i class="fa-solid fa-calendar-days"></i> Monthly Calendar
-        </a>
-        <a href="#sectionAttendanceRegularisation" class="portal-nav-link" data-target="sectionAttendanceRegularisation">
-          <i class="fa-solid fa-clipboard-check"></i> Regularisation
+        <a href="#" class="portal-nav-link" data-view="regularisation" role="button">
+          <i class="fa-solid fa-clipboard-check"></i> Regularisation Requests
         </a>
       </nav>
 
@@ -137,9 +137,15 @@
       </div>
     </aside>
 
+    <!-- Mobile drawer scrim (click to close) -->
+    <div class="portal-drawer-overlay" id="portalDrawerOverlay"></div>
+
     <!-- ================= MAIN COLUMN ================= -->
     <div class="admin-main-col">
     <header class="navbar portal-navbar">
+      <button type="button" class="portal-burger-btn" id="portalBurgerBtn" aria-label="Toggle navigation menu" aria-expanded="false">
+        <i class="fa-solid fa-bars"></i>
+      </button>
       <div class="admin-page-heading">
         <h2 id="portalViewTitle">Attendance</h2>
         <p class="admin-view-sub" id="portalViewSub">Your day at a glance &bull; punch in, leave &amp; WFH</p>
@@ -178,7 +184,7 @@
     <main class="main-content" id="portalTop">
       
       <!-- ================= TOP SECTION: EMPLOYEE ACTION HUB (BEFORE CALENDAR) ================= -->
-      <section class="employee-action-hub" id="sectionActions">
+      <section class="employee-action-hub portal-view" id="sectionActions" data-portal-view="dashboard">
         
         <div class="action-hub-heading">
           <h2><i class="fa-solid fa-bolt"></i> Today&rsquo;s Actions</h2>
@@ -232,6 +238,44 @@
           </button>
         </div>
 
+      </section>
+
+      <!-- ================= DASHBOARD: PERSONAL STATS CARDS ================= -->
+      <section class="portal-view dashboard-stats-section" id="sectionDashboardStats" data-portal-view="dashboard">
+        <div class="dash-stats-grid">
+          <div class="dash-stat-card stat-present">
+            <div class="dash-stat-icon"><i class="fa-solid fa-user-check"></i></div>
+            <div class="dash-stat-body">
+              <span class="dash-stat-value" id="dashStatDaysPresent">0</span>
+              <span class="dash-stat-label">Days Present</span>
+              <span class="dash-stat-sub" id="dashStatPresentSub">This month</span>
+            </div>
+          </div>
+          <div class="dash-stat-card stat-wfh">
+            <div class="dash-stat-icon"><i class="fa-solid fa-house-laptop"></i></div>
+            <div class="dash-stat-body">
+              <span class="dash-stat-value" id="dashStatWfh">0 / 2</span>
+              <span class="dash-stat-label">WFH This Week</span>
+              <span class="dash-stat-sub" id="dashStatWfhSub">2 remaining</span>
+            </div>
+          </div>
+          <div class="dash-stat-card stat-leave">
+            <div class="dash-stat-icon"><i class="fa-solid fa-umbrella-beach"></i></div>
+            <div class="dash-stat-body">
+              <span class="dash-stat-value" id="dashStatLeaves">14</span>
+              <span class="dash-stat-label">Paid Leaves Left</span>
+              <span class="dash-stat-sub" id="dashStatLeaveSub">of 14 / year</span>
+            </div>
+          </div>
+          <div class="dash-stat-card stat-hours">
+            <div class="dash-stat-icon"><i class="fa-solid fa-clock"></i></div>
+            <div class="dash-stat-body">
+              <span class="dash-stat-value" id="dashStatHours">0</span>
+              <span class="dash-stat-label">Hours Logged</span>
+              <span class="dash-stat-sub" id="dashStatHoursSub">This month</span>
+            </div>
+          </div>
+        </div>
       </section>
 
       <!-- ================= MODAL CARD 1: MARK PRESENT ================= -->
@@ -507,7 +551,7 @@
       </div>
       
       <!-- ================= SECTION 1: MONTHLY CALENDAR ================= -->
-      <section class="calendar-section glass-panel" id="sectionCalendar">
+      <section class="calendar-section glass-panel portal-view" id="sectionCalendar" data-portal-view="attendance">
         
         <!-- Calendar Header Toolbar -->
         <div class="calendar-toolbar">
@@ -579,7 +623,7 @@
       </section>
 
       <!-- ================= SECTION 2: ATTENDANCE REGULARISATION (AFTER CALENDAR) ================= -->
-      <section class="regularisation-section glass-panel" id="sectionAttendanceRegularisation">
+      <section class="regularisation-section glass-panel portal-view" id="sectionAttendanceRegularisation" data-portal-view="regularisation">
         <div class="box-header">
           <div class="box-icon icon-regularise">
             <i class="fa-solid fa-clock-rotate-left"></i>
@@ -877,7 +921,7 @@
 
   <!-- Shared Engine & App Controller -->
   <script src="shared.js?v=20261013_ist"></script>
-  <script src="app.js?v=20261015_portal"></script>
+  <script src="app.js?v=20261015_views2"></script>
 
   <!-- Present Day & Migration Guarantee -->
   <script>
