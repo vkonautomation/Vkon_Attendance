@@ -8367,6 +8367,92 @@ body:not(.light-theme) .help-faq-card {
   .side-nav-label-row { display: none; } /* keep the rail label-free like the other groups */
 }
 
+/* ==========================================================================
+   LAYER: ROSTER TABLE ZOOM FIX
+   .table-responsive previously had NO styles, so wide tables (Registered
+   Staff Roster, approvals, holidays…) overflowed their .admin-card
+   (overflow:hidden) and the Actions column got clipped unreachable when
+   zooming. Give the wrapper real horizontal scrolling + let grid columns
+   shrink below their content's natural width.
+   ========================================================================== */
+
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Grid/flex children must be allowed to shrink so .table-responsive can scroll */
+.admin-split-grid > .glass-panel,
+.admin-split-grid > .admin-card {
+  min-width: 0;
+}
+
+/* Keep action buttons on one line and un-crushed at any zoom level */
+.action-btn-cluster {
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+.action-btn-cluster .btn {
+  flex-shrink: 0;
+}
+
+.data-table th:last-child,
+.data-table td:last-child {
+  white-space: nowrap;
+}
+
+/* Slim the roster name cell so the table needs less width before scrolling */
+.roster-info-cell {
+  min-width: 130px;
+  max-width: 190px;
+}
+
+/* Pin the roster Actions column to the right edge so Edit/Delete stay
+   reachable at any zoom level even before the user scrolls the table */
+#tab-roster .table-responsive .data-table th:last-child,
+#tab-roster .table-responsive .data-table td:last-child {
+  position: sticky;
+  right: 0;
+  z-index: 2;
+  background: var(--bg-card);
+  border-left: 1px solid var(--border-glass);
+}
+
+body.admin-page.light-theme #tab-roster .table-responsive .data-table td:last-child {
+  background: #fffdf9; /* match the warm roster card surface */
+  border-left: 1px solid #eae5d9;
+}
+
+body.admin-page.light-theme #tab-roster .table-responsive .data-table th:last-child {
+  background: #f8fafc;
+  border-left: 1px solid #e2e8f0;
+}
+
+body.admin-page.light-theme #tab-roster .table-responsive .data-table tr:hover td:last-child {
+  background: #f8fafc;
+}
+
+/* Subtle affordance that the table area scrolls sideways when clipped */
+.table-responsive::-webkit-scrollbar {
+  height: 8px;
+}
+
+/* When jumping to a card, keep its header clear of the sticky navbar */
+.admin-shell .admin-card,
+.admin-shell .admin-panel {
+  scroll-margin-top: 160px;
+}
+
+.table-responsive::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.45);
+  border-radius: 4px;
+}
+
+.table-responsive::-webkit-scrollbar-track {
+  background: transparent;
+}
+
 
 
 
