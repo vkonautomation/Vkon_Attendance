@@ -8742,6 +8742,226 @@ body:not(.light-theme) .portal-burger-btn {
 }
 
 
+/* ==========================================================================
+   CALCS CLARITY, NOT-MARKED & LEGIBILITY LAYER (2026-10-15)
+   ========================================================================== */
+
+/* --- Not Marked (needs regularisation) — distinct from Absent --- */
+.day-badge-pill.badge-notmarked {
+  background: rgba(100, 116, 139, 0.14);
+  color: #94a3b8;
+  border: 1px dashed rgba(148, 163, 184, 0.55);
+}
+
+body.light-theme .day-badge-pill.badge-notmarked {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px dashed #94a3b8;
+}
+
+.calendar-day-cell:has(.badge-notmarked) {
+  background: rgba(100, 116, 139, 0.05);
+  border-color: rgba(100, 116, 139, 0.22);
+}
+
+body.light-theme .calendar-day-cell:has(.badge-notmarked) {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.legend-dot.dot-notmarked {
+  background: transparent;
+  border: 1.5px dashed #94a3b8;
+  box-shadow: none;
+}
+
+body.light-theme .legend-dot.dot-notmarked {
+  background: #f1f5f9;
+  border: 1.5px dashed #64748b;
+}
+
+.quick-stat-badge.stat-slate {
+  background: rgba(100, 116, 139, 0.12);
+  color: #94a3b8;
+  border: 1px solid rgba(100, 116, 139, 0.3);
+}
+.quick-stat-badge.stat-slate .q-num {
+  color: #64748b;
+}
+
+body.light-theme .quick-stat-badge.stat-slate {
+  background: #f1f5f9;
+  color: #334155;
+  border-color: #cbd5e1;
+}
+body.light-theme .quick-stat-badge.stat-slate .q-num {
+  color: #475569;
+}
+
+/* --- Quick regularise action on the calendar cell --- */
+.cell-reg-quick {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.35rem;
+  padding: 0.28rem 0.6rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(227, 179, 65, 0.55);
+  background: rgba(227, 179, 65, 0.12);
+  color: #e3b341;
+  font-family: inherit;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.cell-reg-quick:hover {
+  background: rgba(227, 179, 65, 0.26);
+  transform: translateY(-1px);
+}
+
+.cell-reg-quick i {
+  font-size: 0.62rem;
+}
+
+body.light-theme .cell-reg-quick {
+  background: #fffbeb;
+  border-color: #f0c65f;
+  color: #92400e;
+}
+
+body.light-theme .cell-reg-quick:hover {
+  background: #fef3c7;
+}
+
+/* --- Admin report: "+N not marked" sub-note in the Absent cell --- */
+.unmarked-note {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+body.light-theme .unmarked-note {
+  color: #475569;
+}
+
+/* --- Truncated labels: ellipsis with full name kept in title tooltip --- */
+.pill-text {
+  display: inline-block;
+  max-width: 92px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
+/* --- Raise text size & contrast across dense UI --- */
+.day-badge-pill {
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.day-meta-text {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+body.light-theme .day-meta-text {
+  color: #334155;
+}
+
+.legend-item {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.weekday-header {
+  font-size: 0.8rem;
+}
+
+body.light-theme .weekday-header {
+  color: #334155;
+}
+
+.q-label {
+  font-size: 0.78rem;
+}
+
+.q-title {
+  font-size: 0.78rem;
+}
+
+.kpi-lbl {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+body.light-theme .kpi-lbl {
+  color: #475569;
+}
+
+.table-sub {
+  font-size: 0.76rem;
+}
+
+body.light-theme .table-sub {
+  color: #475569;
+}
+
+.data-table {
+  font-size: 0.9rem;
+}
+
+.data-table th {
+  font-size: 0.76rem;
+}
+
+body.light-theme .data-table th {
+  color: #1e293b;
+}
+
+body.light-theme .q-label,
+body.light-theme .legend-item {
+  color: #334155;
+}
+
+/* --- Give the Today cell room for chip + badge + meta --- */
+.calendar-day-cell {
+  min-height: 98px;
+}
+
+.calendar-day-cell.is-today {
+  min-height: 118px;
+}
+
+.calendar-day-cell.is-today .day-badge-pill {
+  margin-top: 0.4rem;
+}
+
+@media (max-width: 768px) {
+  .day-badge-pill {
+    font-size: 0.62rem;
+  }
+  .calendar-day-cell {
+    min-height: 78px;
+  }
+  .calendar-day-cell.is-today {
+    min-height: 96px;
+  }
+  .cell-reg-quick {
+    font-size: 0.6rem;
+    padding: 0.22rem 0.45rem;
+  }
+  .pill-text {
+    max-width: 64px;
+  }
+}
+
+
 
 
 

@@ -368,6 +368,7 @@ function renderMonthlyCalendar() {
   let countWfh = 0;
   let countLeave = 0;
   let countAbsent = 0;
+  let countNotMarked = 0;
 
   // Previous Month Padded Days
   for (let i = firstDayIndex - 1; i >= 0; i--) {
@@ -402,7 +403,7 @@ function renderMonthlyCalendar() {
     if (declaredHoliday) {
       badgeHtml = `
         <span class="day-badge-pill badge-holiday-day" title="${declaredHoliday.name}">
-          <i class="fa-solid fa-star"></i> ${declaredHoliday.name.substring(0, 10)}
+          <i class="fa-solid fa-star"></i> <span class="pill-text">${declaredHoliday.name}</span>
         </span>
       `;
     } else if (isWeekend) {
@@ -446,9 +447,11 @@ function renderMonthlyCalendar() {
         nowZero.setHours(0, 0, 0, 0);
 
         if (dayDate < nowZero && !isWeekend && !isBeforeEnrollment) {
-          countAbsent++;
+          // No punch, no leave, no WFH — this is NOT an absence, it needs regularisation
+          countNotMarked++;
           badgeHtml = `
-            <span class="day-badge-pill badge-absent-day"><i class="fa-solid fa-circle-xmark"></i> Absent</span>
+            <span class="day-badge-pill badge-notmarked" title="No record for this working day &mdash; raise a regularisation if you were working"><i class="fa-solid fa-circle-question"></i> Not Marked</span>
+            <button type="button" class="cell-reg-quick" data-reg-date="${dateStr}" title="Request regularisation for ${dateStr}"><i class="fa-solid fa-wand-magic-sparkles"></i> Regularise</button>
           `;
         } else if (isToday && !declaredHoliday && !isWeekend) {
           badgeHtml = `
@@ -473,6 +476,13 @@ function renderMonthlyCalendar() {
       openDayDetailsModal(dateStr, record, isWeekend, declaredHoliday);
     });
 
+    cell.querySelectorAll(".cell-reg-quick").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        quickRegulariseDate(btn.dataset.regDate);
+      });
+    });
+
     grid.appendChild(cell);
   }
 
@@ -485,6 +495,8 @@ function renderMonthlyCalendar() {
   if (statL) statL.textContent = countLeave;
   const statA = document.getElementById("statsAbsentCount");
   if (statA) statA.textContent = countAbsent;
+  const statNM = document.getElementById("statsNotMarkedCount");
+  if (statNM) statNM.textContent = countNotMarked;
 }
 
 function openDayDetailsModal(dateStr, record, isWeekend, declaredHoliday) {
@@ -667,10 +679,10 @@ function renderLeaveBox() {
   const headerRhQuota = document.getElementById("headerRhQuota");
 
   if (personalRemainEl) personalRemainEl.textContent = personalRemaining;
-  if (headerLeaveQuota) headerLeaveQuota.textContent = `${personalRemaining}/${quota.personalLeave} Left`;
+  if (headerLeaveQuota) headerLeaveQuota.textContent = `${personalUsed} used \u00b7 ${personalRemaining} left`;
   if (rhUsedEl) rhUsedEl.textContent = rhUsed;
   if (rhRemainEl) rhRemainEl.textContent = rhRemaining;
-  if (headerRhQuota) headerRhQuota.textContent = `${rhRemaining}/${quota.restrictedLeave} Left`;
+  if (headerRhQuota) headerRhQuota.textContent = `${rhUsed} used \u00b7 ${rhRemaining} left /mo`;
 
   renderMyLeavesStatusList();
 }
@@ -1900,18 +1912,18 @@ function renderWfhBox() {
   const statusText = document.getElementById("wfhStatusText");
   const headerWfhQuota = document.getElementById("headerWfhQuota");
 
-  if (counterEl) counterEl.textContent = `${approvedThisWeek} / 2 Days`;
+  if (counterEl) counterEl.textContent = `${approvedThisWeek} used \u00b7 ${Math.max(WEEKLY_WFH_ALLOWANCE - approvedThisWeek, 0)} left`;
   if (barEl) barEl.style.width = `${(approvedThisWeek / WEEKLY_WFH_ALLOWANCE) * 100}%`;
-  if (headerWfhQuota) headerWfhQuota.textContent = `${approvedThisWeek}/2 Days This Wk`;
+  if (headerWfhQuota) headerWfhQuota.textContent = `${activeThisWeek} used \u00b7 ${Math.max(WEEKLY_WFH_ALLOWANCE - activeThisWeek, 0)} left /wk`;
 
   if (statusText) {
     if (activeThisWeek >= WEEKLY_WFH_ALLOWANCE) {
-      statusText.textContent = "Quota Used";
+      statusText.textContent = "0 left";
       statusText.className = "q-val text-danger font-bold";
       const warn = document.getElementById("wfhLimitWarning");
       if (warn) warn.style.display = "flex";
     } else {
-      statusText.textContent = `${WEEKLY_WFH_ALLOWANCE - activeThisWeek} Left`;
+      statusText.textContent = `${WEEKLY_WFH_ALLOWANCE - activeThisWeek} left`;
       statusText.className = "q-val text-success font-bold";
       const warn = document.getElementById("wfhLimitWarning");
       if (warn) warn.style.display = "none";
@@ -2460,6 +2472,25 @@ function populateRegularisationEligibleDates() {
   renderRegularisationCalendar();
 }
 
+// Quick action from a "Not Marked" calendar cell: jump to the Regularisation
+// view with the date pre-selected in both the mini calendar and the dropdown.
+function quickRegulariseDate(dateStr) {
+  if (!dateStr) return;
+  regCalendarState.viewDate = new Date(dateStr + "T00:00:00");
+  regCalendarState.selectedDateStr = dateStr;
+  populateRegularisationEligibleDates();
+
+  const dateSelect = document.getElementById("regularisationDate");
+  if (dateSelect && Array.from(dateSelect.options).some(o => o.value === dateStr)) {
+    dateSelect.value = dateStr;
+    dateSelect.dispatchEvent(new Event("change"));
+  }
+
+  if (window.__portalSwitchView) window.__portalSwitchView("regularisation");
+  const form = document.getElementById("attendanceRegularisationForm");
+  if (form) form.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
 function renderMyRegularisationsList() {
   if (!employeeState.currentEmployee) return;
   const empId = employeeState.currentEmployee.id;
@@ -2730,16 +2761,17 @@ function renderDashboardStats() {
   const wfhRemaining = Math.max((typeof WEEKLY_WFH_ALLOWANCE !== "undefined" ? WEEKLY_WFH_ALLOWANCE : 2) - wfhUsed, 0);
 
   const quota = getEmployeeLeaveQuota(emp.id);
-  const leaveRemaining = Math.max(quota.personalLeave - calculatePersonalLeavesUsed(emp.id), 0);
+  const leavesUsed = calculatePersonalLeavesUsed(emp.id);
+  const leaveRemaining = Math.max(quota.personalLeave - leavesUsed, 0);
 
   const monthName = employeeState.calendarCurrentDate.toLocaleDateString("en-US", { month: "long", timeZone: "Asia/Kolkata" });
 
   setDashText("dashStatDaysPresent", present);
   setDashText("dashStatPresentSub", monthName);
-  setDashText("dashStatWfh", `${wfhUsed} / ${typeof WEEKLY_WFH_ALLOWANCE !== "undefined" ? WEEKLY_WFH_ALLOWANCE : 2}`);
-  setDashText("dashStatWfhSub", `${wfhRemaining} remaining`);
-  setDashText("dashStatLeaves", leaveRemaining);
-  setDashText("dashStatLeaveSub", `of ${quota.personalLeave} / year`);
+  setDashText("dashStatWfh", `${wfhRemaining} left`);
+  setDashText("dashStatWfhSub", `${wfhUsed} used of ${typeof WEEKLY_WFH_ALLOWANCE !== "undefined" ? WEEKLY_WFH_ALLOWANCE : 2} this week`);
+  setDashText("dashStatLeaves", `${leaveRemaining} left`);
+  setDashText("dashStatLeaveSub", `${leavesUsed} used of ${quota.personalLeave} / year`);
   setDashText("dashStatHours", Math.round(hours));
   setDashText("dashStatHoursSub", monthName);
 }

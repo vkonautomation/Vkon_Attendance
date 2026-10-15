@@ -262,10 +262,13 @@ function renderMonthlyReport() {
 
   let companyTotalHours = 0;
   let totalAttendedCount = 0;
+  let companyRateSum = 0;
+  let companyRateCount = 0;
 
   employees.forEach(emp => {
     let presentCount = 0;
     let absentCount = 0;
+    let unmarkedCount = 0;
     let wfhCount = 0;
     let leaveCount = 0;
     let empTotalHours = 0;
@@ -288,21 +291,20 @@ function renderMonthlyReport() {
       if (rec) {
         if (rec.status === "Present") {
           presentCount++;
-          empTotalHours += (rec.hoursDecimal || 9.0);
+          empTotalHours += (Number(rec.hoursDecimal) || 0);
         } else if (rec.status === "WFH") {
           wfhCount++;
-          empTotalHours += (rec.hoursDecimal || 8.8);
+          empTotalHours += (Number(rec.hoursDecimal) || 0);
         } else if (rec.status === "Holiday" || rec.status === "Leave") {
           leaveCount++;
         } else if (rec.status === "Absent") {
           absentCount++;
         }
       } else {
-        // Only count as absent if it's a past elapsed working day
-        const nowZero = new Date();
-        nowZero.setHours(0, 0, 0, 0);
+        // Past working day with NO record: not an absence — it needs regularisation
+        const nowZero = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         if (dateObj < nowZero) {
-          absentCount++;
+          unmarkedCount++;
         }
       }
     }
@@ -311,8 +313,14 @@ function renderMonthlyReport() {
     const attended = presentCount + wfhCount;
     totalAttendedCount += attended;
 
-    // Strict percentage calculation as per elapsed days after employee enrollment
-    const rate = empWorkingDaysElapsed > 0 ? Math.round((attended / empWorkingDaysElapsed) * 100) : 100;
+    // Attendance % is computed over TRACKED days only (present + marked absent), so a
+    // day nobody ever marked can't masquerade as an absence and tank the rate.
+    const trackedDays = attended + absentCount;
+    const rate = trackedDays > 0 ? Math.round((attended / trackedDays) * 100) : null;
+    if (rate !== null) {
+      companyRateSum += rate;
+      companyRateCount++;
+    }
 
     // --- Today snapshot: check-in & out pair, work type, on-time/late pill ---
     const todayRec = records[`${emp.id}_${todayKey}`] || null;
@@ -364,7 +372,7 @@ function renderMonthlyReport() {
     const tr = document.createElement("tr");
     tr.setAttribute("data-name", emp.name.toLowerCase());
     tr.setAttribute("data-dept", emp.department.toLowerCase());
-    tr.setAttribute("data-rate", String(rate));
+    tr.setAttribute("data-rate", String(rate === null ? -1 : rate));
     tr.setAttribute("data-hours", empTotalHours.toFixed(2));
     tr.setAttribute("data-present", String(attended));
     tr.setAttribute("data-checkin", checkinMin === null ? "-1" : String(checkinMin));
@@ -385,7 +393,10 @@ function renderMonthlyReport() {
       <td><span class="type-cell">${typeLabel}</span></td>
       <td><span class="today-pill ${pillClass}">${pillLabel}</span></td>
       <td><span class="text-success font-bold">${presentCount} Days</span></td>
-      <td><span class="text-danger font-bold">${absentCount} Days</span></td>
+      <td>
+        <span class="text-danger font-bold">${absentCount} Days</span>
+        ${unmarkedCount > 0 ? `<span class="unmarked-note" title="${unmarkedCount} past working day(s) with no punch or request &mdash; needs regularisation, not counted as Absent">+${unmarkedCount} not marked</span>` : ""}
+      </td>
       <td><span class="text-primary font-bold">${wfhCount} Days</span></td>
       <td><span class="day-badge-pill badge-neutral font-mono font-bold" title="Annual Leaves Taken / Total Leave Quota">${leaveCellFormatted}</span></td>
       <td class="font-mono">${empTotalHours.toFixed(1)} hrs</td>
@@ -401,9 +412,9 @@ function renderMonthlyReport() {
   updatePendingBadges();
 
   const totalPossible = workingDaysElapsed * employees.length;
-  const avgAttendance = totalPossible > 0 ? Math.round((totalAttendedCount / totalPossible) * 100) : 100;
+  const avgAttendance = companyRateCount > 0 ? Math.round(companyRateSum / companyRateCount) : 100;
   document.getElementById("kpiAvgAttendance").textContent = `${Math.min(avgAttendance, 100)}%`;
-  document.getElementById("kpiAvgAttLabel").textContent = `To-Date Rate (Oct 1-${todayDay}, ${workingDaysElapsed} working days)`;
+  document.getElementById("kpiAvgAttLabel").textContent = `To-Date Rate (Oct 1-${todayDay} \u2022 tracked days only)`;
 
   renderKpiDeltas(now, employees, records);
   renderAdminWeekStrip();
@@ -479,37 +490,44 @@ function weekStartFor(offsetWeeks, now) {
   return sunday;
 }
 
-function computeWeekStats(weekStart, employees, records, now) {
+function computeWeekStats(weekStart, employees, records, now, dayCap) {
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  let attended = 0, possible = 0, hours = 0;
+  let attended = 0, possible = 0, hours = 0, elapsedDays = 0;
   for (let i = 0; i < 7; i++) {
     const d = new Date(weekStart);
     d.setDate(weekStart.getDate() + i);
     if (d.getDay() === 0 || d.getDay() === 6) continue; // weekends excluded
     if (d > todayStart) continue;                       // only elapsed days
+    if (dayCap !== undefined && elapsedDays >= dayCap) continue; // like-for-like cap vs last week
+    elapsedDays++;
     possible += employees.length;
     employees.forEach(emp => {
       const rec = records[`${emp.id}_${formatDateKey(d)}`];
       if (rec && (rec.status === "Present" || rec.status === "WFH")) {
         attended++;
-        hours += (rec.hoursDecimal || 9);
+        hours += (Number(rec.hoursDecimal) || 0);
       }
     });
   }
-  return { attended, possible, hours };
+  return { attended, possible, hours, elapsedDays };
 }
 
 function renderKpiDeltas(now, employees, records) {
   const thisW = computeWeekStats(weekStartFor(0, now), employees, records, now);
-  const lastW = computeWeekStats(weekStartFor(-1, now), employees, records, now);
+  // Compare like-for-like: last week counted over the same number of elapsed workdays
+  const lastW = computeWeekStats(weekStartFor(-1, now), employees, records, now, thisW.elapsedDays);
 
   const attEl = document.getElementById("kpiAvgAttDelta");
   if (attEl) {
     const rateThis = thisW.possible ? Math.round((thisW.attended / thisW.possible) * 100) : null;
     const rateLast = lastW.possible ? Math.round((lastW.attended / lastW.possible) * 100) : null;
-    if (rateThis === null || rateLast === null) {
-      attEl.textContent = "";
-      attEl.className = "kpi-delta";
+    if (!thisW.elapsedDays || thisW.attended === 0) {
+      // Week hasn't started producing data yet — a "−100%" here is noise, not insight
+      attEl.textContent = thisW.elapsedDays ? "Awaiting first punches this week" : "";
+      attEl.className = "kpi-delta is-flat";
+    } else if (rateLast === null) {
+      attEl.textContent = "No comparison available";
+      attEl.className = "kpi-delta is-flat";
     } else {
       const diff = rateThis - rateLast;
       attEl.textContent = diff === 0 ? "Same as last week" : `${diff > 0 ? "+" : "\u2212"}${Math.abs(diff)}% vs last week`;
@@ -519,9 +537,12 @@ function renderKpiDeltas(now, employees, records) {
 
   const hrsEl = document.getElementById("kpiHoursDelta");
   if (hrsEl) {
-    if (!lastW.hours) {
-      hrsEl.textContent = thisW.hours ? "New this week" : "";
-      hrsEl.className = "kpi-delta";
+    if (!thisW.hours) {
+      hrsEl.textContent = thisW.elapsedDays ? "No hours logged yet this week" : "";
+      hrsEl.className = "kpi-delta is-flat";
+    } else if (!lastW.hours) {
+      hrsEl.textContent = "New this week";
+      hrsEl.className = "kpi-delta is-flat";
     } else {
       const pct = Math.round(((thisW.hours - lastW.hours) / lastW.hours) * 100);
       hrsEl.textContent = pct === 0 ? "Same hours as last week" : `${pct > 0 ? "+" : "\u2212"}${Math.abs(pct)}% hrs vs last week`;
