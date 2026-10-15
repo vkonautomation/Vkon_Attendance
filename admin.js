@@ -264,18 +264,19 @@ function renderMonthlyReport() {
   const workingDaysElapsed = calculateWorkingDaysElapsed(currentYear, selectedMonth, todayDay);
 
   let companyTotalHours = 0;
-  let totalAttendedCount = 0;
-  let companyRateSum = 0;
-  let companyRateCount = 0;
+  let teamAttendedSum = 0;   // \u03a3 (present + wfh + \u00bd\u00d7half-day) on CLOSED days only
+  let teamExpectedSum = 0;   // \u03a3 closed working days, net of holidays & approved leave
 
   employees.forEach(emp => {
     let presentCount = 0;
     let absentCount = 0;
     let unmarkedCount = 0;
     let wfhCount = 0;
+    let halfCount = 0;
     let leaveCount = 0;
     let empTotalHours = 0;
-    let expectedUpToYesterday = 0;
+    let expectedDays = 0;     // closed working days, net of holidays & approved leave
+    let closedAttended = 0;   // attendance credit on closed days only (today excluded)
 
     const empEnrolledDate = emp.enrolledAt ? new Date(emp.enrolledAt + "T00:00:00") : null;
     let empWorkingDaysElapsed = 0;
@@ -291,46 +292,51 @@ function renderMonthlyReport() {
       empWorkingDaysElapsed++;
       const dateStr = formatDateKey(dateObj);
       const rec = records[`${emp.id}_${dateStr}`];
+      // A day is "closed" only once its end-of-day cutoff has passed, i.e. strictly
+      // before today. Today is reported separately and never counted in the rate.
+      const isClosed = dateObj < nowZero;
 
-      // "Expected" = a completed working day the employee was scheduled to be in
-      // (not a weekend, not a declared holiday, not an approved leave/RH day).
-      const onLeave = rec && (rec.status === "Leave" || rec.status === "Holiday");
-      if (dateObj < nowZero && !holidaySet.has(dateStr) && !onLeave) {
-        expectedUpToYesterday++;
-      }
-
+      // Attendance credit for this day (a half-day counts as 0.5).
+      let credit = 0;
       if (rec) {
         if (rec.status === "Present") {
-          presentCount++;
+          presentCount++; credit = 1;
           empTotalHours += (Number(rec.hoursDecimal) || 0);
         } else if (rec.status === "WFH") {
-          wfhCount++;
+          wfhCount++; credit = 1;
+          empTotalHours += (Number(rec.hoursDecimal) || 0);
+        } else if (rec.status === "Half Day" || rec.status === "Halfday" || rec.status === "Half") {
+          halfCount++; credit = 0.5;
           empTotalHours += (Number(rec.hoursDecimal) || 0);
         } else if (rec.status === "Holiday" || rec.status === "Leave") {
           leaveCount++;
         } else if (rec.status === "Absent") {
           absentCount++;
         }
-      } else {
+      } else if (isClosed) {
         // Past working day with NO record: not an absence — it needs regularisation
-        if (dateObj < nowZero) {
-          unmarkedCount++;
-        }
+        unmarkedCount++;
+      }
+
+      // Expected = a closed working day, net of declared holidays and approved leave/RH.
+      const isHoliday = holidaySet.has(dateStr);
+      const isApprovedLeave = rec && (rec.status === "Leave" || rec.status === "Holiday");
+      if (isClosed && !isHoliday && !isApprovedLeave) {
+        expectedDays++;
+        closedAttended += credit;
       }
     }
 
     companyTotalHours += empTotalHours;
-    const attended = presentCount + wfhCount;
-    totalAttendedCount += attended;
+    const attended = presentCount + wfhCount + 0.5 * halfCount;
 
-    // To-date attendance rate = (Present + WFH) \u00f7 expected working days, up to yesterday.
-    // Unmarked days sit in the denominator (they are expected-but-unmarked), which is why
-    // the separate "Not Marked" column exists so payroll never mistakes them for absences.
-    const rate = expectedUpToYesterday > 0 ? Math.round((attended / expectedUpToYesterday) * 100) : null;
-    if (rate !== null) {
-      companyRateSum += rate;
-      companyRateCount++;
-    }
+    // Per-employee to-date rate (used only for row sorting / employee detail).
+    const rate = expectedDays > 0 ? Math.round((closedAttended / expectedDays) * 100) : null;
+
+    // Team totals are SUMMED, so the headline rate is \u03a3 attended \u00f7 \u03a3 expected
+    // (NOT an average of per-employee percentages, which over-weights small denominators).
+    teamAttendedSum += closedAttended;
+    teamExpectedSum += expectedDays;
 
     // --- Today snapshot: check-in & out pair, work type, on-time/late pill ---
     const todayRec = records[`${emp.id}_${todayKey}`] || null;
@@ -428,8 +434,8 @@ function renderMonthlyReport() {
   document.getElementById("kpiPendingCount").textContent = pendingLeaves;
   updatePendingBadges();
 
-  const totalPossible = workingDaysElapsed * employees.length;
-  const avgAttendance = companyRateCount > 0 ? Math.round(companyRateSum / companyRateCount) : 100;
+  // Team rate = \u03a3 attended \u00f7 \u03a3 expected (fractional half-days preserved, today excluded).
+  const avgAttendance = teamExpectedSum > 0 ? Math.round((teamAttendedSum / teamExpectedSum) * 100) : 100;
   const rateMonth = now.toLocaleDateString("en-US", { timeZone: "Asia/Kolkata", month: "short" });
   const throughDay = Math.max(todayDay - 1, 0);
   const rateLabelEl = document.getElementById("kpiAvgAttLabel");
@@ -437,7 +443,7 @@ function renderMonthlyReport() {
   if (rateLabelEl) {
     rateLabelEl.textContent = `To-Date Rate \u00b7 through ${rateMonth} ${throughDay}`;
     const rateCard = rateLabelEl.closest(".kpi-card");
-    if (rateCard) rateCard.setAttribute("title", "(Present + WFH) \u00f7 expected days, up to yesterday");
+    if (rateCard) rateCard.setAttribute("title", "Team rate = \u03a3(Present + WFH + \u00bd\u00d7Half-day) \u00f7 \u03a3(closed working days \u2212 holidays \u2212 approved leave). Today is shown separately and not counted.");
   }
 
   renderKpiDeltas(now, employees, records);
