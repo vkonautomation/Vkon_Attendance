@@ -9736,6 +9736,153 @@ body.light-theme { --text-dim: #6b7280; --text-muted: #566072; }
 .week-pill-name { color: #566072 !important; }
 
 
+/* ===================================================================
+   DESIGN SYSTEM v3a — Tighter, consistent TYPE SCALE (both themes)
+   Establishes a clear page-title > section > card hierarchy and lifts
+   the fragmented 9.6–13px micro-sizes onto a small modular scale.
+   =================================================================== */
+:root {
+  --fs-page-title: 1.35rem;
+  --fs-section: 1.1rem;
+  --fs-card: 1rem;
+  --fs-label: 0.72rem;
+  --fs-meta: 0.78rem;
+}
+
+.admin-page-heading h2,
+.navbar h2 {
+  font-size: var(--fs-page-title);
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+}
+.main-content h2,
+.action-hub-heading h2 {
+  font-size: var(--fs-section);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+}
+.toolbar-title-group,
+.modal-title-group,
+.panel-title,
+.card-title {
+  font-size: var(--fs-card);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* uppercase label floor (kills the 9.6px micro-labels) */
+.side-nav-label,
+.label-tech,
+.badge-sub,
+.data-table th,
+.weekday-header {
+  font-size: var(--fs-label);
+}
+
+/* secondary/meta floor */
+.admin-view-sub,
+.calendar-subtitle,
+.table-sub,
+.footer-meta,
+.chip-role {
+  font-size: var(--fs-meta);
+}
+
+
+/* ===================================================================
+   DESIGN SYSTEM v3b — CLEAN CORPORATE DARK pass
+   Scoped to body:not(.light-theme) so the light pass is untouched.
+   Fixes light values that never flipped (white table rows / navbar &
+   profile chips / cream quick-stats / dark-on-dark meta text), removes
+   the neon orange glows, solidifies the blurred navbar, restores focus
+   rings, and lifts sub-AA muted text.
+   =================================================================== */
+
+/* solid, flat navbar (no blur, no translucency) */
+body:not(.light-theme) .navbar,
+body:not(.light-theme) .admin-shell .admin-navbar,
+body:not(.light-theme) .admin-shell .navbar {
+  background: #0f141b !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border-bottom: 1px solid #26303d !important;
+}
+
+/* P0: table rows were white -> invisible light text */
+body:not(.light-theme) .data-table tbody tr { background: #161d27 !important; }
+body:not(.light-theme) .data-table tbody tr:nth-child(even) { background: #131a23 !important; }
+body:not(.light-theme) .data-table tbody tr:hover { background: #1b2431 !important; }
+body:not(.light-theme) #tab-roster .data-table td:last-child { background: #161d27 !important; }
+body:not(.light-theme) #tab-roster .data-table th:last-child { background: #0b0f14 !important; }
+
+/* P0: navbar profile chips */
+body:not(.light-theme) .employee-chip,
+body:not(.light-theme) .admin-chip {
+  background: #1a232e !important;
+  border: 1px solid #26303d !important;
+}
+body:not(.light-theme) .employee-chip .chip-name,
+body:not(.light-theme) .admin-chip .chip-name { color: #eef2f7 !important; }
+body:not(.light-theme) .employee-chip .chip-role,
+body:not(.light-theme) .admin-chip .chip-role { color: #9aa6b4 !important; }
+
+/* P0: sub-bar policy chips + quick-stat badges (were white / cream) */
+body:not(.light-theme) .policy-chip {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid #26303d !important;
+  color: #a7b2c0 !important;
+}
+body:not(.light-theme) .quick-stat-badge {
+  background: #161d27 !important;
+  border: 1px solid #26303d !important;
+}
+body:not(.light-theme) .quick-stat-badge .q-label { color: #9aa6b4 !important; }
+body:not(.light-theme) .q-num { color: #f1f5f9 !important; }
+
+/* P1: dark-on-dark meta text */
+body:not(.light-theme) .meta-hours,
+body:not(.light-theme) .day-meta-text { color: #94a3b8 !important; }
+
+/* P2: sub-AA muted text (also overrides the unscoped v2c light fixes) */
+body:not(.light-theme) .footer-meta,
+body:not(.light-theme) .calendar-subtitle,
+body:not(.light-theme) .table-sub,
+body:not(.light-theme) .week-pill-name,
+body:not(.light-theme) .week-pill-foot,
+body:not(.light-theme) .weekday-header,
+body:not(.light-theme) .label-tech {
+  color: #9aa6b4 !important;
+}
+body:not(.light-theme) .badge-bubble { background: #c2410c !important; }
+
+/* P3: retire neon glows -> solid brand buttons with neutral elevation */
+body:not(.light-theme) .btn-primary,
+body:not(.light-theme) .btn-primary.btn-block,
+body:not(.light-theme) .btn-capture-action {
+  background: #ea580c !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4) !important;
+}
+body:not(.light-theme) .btn-warning {
+  background: #b45309 !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4) !important;
+}
+body:not(.light-theme) .reg-cal-cell.reg-selected { box-shadow: none !important; }
+
+/* P3: restore a visible focus ring on inputs */
+body:not(.light-theme) .form-control:focus {
+  outline: none !important;
+  border-color: #ea580c !important;
+  box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.32) !important;
+}
+
+/* ---- v3c: lift the last sub-11px labels onto the type floor ---- */
+.badge-sub .label-tech { font-size: var(--fs-label); }
+.week-pill-name,
+.week-pill-foot { font-size: var(--fs-label); }
+
+
 
 
 
