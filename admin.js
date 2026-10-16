@@ -2590,7 +2590,7 @@ const DEFAULT_CANDIDATES = [
 
 const CANDIDATE_STAGES = ["Applied", "Screening", "Interview", "Offered", "Hired"];
 const TASK_STATUSES = ["Open", "In Progress", "Done"];
-const DEPT_DOT_COLORS = ["#e3b341", "#7c3aed", "#0ea5e9", "#22c55e", "#db2777", "#f97316", "#64748b"];
+const DEPT_DOT_COLORS = ["#ea580c", "#7c3aed", "#0ea5e9", "#22c55e", "#db2777", "#f97316", "#64748b"];
 const DEFAULT_PAY_BY_DEPT = { Engineering: 85000, Product: 78000, Operations: 92000, Infrastructure: 88000 };
 const LATE_CUTOFF_MIN_DASH = 10 * 60; // 10:00 AM IST grace (matches master sheet)
 

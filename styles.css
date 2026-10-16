@@ -7343,11 +7343,11 @@ body.light-theme .sidebar-wordmark {
   bottom: 22%;
   width: 3px;
   border-radius: 0 3px 3px 0;
-  background: #e3b341;
+  background: #ea580c;
 }
 
 .admin-sidebar .nav-tab.active i {
-  color: #e3b341;
+  color: #ea580c;
 }
 
 .admin-sidebar .badge-bubble {
@@ -7478,7 +7478,7 @@ body.admin-page.light-theme .kpi-card .kpi-lbl {
   align-items: center;
   gap: 1px;
   background: #ffffff;
-  border: 1px solid #eae5d9;
+  border: 1px solid #e7eaf0;
   border-radius: 12px;
   padding: 0.6rem 0.4rem 0.5rem;
   text-align: center;
@@ -7527,7 +7527,7 @@ body.admin-page:not(.light-theme) .week-pill-foot { color: var(--text-muted); }
 
 .week-pill.is-today .week-pill-day { color: #ffffff; }
 .week-pill.is-today .week-pill-name { color: rgba(255, 255, 255, 0.65); }
-.week-pill.is-today .week-pill-foot { color: #e3b341; font-weight: 700; }
+.week-pill.is-today .week-pill-foot { color: #ea580c; font-weight: 700; }
 
 /* --- Table toolbar: search + count --- */
 .table-toolbar-row {
@@ -7582,14 +7582,14 @@ body.admin-page.light-theme .master-table-wrap {
 
 body.admin-page.light-theme .master-table {
   background: #ffffff;
-  border: 1px solid #eae5d9;
+  border: 1px solid #e7eaf0;
   border-radius: 16px;
   overflow: hidden;
   box-shadow: 0 1px 3px rgba(23, 34, 28, 0.05);
 }
 
 body.admin-page.light-theme .master-table thead th {
-  background: #faf8f2;
+  background: #f8fafc;
   color: #6b7568;
   font-size: 0.72rem;
   text-transform: uppercase;
@@ -7624,8 +7624,8 @@ body.admin-page.light-theme .master-table tbody td {
 body.admin-page.light-theme .admin-panel,
 body.admin-page.light-theme .admin-card,
 body.admin-page.light-theme .admin-split-grid > .glass-panel {
-  background: #fffdf9;
-  border-color: #eae5d9;
+  background: #ffffff;
+  border-color: #e7eaf0;
   box-shadow: 0 1px 3px rgba(23, 34, 28, 0.05);
 }
 
@@ -7768,7 +7768,7 @@ body.light-theme .portal-shell .sub-bar {
 }
 
 .portal-nav-link.active i {
-  color: #e3b341;
+  color: #ea580c;
 }
 
 .portal-nav-link.active::before {
@@ -7779,25 +7779,25 @@ body.light-theme .portal-shell .sub-bar {
   bottom: 22%;
   width: 3px;
   border-radius: 0 3px 3px 0;
-  background: #e3b341;
+  background: #ea580c;
 }
 
 /* --- Cards on the warm canvas (calendar, regularisation, trackers) --- */
 body.light-theme .portal-shell .glass-panel {
-  background: #fffdf9;
-  border-color: #eae5d9;
+  background: #ffffff;
+  border-color: #e7eaf0;
   box-shadow: 0 1px 3px rgba(23, 34, 28, 0.05);
 }
 
 body.light-theme .portal-shell .my-leaves-tracker-box {
   background: #ffffff;
-  border-color: #eae5d9;
+  border-color: #e7eaf0;
 }
 
 body.light-theme .portal-shell .today-metrics-strip,
 body.light-theme .portal-shell .snapshot-preview-card {
-  background: #faf8f2;
-  border-color: #eae5d9;
+  background: #f8fafc;
+  border-color: #e7eaf0;
 }
 
 /* --- Login screen: warm canvas, dark-green primary action --- */
@@ -7810,7 +7810,7 @@ body.light-theme .auth-screen-overlay {
 
 body.light-theme .auth-card {
   background: #ffffff;
-  border: 1px solid #eae5d9;
+  border: 1px solid #e7eaf0;
   box-shadow: 0 24px 60px -20px rgba(23, 34, 28, 0.22);
 }
 
@@ -7831,7 +7831,7 @@ body.light-theme .auth-card::before {
 
 body:not(.light-theme) .auth-screen-overlay {
   background:
-    radial-gradient(circle at 18% 12%, rgba(227, 179, 65, 0.05), transparent 42%),
+    radial-gradient(circle at 18% 12%, rgba(234, 88, 12, 0.06), transparent 42%),
     rgba(10, 14, 20, 0.86);
 }
 
@@ -8048,7 +8048,7 @@ body:not(.light-theme) .pill-notin { background: rgba(100, 116, 139, 0.18); colo
   flex-direction: column;
   gap: 0.7rem;
   background: #ffffff;
-  border: 1px solid #eae5d9;
+  border: 1px solid #e7eaf0;
   border-radius: 14px;
   padding: 0.9rem;
   box-shadow: 0 16px 40px -12px rgba(23, 34, 28, 0.25);
@@ -8111,10 +8111,10 @@ body:not(.light-theme) .more-filters-btn {
 
 .table-chip:hover {
   border-color: #b9b1a0;
-  background: #faf7ef;
+  background: #f1f5f9;
 }
 
-.table-chip i { color: #e3b341; font-size: 0.7rem; }
+.table-chip i { color: #ea580c; font-size: 0.7rem; }
 .table-chip .chip-x { font-size: 0.95rem; line-height: 1; color: var(--text-muted); margin-left: 0.15rem; }
 
 body:not(.light-theme) .table-chip {
@@ -8218,7 +8218,7 @@ body:not(.light-theme) .pager-btn.is-active {
   border-radius: 6px;
   border: 1px solid rgba(255, 255, 255, 0.18);
   background: rgba(255, 255, 255, 0.06);
-  color: #e3b341;
+  color: #ea580c;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -8317,7 +8317,7 @@ body:not(.light-theme) .pager-btn.is-active {
 
 body.light-theme .dash-request-item {
   background: #ffffff;
-  border-color: #eae5d9;
+  border-color: #e7eaf0;
 }
 
 .dash-request-item > i {
@@ -8379,8 +8379,8 @@ body.light-theme .dash-request-item {
 }
 
 .help-faq-card {
-  background: #fffdf9;
-  border: 1px solid #eae5d9;
+  background: #ffffff;
+  border: 1px solid #e7eaf0;
   border-radius: 14px;
   padding: 0.95rem 1.05rem;
 }
@@ -8470,8 +8470,8 @@ body:not(.light-theme) .help-faq-card {
 }
 
 body.admin-page.light-theme #tab-roster .table-responsive .data-table td:last-child {
-  background: #fffdf9; /* match the warm roster card surface */
-  border-left: 1px solid #eae5d9;
+  background: #ffffff; /* match the roster card surface */
+  border-left: 1px solid #e7eaf0;
 }
 
 body.admin-page.light-theme #tab-roster .table-responsive .data-table th:last-child {
@@ -8577,8 +8577,8 @@ body.light-theme .portal-shell .sub-bar {
   gap: 0.9rem;
   padding: 1.1rem 1.15rem;
   border-radius: 16px;
-  background: #fffdf9;
-  border: 1px solid #eae5d9;
+  background: #ffffff;
+  border: 1px solid #e7eaf0;
   box-shadow: 0 1px 3px rgba(23, 34, 28, 0.05);
 }
 
@@ -8866,9 +8866,9 @@ body.light-theme .quick-stat-badge.stat-slate .q-num {
   margin-top: 0.35rem;
   padding: 0.28rem 0.6rem;
   border-radius: var(--radius-sm);
-  border: 1px solid rgba(227, 179, 65, 0.55);
-  background: rgba(227, 179, 65, 0.12);
-  color: #e3b341;
+  border: 1px solid rgba(234, 88, 12, 0.5);
+  background: rgba(234, 88, 12, 0.12);
+  color: #ea580c;
   font-family: inherit;
   font-size: 0.68rem;
   font-weight: 700;
@@ -8878,7 +8878,7 @@ body.light-theme .quick-stat-badge.stat-slate .q-num {
 }
 
 .cell-reg-quick:hover {
-  background: rgba(227, 179, 65, 0.26);
+  background: rgba(234, 88, 12, 0.2);
   transform: translateY(-1px);
 }
 
@@ -9355,6 +9355,385 @@ body:not(.light-theme) .emp-cal-chip.chip-a { background: rgba(239, 68, 68, 0.16
     display: none;
   }
 }
+
+
+/* ===================================================================
+   DESIGN SYSTEM v2 — "Clean Corporate" refresh (bold restyle)
+   Appended last so it wins the cascade. Redefines the core tokens
+   (palette / radius / elevation / type) and restyles the shared chrome:
+   shell, sidebar, navbar, sub-bar, cards, buttons, forms, tables, KPIs,
+   modals. Calendar + attendance-status semantics are intentionally left
+   untouched. Light theme is the primary target (both pages default to it).
+   =================================================================== */
+
+:root {
+  /* consistent radius + neutral, soft elevation */
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+
+  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06);
+  --shadow-md: 0 6px 18px -6px rgba(16, 24, 40, 0.12), 0 2px 6px -2px rgba(16, 24, 40, 0.08);
+  --shadow-lg: 0 20px 44px -16px rgba(16, 24, 40, 0.24);
+  --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.04), 0 10px 26px -14px rgba(16, 24, 40, 0.14);
+
+  /* refined dark theme (non-default) */
+  --bg-primary: #0f141b;
+  --bg-secondary: #0b0f14;
+  --bg-surface: #121821;
+  --bg-card: #161d27;
+  --bg-card-hover: #1b2431;
+  --border-glass: #26303d;
+  --border-line-strong: #33404f;
+  --text-main: #eef2f7;
+  --text-muted: #9aa6b4;
+  --text-dim: #6b7683;
+  --color-primary: #ea580c;
+  --color-primary-dark: #c2410c;
+  --color-primary-light: #f97316;
+  --grad-primary: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+}
+
+body {
+  background: var(--bg-primary);
+  color: var(--text-main);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body.light-theme {
+  --bg-primary: #f4f6fa;
+  --bg-secondary: #eef1f6;
+  --bg-surface: #ffffff;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f7f9fc;
+  --border-glass: #e7eaf0;
+  --border-line-strong: #d7dce4;
+  --text-main: #111827;
+  --text-muted: #5b6472;
+  --text-dim: #8a93a2;
+  --color-primary: #ea580c;
+  --color-primary-dark: #c2410c;
+  --color-primary-light: #f97316;
+  background:
+    radial-gradient(1100px 460px at 100% -12%, rgba(234, 88, 12, 0.05), transparent 60%),
+    #f4f6fa;
+  color: #111827;
+}
+
+h1, h2, h3, h4 {
+  color: var(--text-main);
+  letter-spacing: -0.012em;
+}
+
+/* ---------- Sidebar: clean dark rail (kept dark in both themes) ---------- */
+.admin-sidebar {
+  background: #1a232e !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+}
+body.light-theme .admin-sidebar { background: #1b2531 !important; }
+
+.sidebar-brand { border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
+
+.side-nav-label {
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.nav-tab,
+.portal-nav-link {
+  color: rgba(255, 255, 255, 0.72);
+  border-radius: var(--radius-md);
+  padding: 0.6rem 0.8rem;
+  font-weight: 500;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+.nav-tab:hover,
+.portal-nav-link:hover { background: rgba(255, 255, 255, 0.06); color: #ffffff; }
+
+.nav-tab.active,
+.portal-nav-link.active {
+  background: rgba(234, 88, 12, 0.16);
+  color: #ffffff;
+  box-shadow: inset 3px 0 0 var(--color-primary);
+}
+.nav-tab.active i,
+.portal-nav-link.active i { color: var(--color-primary-light); opacity: 1; }
+
+.badge-bubble { background: var(--color-primary); color: #fff; font-weight: 700; }
+
+/* ---------- Top navbar: flat, hairline, clear hierarchy ---------- */
+.navbar {
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border-glass);
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+body.light-theme .navbar { background: #ffffff; }
+.admin-navbar { border-bottom: 1px solid var(--border-glass); }
+
+.admin-page-heading h2 {
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  margin: 0;
+  color: var(--text-main);
+}
+.admin-view-sub { color: var(--text-muted); font-size: 0.82rem; }
+
+.realtime-clock {
+  background: var(--bg-card-hover);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-md);
+  padding: 0.42rem 0.85rem;
+}
+.clock-time { font-variant-numeric: tabular-nums; font-weight: 700; letter-spacing: 0.02em; }
+.clock-date { color: var(--text-muted); }
+
+/* ---------- Sub-bar: quiet, clean ---------- */
+.sub-bar {
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border-glass);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+body.light-theme .sub-bar { background: #fbfcfe; }
+.policy-chip {
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-glass);
+  background: transparent;
+  padding: 0.32rem 0.72rem;
+  font-size: 0.76rem;
+  color: var(--text-muted);
+}
+
+/* ---------- Cards: flat white, hairline, soft elevation ---------- */
+.glass-panel,
+.admin-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-card);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+body.light-theme .glass-panel,
+body.light-theme .admin-panel { background: #ffffff; }
+
+/* ---------- Buttons: crisp, consistent, subtle lift ---------- */
+.btn {
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), filter var(--transition-fast), background var(--transition-fast);
+}
+.btn-primary { box-shadow: 0 6px 16px -8px rgba(234, 88, 12, 0.6); }
+.btn-primary:hover,
+.btn:not(.btn-ghost):not(.btn-outline):hover { transform: translateY(-1px); filter: brightness(1.04); }
+
+/* ---------- Forms: clean, accessible focus ---------- */
+.form-control {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-line-strong);
+  border-radius: var(--radius-md);
+  color: var(--text-main);
+  padding: 0.62rem 0.8rem;
+  font-size: 0.86rem;
+}
+body.light-theme .form-control { background: #ffffff; }
+.form-control:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.16);
+}
+
+/* ---------- Tables: refined header, roomy rows, hairline dividers ---------- */
+.data-table { font-size: 0.85rem; }
+.data-table th {
+  background: var(--bg-secondary);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 0.8rem 1rem;
+  border-bottom: 1px solid var(--border-glass);
+}
+body.light-theme .data-table th { background: #f7f9fc; }
+.data-table td {
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--border-glass);
+  color: var(--text-main);
+}
+.data-table tbody tr { transition: background var(--transition-fast); }
+.data-table tbody tr:hover { background: var(--bg-card-hover); }
+
+/* ---------- KPI + quick-stat cards ---------- */
+.kpi-grid { gap: 1rem; }
+.kpi-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  padding: 1.15rem;
+}
+body.light-theme .kpi-card { background: #ffffff; }
+.quick-stat-badge {
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ---------- Modals ---------- */
+.modal-dialog,
+.modal-dialog-lg {
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+}
+body.light-theme .modal-dialog,
+body.light-theme .modal-dialog-lg { background: #ffffff; }
+
+
+/* ===================================================================
+   DESIGN SYSTEM v2b — harmony + legibility fixes
+   The audit found the v2 layer was being out-specified by legacy
+   warm-canvas rules (cream admin navbar, #f6f3ec main col, #ffffff
+   cards, gold #ea580c accents) and a body.light-theme .nav-tab rule
+   that dimmed the dark sidebar. These higher-specificity overrides
+   commit the whole app to one cool-neutral corporate system and fix
+   the objective contrast bugs. Uses !important to guarantee the win.
+   =================================================================== */
+
+/* ---- Palette harmony: one neutral family, single orange accent ---- */
+body.admin-page.light-theme .admin-shell .admin-navbar {
+  background: #ffffff !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border-bottom: 1px solid #e7eaf0 !important;
+}
+body.admin-page.light-theme .admin-main-col { background: #f4f6fa !important; }
+
+body.light-theme .dash-stat-card {
+  background: #ffffff !important;
+  border: 1px solid #e7eaf0 !important;
+  box-shadow: var(--shadow-card) !important;
+}
+body.light-theme .kpi-card {
+  background: #ffffff !important;
+  border: 1px solid #e7eaf0 !important;
+  box-shadow: var(--shadow-card) !important;
+}
+
+/* ---- Sidebar nav: let the rail's own colors win, one orange indicator ---- */
+body.light-theme .admin-sidebar .nav-tab { color: rgba(255, 255, 255, 0.74) !important; }
+body.light-theme .admin-sidebar .nav-tab i { color: rgba(255, 255, 255, 0.5) !important; }
+body.light-theme .admin-sidebar .nav-tab:hover { color: #ffffff !important; background: rgba(255, 255, 255, 0.06) !important; }
+body.light-theme .admin-sidebar .nav-tab.active {
+  background: rgba(234, 88, 12, 0.16) !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
+}
+body.light-theme .admin-sidebar .nav-tab.active i { color: #fb923c !important; }
+
+/* retire the gold accent — single brand orange in both themes */
+.admin-sidebar .nav-tab.active::before { background: #ea580c !important; }
+.admin-sidebar .nav-tab.active i { color: #fb923c !important; }
+
+/* ---- Sidebar footer controls stay legible on the dark rail ---- */
+.admin-sidebar .sidebar-logout-btn { color: rgba(255, 255, 255, 0.8) !important; border-color: rgba(255, 255, 255, 0.18) !important; }
+.admin-sidebar .sidebar-logout-btn:hover { color: #ffffff !important; background: rgba(255, 255, 255, 0.08) !important; }
+.admin-sidebar .theme-toggle-btn {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: rgba(255, 255, 255, 0.85) !important;
+  border: 1px solid rgba(255, 255, 255, 0.16) !important;
+}
+.admin-sidebar .theme-toggle-btn:hover { background: rgba(255, 255, 255, 0.14) !important; color: #ffffff !important; }
+
+/* ---- Sidebar section labels + sub-label legibility ---- */
+.side-nav-label { color: rgba(255, 255, 255, 0.55) !important; font-size: 0.7rem !important; }
+.sidebar-brand .badge-sub { color: rgba(255, 255, 255, 0.62) !important; }
+
+/* ---- Objective contrast fixes ---- */
+body.light-theme .text-primary { color: #c2410c !important; }
+body.light-theme .clock-time { color: #111827 !important; }
+body.light-theme .modal-status-badge { background: #eef2ff; color: #3730a3; }
+#editEmpIdBadge { color: #3730a3 !important; }
+#photoStatusBadge { background: #047857 !important; color: #ffffff !important; }
+
+/* ---- Login: soft elevation, single brand CTA (no olive / no glow) ---- */
+body.light-theme .auth-card { box-shadow: var(--shadow-card) !important; }
+.auth-screen-overlay .btn-block {
+  background: var(--grad-primary) !important;
+  border: none !important;
+  color: #ffffff !important;
+  box-shadow: 0 8px 20px -10px rgba(234, 88, 12, 0.5) !important;
+}
+.auth-screen-overlay .btn-block:hover { filter: brightness(1.04); transform: translateY(-1px); }
+
+
+/* ===================================================================
+   DESIGN SYSTEM v2c — finish the harmony (portal surfaces, gold
+   retirement, blue/contrast residuals, dark-mode badge guard).
+   =================================================================== */
+
+/* ---- Portal navbar + canvas: match the admin (flat white / cool) ---- */
+body.light-theme .admin-shell .navbar {
+  background: #ffffff !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border-bottom: 1px solid #e7eaf0 !important;
+}
+body.light-theme .admin-main-col { background: #f4f6fa !important; }
+body.light-theme .auth-screen-overlay { background: #f4f6fa !important; }
+
+/* ---- Warm card remnants -> white + cool hairline ---- */
+body.light-theme .portal-shell .glass-panel,
+body.admin-page.light-theme .admin-split-grid > .glass-panel {
+  background: #ffffff !important;
+  border-color: #e7eaf0 !important;
+  box-shadow: var(--shadow-card) !important;
+}
+body.light-theme .auth-card { border-color: #e7eaf0 !important; }
+
+/* ---- Retire the gold accent everywhere -> single brand orange ---- */
+.portal-nav-link.active i { color: #fb923c !important; }
+.portal-nav-link.active::before { background: #ea580c !important; }
+.table-chip i { color: #ea580c !important; }
+.dept-add-btn { color: #fb923c !important; }
+
+/* "Today" week pill: slate surface (matches rail) + orange foot, not olive+gold */
+.week-pill.is-today { background: #1b2531 !important; border-color: #1b2531 !important; }
+.week-pill.is-today .week-pill-day { color: #ffffff !important; }
+.week-pill.is-today .week-pill-name { color: rgba(255, 255, 255, 0.65) !important; }
+.week-pill.is-today .week-pill-foot { color: #fb923c !important; }
+
+/* ---- Neutralize the stray blue highlight ---- */
+body.light-theme #previewPolicyDurationText { color: #c2410c !important; }
+
+/* ---- Guard: keep the modal ID badge readable in DARK mode too ---- */
+body:not(.light-theme) #editEmpIdBadge { color: #c7d2fe !important; }
+
+/* ---- Restore the secondary ghost button on the login overlay ---- */
+.auth-screen-overlay .btn-ghost.btn-block {
+  background: transparent !important;
+  color: var(--text-muted) !important;
+  border: 1px solid var(--border-line-strong) !important;
+  box-shadow: none !important;
+}
+
+/* ---- Micro-text legibility (>= 4.5:1) ---- */
+body.light-theme { --text-dim: #6b7280; --text-muted: #566072; }
+.footer-meta { color: #6b7280 !important; }
+.calendar-subtitle { color: #566072 !important; }
+.week-pill-foot { color: #6b7280 !important; }
+.week-pill-name { color: #566072 !important; }
 
 
 
