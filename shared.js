@@ -349,6 +349,10 @@ function setStore(key, val) {
   } catch (e) {
     console.error("Storage write error:", e);
   }
+  // Mirror to the authoritative backend (debounced; server enforces permissions).
+  if (window.VKON && typeof window.VKON.syncStore === "function") {
+    try { window.VKON.syncStore(key, val); } catch (e) {}
+  }
 }
 
 function calculateDistanceInMeters(lat1, lon1, lat2, lon2) {

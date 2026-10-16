@@ -107,105 +107,67 @@ function initAuthSystem() {
     });
   }
 
-  // Employee Login Form
+  // Employee Login Form (server-authoritative auth)
   empForm.addEventListener("submit", (e) => {
     e.preventDefault();
     clearLoginError();
-    const uname = document.getElementById("loginUsername").value.trim().toLowerCase();
+    const identifier = document.getElementById("loginUsername").value.trim();
     const pwd = document.getElementById("loginPassword").value.trim();
 
-    // 1. Cross-login: Check if Admin credentials were submitted on employee form
-    const adminCreds = getAdminCredentials();
-    if ((uname === adminCreds.username.toLowerCase() || uname === "admin") && 
-        (pwd === adminCreds.password || pwd === DEFAULT_ADMIN_CREDENTIALS.password)) {
-      const adminSessionData = {
-        username: adminCreds.username,
-        name: adminCreds.name || "VKON Executive Administrator",
-        role: "admin",
-        loginTime: new Date().toISOString()
-      };
-      sessionStorage.setItem(STORAGE_KEYS.CURRENT_SESSION, JSON.stringify(adminSessionData));
-      localStorage.setItem(STORAGE_KEYS.CURRENT_SESSION, JSON.stringify(adminSessionData));
-      showToast("Admin credentials recognized! Opening Executive Console...", "success");
-      setTimeout(() => { window.location.href = "admin.html"; }, 300);
+    if (!window.VKON || !VKON.login) {
+      showLoginError("Authentication service is unavailable. Please try again.", "Sign-in Error");
       return;
     }
 
-    // 2. Check employee credentials
-    const employees = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
-    let found = employees.find(emp => emp.username.toLowerCase() === uname && emp.password === pwd);
-    if (!found) {
-      found = DEFAULT_EMPLOYEES.find(emp => emp.username.toLowerCase() === uname && emp.password === pwd);
-    }
-
-    if (found) {
-      const sessionData = {
-        username: found.username,
-        employeeId: found.id,
-        role: "employee",
-        loginTime: new Date().toISOString()
-      };
-      sessionStorage.setItem(STORAGE_KEYS.CURRENT_SESSION, JSON.stringify(sessionData));
-      localStorage.setItem(STORAGE_KEYS.CURRENT_SESSION, JSON.stringify(sessionData));
+    VKON.login(identifier, pwd).then((res) => {
+      // Admin credentials entered here -> hand off to the Executive Console (which does MFA).
+      if (res && res.mfaRequired) {
+        showToast("Admin credentials recognized! Opening Executive Console...", "success");
+        setTimeout(() => { window.location.href = "admin.html"; }, 300);
+        return;
+      }
+      if (!res || !res.ok) {
+        showLoginError((res && res.message) || "The employee credentials you entered are incorrect.", "Invalid Employee Credentials");
+        return;
+      }
       authScreen.style.display = "none";
       mainAppWrapper.style.display = "flex";
-      loadEmployeeSession(found);
-      showToast(`Welcome back, ${found.name}!`, "success");
-    } else {
-      showLoginError("The employee username or password you entered is incorrect. Default accounts: mukesh / mukesh123, chiranth / chiranth123, priya / priya123", "Invalid Employee Credentials");
-      showToast("Invalid credentials. Try mukesh / mukesh123", "error");
-    }
+      const found = resolveRosterEmployee(res.user);
+      loadEmployeeSession(found || syntheticEmployee(res.user));
+      showToast(`Welcome back, ${res.user.name}!`, "success");
+    }).catch(() => showLoginError("Network error during sign-in. Please retry.", "Sign-in Error"));
   });
 
-  // Admin Login Form (if present)
+  // Admin Login Form on the portal (if present) -> delegates to the backend
   if (adminForm) {
     adminForm.addEventListener("submit", (e) => {
       e.preventDefault();
       clearLoginError();
-      const uname = document.getElementById("adminUsername").value.trim().toLowerCase();
+      const identifier = document.getElementById("adminUsername").value.trim();
       const pwd = document.getElementById("adminPassword").value.trim();
 
-      const adminCreds = getAdminCredentials();
-      const isAdminMatch = (uname === adminCreds.username.toLowerCase() || uname === "admin") && 
-                           (pwd === adminCreds.password || pwd === DEFAULT_ADMIN_CREDENTIALS.password);
-
-      if (isAdminMatch) {
-        const adminSessionData = {
-          username: adminCreds.username,
-          name: adminCreds.name || "VKON Executive Administrator",
-          role: "admin",
-          loginTime: new Date().toISOString()
-        };
-        sessionStorage.setItem(STORAGE_KEYS.CURRENT_SESSION, JSON.stringify(adminSessionData));
-        localStorage.setItem(STORAGE_KEYS.CURRENT_SESSION, JSON.stringify(adminSessionData));
-        window.location.href = "admin.html";
+      if (!window.VKON || !VKON.login) {
+        showLoginError("Authentication service is unavailable. Please try again.", "Sign-in Error");
         return;
       }
 
-      // Cross-check: If employee credentials were submitted on admin form
-      const employees = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
-      let found = employees.find(emp => emp.username.toLowerCase() === uname && emp.password === pwd);
-      if (!found) {
-        found = DEFAULT_EMPLOYEES.find(emp => emp.username.toLowerCase() === uname && emp.password === pwd);
-      }
-      if (found) {
-        const sessionData = {
-          username: found.username,
-          employeeId: found.id,
-          role: "employee",
-          loginTime: new Date().toISOString()
-        };
-        sessionStorage.setItem(STORAGE_KEYS.CURRENT_SESSION, JSON.stringify(sessionData));
-        localStorage.setItem(STORAGE_KEYS.CURRENT_SESSION, JSON.stringify(sessionData));
+      VKON.login(identifier, pwd).then((res) => {
+        if (res && res.mfaRequired) {
+          // Correct admin password -> finish TOTP on the console.
+          window.location.href = "admin.html";
+          return;
+        }
+        if (!res || !res.ok) {
+          showLoginError((res && res.message) || "The administrator credentials you entered are incorrect.", "Invalid Admin Credentials");
+          return;
+        }
+        // Employee credentials entered on the admin tab -> open the portal instead.
         authScreen.style.display = "none";
         mainAppWrapper.style.display = "flex";
-        loadEmployeeSession(found);
-        showToast(`Welcome back, ${found.name}!`, "success");
-        return;
-      }
-
-      showLoginError("The executive administrator username or password you entered is incorrect. Master credentials: admin / admin123", "Invalid Admin Credentials");
-      showToast("Invalid admin credentials. Use admin / admin123", "error");
+        const found = resolveRosterEmployee(res.user);
+        loadEmployeeSession(found || syntheticEmployee(res.user));
+        showToast(`Welcome back, ${res.user.name}!`, "success");
+      }).catch(() => showLoginError("Network error during sign-in. Please retry.", "Sign-in Error"));
     });
   }
 
@@ -213,48 +175,66 @@ function initAuthSystem() {
   const logoutBtn = document.getElementById("logoutBtn");
   if (logoutBtn) {
     logoutBtn.addEventListener("click", () => {
-      sessionStorage.removeItem(STORAGE_KEYS.CURRENT_SESSION);
-      localStorage.removeItem(STORAGE_KEYS.CURRENT_SESSION);
-      localStorage.removeItem("apex_session_v5");
-      localStorage.removeItem("vkon_session_v6");
-      showToast("Logged out successfully.", "info");
-      checkActiveSession();
+      const done = () => {
+        showToast("Logged out successfully.", "info");
+        checkActiveSession();
+      };
+      if (window.VKON && VKON.logout) { VKON.logout().then(done).catch(done); }
+      else { done(); }
     });
   }
+}
+
+// Resolve the roster entry for a session user (roster is hydrated server-side).
+function resolveRosterEmployee(user) {
+  if (!user) return null;
+  const employees = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
+  if (!Array.isArray(employees)) return null;
+  return employees.find(e => e.id === user.employee_id)
+    || employees.find(e => (e.username || "").toLowerCase() === (user.username || "").toLowerCase())
+    || null;
+}
+
+// Fallback display object when the roster cache has not hydrated yet.
+function syntheticEmployee(user) {
+  return {
+    id: user.employee_id,
+    name: user.name,
+    username: user.username,
+    role: user.role_title || "Employee",
+    department: user.department || "",
+    avatar: (DEFAULT_EMPLOYEES.find(e => e.id === user.employee_id) || {}).avatar || ""
+  };
 }
 
 function checkActiveSession() {
   const authScreen = document.getElementById("authScreen");
   const mainAppWrapper = document.getElementById("mainAppWrapper");
-  
-  // Prefer sessionStorage for current tab session, fallback to localStorage
-  let session = null;
-  try {
-    const raw = sessionStorage.getItem(STORAGE_KEYS.CURRENT_SESSION) || localStorage.getItem(STORAGE_KEYS.CURRENT_SESSION);
-    if (raw) session = JSON.parse(raw);
-  } catch (e) {}
 
-  const employees = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
+  function showLogin() {
+    if (authScreen) authScreen.style.display = "flex";
+    if (mainAppWrapper) mainAppWrapper.style.display = "none";
+  }
 
-  if (!session || !session.username || session.role !== "employee") {
-    // If not logged in as employee, always show login screen and hide main dashboard
-    authScreen.style.display = "flex";
-    mainAppWrapper.style.display = "none";
+  // Server (cookie) is authoritative: VKON.ready resolves after /api/session + hydration.
+  if (window.VKON && VKON.ready) {
+    VKON.ready.then((user) => {
+      if (!user) { showLogin(); return; }
+      if (user.kind === "admin") { window.location.href = "admin.html"; return; }
+      const found = resolveRosterEmployee(user);
+      if (found) {
+        if (authScreen) authScreen.style.display = "none";
+        if (mainAppWrapper) mainAppWrapper.style.display = "flex";
+        loadEmployeeSession(found);
+      } else {
+        showLogin();
+      }
+    });
     return;
   }
 
-  const found = employees.find(e => e.username.toLowerCase() === session.username.toLowerCase());
-  if (found) {
-    authScreen.style.display = "none";
-    mainAppWrapper.style.display = "flex";
-    loadEmployeeSession(found);
-  } else {
-    // Session invalid or employee not found -> Show login screen
-    sessionStorage.removeItem(STORAGE_KEYS.CURRENT_SESSION);
-    localStorage.removeItem(STORAGE_KEYS.CURRENT_SESSION);
-    authScreen.style.display = "flex";
-    mainAppWrapper.style.display = "none";
-  }
+  // No backend adapter present -> stay on the login screen.
+  showLogin();
 }
 
 function loadEmployeeSession(emp) {

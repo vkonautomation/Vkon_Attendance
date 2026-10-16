@@ -1,0 +1,11 @@
+# Local/dev artifacts that must not be baked into the image
+__pycache__/
+*.pyc
+.pytest_cache/
+data/
+*.db
+*.db-wal
+*.db-shm
+.env
+.git/
+node_modules/

@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    container_name: vkon-attendance-app
+    ports:
+      - "8130:8000"
+    environment:
+      # Set a strong, random value in production.
+      SESSION_SECRET: "change-me-to-a-long-random-secret"
+      VKON_ENV: "prod"
+      VKON_DB_PATH: "/app/data/vkon.db"
+      # Keep false for plain-http local access (http://localhost:8130).
+      # Set true when served behind TLS (required in real production).
+      COOKIE_SECURE: "false"
+    volumes:
+      - vkon-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  vkon-data:
