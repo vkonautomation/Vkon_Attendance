@@ -9883,6 +9883,82 @@ body:not(.light-theme) .form-control:focus {
 .week-pill-foot { font-size: var(--fs-label); }
 
 
+/* ==========================================================================
+   v4 — CALM CALENDAR: fewer colors, more whitespace
+   The month grid read as a rainbow (every cell filled with a pastel + a
+   colored border + a colored pill + colored meta text). Neutralize the cell
+   fills/borders and the tinted stat chips so the small status pill and the
+   colored count number are the only places color appears. Calmer, still scannable.
+   ========================================================================== */
+
+/* Day cells: uniform surface + hairline grid — status lives in the pill */
+body.light-theme .calendar-day-cell:has(.badge-present),
+body.light-theme .calendar-day-cell:has(.badge-wfh-day),
+body.light-theme .calendar-day-cell:has(.badge-leave-day),
+body.light-theme .calendar-day-cell:has(.badge-rh-day),
+body.light-theme .calendar-day-cell:has(.badge-absent-day),
+body.light-theme .calendar-day-cell:has(.badge-holiday-day),
+body.light-theme .calendar-day-cell:has(.badge-notmarked),
+body.light-theme .calendar-day-cell:has(.badge-regpending),
+body.light-theme .calendar-day-cell:has(.badge-today-active) {
+  background: #ffffff !important;
+  border-color: #eef1f5 !important;
+}
+
+/* Weekends: one faint neutral tone (not a color) to set off the grid */
+body.light-theme .calendar-day-cell:has(.badge-weekend-day) {
+  background: #f7f9fc !important;
+  border-color: #eef1f5 !important;
+}
+
+/* Dark theme parity */
+.calendar-day-cell:has(.badge-present),
+.calendar-day-cell:has(.badge-wfh-day),
+.calendar-day-cell:has(.badge-leave-day),
+.calendar-day-cell:has(.badge-rh-day),
+.calendar-day-cell:has(.badge-absent-day),
+.calendar-day-cell:has(.badge-holiday-day),
+.calendar-day-cell:has(.badge-notmarked),
+.calendar-day-cell:has(.badge-regpending),
+.calendar-day-cell:has(.badge-today-active) {
+  background: var(--bg-card) !important;
+  border-color: var(--border-glass) !important;
+}
+.calendar-day-cell:has(.badge-weekend-day) {
+  background: rgba(255, 255, 255, 0.02) !important;
+  border-color: var(--border-glass) !important;
+}
+
+/* Today: keep the accent ring as the only highlight, drop the heavy fill */
+.calendar-day-cell.is-today {
+  background: var(--bg-card) !important;
+  box-shadow: inset 0 0 0 1.5px var(--color-primary) !important;
+}
+body.light-theme .calendar-day-cell.is-today {
+  background: #ffffff !important;
+  box-shadow: inset 0 0 0 1.5px #ea580c !important;
+}
+
+/* Stat chips: clean white cards, neutral border, colored number only */
+.calendar-quick-stats .quick-stat-badge {
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass);
+  color: var(--text-muted);
+}
+body.light-theme .calendar-quick-stats .quick-stat-badge {
+  background: #ffffff !important;
+  border: 1px solid #e7eaf0 !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04) !important;
+  color: var(--text-muted) !important;
+}
+body.light-theme .calendar-quick-stats .q-label { color: #6b7280 !important; }
+body.light-theme .quick-stat-badge.stat-green  .q-num { color: #047857 !important; }
+body.light-theme .quick-stat-badge.stat-purple .q-num { color: #6d28d9 !important; }
+body.light-theme .quick-stat-badge.stat-amber  .q-num { color: #b45309 !important; }
+body.light-theme .quick-stat-badge.stat-red    .q-num { color: #b91c1c !important; }
+body.light-theme .quick-stat-badge.stat-slate  .q-num { color: #475569 !important; }
+
+
 
 
 
