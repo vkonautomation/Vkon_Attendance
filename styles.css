@@ -9959,6 +9959,61 @@ body.light-theme .quick-stat-badge.stat-red    .q-num { color: #b91c1c !importan
 body.light-theme .quick-stat-badge.stat-slate  .q-num { color: #475569 !important; }
 
 
+/* ==========================================================================
+   v5 — CALM REGULARISATION CALENDAR
+   The missed-punch picker cells were triple-colored (filled cell + colored
+   border + colored day number + colored pill), which read as noisy. Give every
+   cell a neutral surface, a neutral hairline and a neutral day number, and let
+   the small light-tinted status pill be the only place color appears. The
+   actionable (eligible) days are marked by a subtle dashed accent outline; the
+   selected day stays obvious but flat (no neon glow).
+   ========================================================================== */
+
+/* Uniform neutral cell surface + hairline */
+.reg-cal-cell {
+  background: rgba(255, 255, 255, 0.02) !important;
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+}
+body.light-theme .reg-cal-cell {
+  background: #ffffff !important;
+  border: 1px solid #eef1f5 !important;
+}
+
+/* Neutral day numbers (drop the per-status color) */
+.reg-cal-cell .cell-day-num { color: var(--text-primary, #eef2f7) !important; }
+body.light-theme .reg-cal-cell .cell-day-num { color: #1f2937 !important; }
+
+/* Quiet neutrals for non-actionable days */
+.reg-cal-cell.reg-restricted { opacity: 0.72; }
+.reg-cal-cell.reg-restricted.reg-future .cell-day-num,
+.reg-cal-cell.reg-restricted.reg-weekend .cell-day-num { color: var(--text-muted, #94a3b8) !important; }
+
+/* Eligible (missed) days: the only clickable cells — subtle dashed accent, calm fill */
+.reg-cal-cell.reg-eligible {
+  background: rgba(255, 255, 255, 0.02) !important;
+  border: 1px dashed rgba(234, 88, 12, 0.5) !important;
+}
+body.light-theme .reg-cal-cell.reg-eligible {
+  background: #ffffff !important;
+  border: 1px dashed rgba(234, 88, 12, 0.55) !important;
+}
+.reg-cal-cell.reg-eligible:hover {
+  background: rgba(234, 88, 12, 0.08) !important;
+  border-color: rgba(234, 88, 12, 0.85) !important;
+  box-shadow: none !important;
+  transform: translateY(-1px);
+}
+
+/* Selected day: clear but flat — single accent, no glow, no scale */
+.reg-cal-cell.reg-selected {
+  background: rgba(234, 88, 12, 0.16) !important;
+  border: 2px solid var(--color-primary, #ea580c) !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+.reg-cal-cell.reg-selected .cell-day-num { color: var(--color-primary, #ea580c) !important; }
+
+
 
 
 
