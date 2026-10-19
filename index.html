@@ -21,7 +21,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="styles.css?v=20261019_geo1">
+  <link rel="stylesheet" href="styles.css?v=20261019_geo2">
 </head>
 <body class="light-theme">
   
@@ -849,13 +849,11 @@
                 <span>Distance: <strong id="modalDistValue">--</strong> m from Office Center</span>
                 <span class="form-hint" id="modalOfficeCenterHint">VKON Automation Tech Park</span>
               </div>
-              <!-- Location Presets / Quick Location Picker -->
+              <!-- Live fix diagnostics: exactly what the device reported and when -->
+              <p class="gps-fix-info" id="modalGpsFixInfo" style="display: none;"></p>
               <div class="modal-sim-shortcuts">
-                <button type="button" class="btn btn-xs btn-ghost sim-modal-btn" data-sim="inside">
-                  <i class="fa-solid fa-building-circle-check text-success"></i> Office Campus
-                </button>
-                <button type="button" class="btn btn-xs btn-ghost sim-modal-btn" data-sim="outside">
-                  <i class="fa-solid fa-location-arrow text-muted"></i> Off-Campus
+                <button type="button" class="btn btn-xs btn-ghost" id="modalGpsRefreshBtn" title="Request a fresh GPS reading from your device">
+                  <i class="fa-solid fa-rotate-right"></i> Refresh location
                 </button>
               </div>
             </div>
@@ -944,7 +942,7 @@
 
   <!-- Shared Engine & App Controller -->
   <script src="shared.js?v=20261013_ist_att_fix1"></script>
-  <script src="app.js?v=20261019_geo1"></script>
+  <script src="app.js?v=20261019_geo2"></script>
   <script src="js/password-toggle.js?v=20261019_ui1"></script>
 
   <!-- Present Day & Migration Guarantee -->

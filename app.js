@@ -1490,6 +1490,8 @@ function startGpsFetch() {
     gpsPill.onclick = null;
   }
   if (distVal) distVal.textContent = "\u2026";
+  const fixInfoEl = document.getElementById("modalGpsFixInfo");
+  if (fixInfoEl) fixInfoEl.style.display = "none"; // never show a stale fix while re-fetching
 
   // Require a fresh, real device fix before any punch can be accepted.
   employeeState.userLocation.located = false;
@@ -1514,6 +1516,7 @@ function startGpsFetch() {
       employeeState.userLocation.lng = pos.coords.longitude;
       employeeState.userLocation.accuracy = Math.round(pos.coords.accuracy || 0);
       employeeState.userLocation.located = true;
+      console.log("[Geofence] Device GPS fix:", pos.coords.latitude.toFixed(6), pos.coords.longitude.toFixed(6), "accuracy(m):", Math.round(pos.coords.accuracy || 0));
       evaluateModalLocation();
     },
     (err) => {
@@ -1635,6 +1638,18 @@ function evaluateModalLocation() {
     } else {
       gpsPill.className = "verification-status-pill pill-danger";
       gpsPill.innerHTML = `<i class="fa-solid fa-circle-xmark"></i> Outside (${distance}m)`;
+    }
+  }
+
+  // Show exactly what the device reported and when, so real detection is visible.
+  const fixInfo = document.getElementById("modalGpsFixInfo");
+  if (fixInfo) {
+    if (isExempt || !employeeState.userLocation.located) {
+      fixInfo.style.display = "none";
+    } else {
+      const acc = employeeState.userLocation.accuracy;
+      fixInfo.innerHTML = `<i class="fa-solid fa-satellite-dish"></i> Device reported <strong>${Number(employeeState.userLocation.lat).toFixed(5)}, ${Number(employeeState.userLocation.lng).toFixed(5)}</strong>${acc ? ` &plusmn;${acc}m accuracy` : ""} &middot; ${formatTimeString(new Date())}`;
+      fixInfo.style.display = "block";
     }
   }
 }
@@ -1919,24 +1934,12 @@ function initVerificationModal() {
     });
   }
 
-  // Shortcut simulation buttons in modal
-  document.querySelectorAll(".sim-modal-btn").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const sim = btn.dataset.sim;
-      const settings = getStore(STORAGE_KEYS.SETTINGS, DEFAULT_OFFICE);
-      if (sim === "inside") {
-        employeeState.userLocation.lat = settings.lat + 0.0003;
-        employeeState.userLocation.lng = settings.lng + 0.0002;
-        evaluateModalLocation();
-        showToast("Simulated: Inside Office (40m)", "success");
-      } else {
-        employeeState.userLocation.lat = settings.lat + 0.010;
-        employeeState.userLocation.lng = settings.lng + 0.008;
-        evaluateModalLocation();
-        showToast("Simulated: Outside Geofence (1.2km)", "error");
-      }
-    });
-  });
+  // Manual re-fetch of the device location (real GPS only — fake preset
+  // buttons were removed because they never set `located` and confused UX)
+  const gpsRefreshBtn = document.getElementById("modalGpsRefreshBtn");
+  if (gpsRefreshBtn) {
+    gpsRefreshBtn.addEventListener("click", startGpsFetch);
+  }
 }
 
 // ============================================================================

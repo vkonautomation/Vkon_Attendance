@@ -10317,6 +10317,11 @@ body:not(.light-theme) .map-search-results { background: #101725; border-color: 
 .map-foot-hint { margin: 0.55rem 0.95rem 0.95rem; line-height: 1.55; }
 .custom-radius-handle { background: transparent; border: 0; }
 
+/* ---- Punch modal: live GPS fix diagnostics + refresh ---- */
+.gps-fix-info { display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; margin: 0.4rem 0 0; font-size: 0.72rem; line-height: 1.5; color: var(--text-muted, #64748b); background: rgba(99, 102, 241, 0.07); border: 1px dashed rgba(99, 102, 241, 0.35); border-radius: 9px; padding: 0.32rem 0.55rem; }
+.gps-fix-info i { color: #6366f1; }
+.gps-fix-info strong { font-variant-numeric: tabular-nums; }
+
 
 
 
