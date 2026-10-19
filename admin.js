@@ -15,113 +15,102 @@ let adminGeofenceCircle = null;
 // 1. AUTHENTICATION & ACCESS CONTROL
 // ============================================================================
 
-let adminOverlayWired = false;
-
-function hideAdminOverlay() {
-  const overlay = document.getElementById("adminAuthOverlay");
-  if (overlay) overlay.style.display = "none";
-}
-
-function showAdminOverlay() {
-  const overlay = document.getElementById("adminAuthOverlay");
-  if (overlay) overlay.style.display = "flex";
-  wireAdminOverlayLogin();
-}
-
-// Two-step server-authoritative admin sign-in: password, then TOTP.
-function wireAdminOverlayLogin() {
-  if (adminOverlayWired) return;
-  adminOverlayWired = true;
+function checkAdminAuth() {
+  let session = null;
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEYS.CURRENT_SESSION) || localStorage.getItem(STORAGE_KEYS.CURRENT_SESSION);
+    if (raw) session = JSON.parse(raw);
+  } catch (e) {}
 
   const overlay = document.getElementById("adminAuthOverlay");
-  const loginForm = document.getElementById("adminOverlayLoginForm");
   const errorAlert = document.getElementById("adminLoginErrorAlert");
-  const loginStep = document.getElementById("adminLoginStep");
-  const mfaStep = document.getElementById("adminMfaStep");
-  const submitBtn = document.getElementById("adminOverlaySubmitBtn");
-  const codeInput = document.getElementById("adminOverlayMfaCode");
-  const backBtn = document.getElementById("adminMfaBackBtn");
-  const quickBtn = document.getElementById("quickFillAdminBtn");
-  if (!loginForm) return;
+  const loginForm = document.getElementById("adminOverlayLoginForm");
 
-  function showError(msg) {
-    if (errorAlert) {
-      const m = document.getElementById("adminLoginErrorMessage");
-      if (m && msg) m.textContent = msg;
-      errorAlert.style.display = "flex";
-      errorAlert.classList.remove("shake");
-      void errorAlert.offsetWidth;
-      errorAlert.classList.add("shake");
-    }
-    showToast(msg || "Invalid credentials.", "error");
-  }
+  if (!session || session.role !== "admin") {
+    if (overlay) {
+      overlay.style.display = "flex";
+      
+      // Clear error on user typing
+      ["adminOverlayUsername", "adminOverlayPassword"].forEach(id => {
+        const inp = document.getElementById(id);
+        if (inp) {
+          inp.addEventListener("input", () => {
+            if (errorAlert) errorAlert.style.display = "none";
+          });
+        }
+      });
 
-  ["adminOverlayUsername", "adminOverlayPassword", "adminOverlayMfaCode"].forEach(id => {
-    const inp = document.getElementById(id);
-    if (inp) inp.addEventListener("input", () => { if (errorAlert) errorAlert.style.display = "none"; });
-  });
-
-  function toMfaStep() {
-    if (loginStep) loginStep.style.display = "none";
-    if (mfaStep) mfaStep.style.display = "block";
-    if (submitBtn) submitBtn.innerHTML = '<i class="fa-solid fa-shield-halved"></i> Verify Code';
-    if (codeInput) { codeInput.value = ""; codeInput.focus(); }
-  }
-
-  function toCredStep() {
-    if (mfaStep) mfaStep.style.display = "none";
-    if (loginStep) loginStep.style.display = "block";
-    if (submitBtn) submitBtn.innerHTML = '<i class="fa-solid fa-unlock-keyhole"></i> Sign In to Admin Console';
-  }
-
-  if (backBtn) backBtn.addEventListener("click", toCredStep);
-
-  if (quickBtn) quickBtn.addEventListener("click", () => {
-    const u = document.getElementById("adminOverlayUsername");
-    const p = document.getElementById("adminOverlayPassword");
-    if (u) u.value = "admin";
-    if (p) p.value = "admin123";
-    loginForm.dispatchEvent(new Event("submit"));
-  });
-
-  function grantAdminAccess(user) {
-    if (errorAlert) errorAlert.style.display = "none";
-    hideAdminOverlay();
-    showToast("Administrator session authenticated.", "success");
-    startAdminConsole();
-  }
-
-  loginForm.addEventListener("submit", (e) => {
-    e.preventDefault();
-    if (!window.VKON || !VKON.login) { showError("Authentication service is unavailable."); return; }
-
-    // Step 2: TOTP verification (the pre-auth token was issued in step 1).
-    if (mfaStep && mfaStep.style.display !== "none") {
-      const code = (codeInput && codeInput.value || "").trim();
-      if (!code) { showError("Enter the 6-digit code from your authenticator app."); return; }
-      VKON.verifyMfa(code).then((res) => {
-        if (!res || !res.ok) { showError((res && res.message) || "Invalid authentication code."); return; }
-        grantAdminAccess(res.user);
-      }).catch(() => showError("Network error while verifying code."));
-      return;
-    }
-
-    // Step 1: password.
-    const identifier = (document.getElementById("adminOverlayUsername").value || "").trim();
-    const pwd = (document.getElementById("adminOverlayPassword").value || "").trim();
-    VKON.login(identifier, pwd).then((res) => {
-      if (res && res.mfaRequired) { toMfaStep(); return; }
-      if (!res || !res.ok) { showError((res && res.message) || "Invalid credentials."); return; }
-      if (res.role !== "admin") {
-        showToast(`Welcome ${res.user.name}! Opening Employee Portal...`, "info");
-        setTimeout(() => { window.location.href = "index.html"; }, 350);
-        return;
+      const quickBtn = document.getElementById("quickFillAdminBtn");
+      if (quickBtn) {
+        quickBtn.onclick = () => {
+          document.getElementById("adminOverlayUsername").value = "admin";
+          document.getElementById("adminOverlayPassword").value = "admin123";
+          loginForm.dispatchEvent(new Event("submit"));
+        };
       }
-      grantAdminAccess(res.user);
-    }).catch(() => showError("Network error during sign-in."));
-  });
 
-  if (overlay) overlay.style.display = "flex";
+      loginForm.onsubmit = (e) => {
+        e.preventDefault();
+        const enteredUser = document.getElementById("adminOverlayUsername").value.trim().toLowerCase();
+        const enteredPass = document.getElementById("adminOverlayPassword").value.trim();
+        const currentCreds = getAdminCredentials();
+
+        // 1. Verify Admin credentials (case-insensitive username, supports current or default password)
+        const isAdminMatch = (enteredUser === currentCreds.username.toLowerCase() || enteredUser === "admin") && 
+                             (enteredPass === currentCreds.password || enteredPass === DEFAULT_ADMIN_CREDENTIALS.password);
+
+        if (isAdminMatch) {
+          if (errorAlert) errorAlert.style.display = "none";
+          const adminSession = {
+            username: currentCreds.username,
+            name: currentCreds.name || "VKON Executive Administrator",
+            role: "admin",
+            loginTime: new Date().toISOString()
+          };
+          sessionStorage.setItem(STORAGE_KEYS.CURRENT_SESSION, JSON.stringify(adminSession));
+          localStorage.setItem(STORAGE_KEYS.CURRENT_SESSION, JSON.stringify(adminSession));
+          overlay.style.display = "none";
+          showToast("Administrator session authenticated.", "success");
+          startAdminConsole();
+          return;
+        }
+
+        // 2. Cross-login: Check if employee credentials were submitted
+        const employees = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
+        let empMatch = employees.find(emp => emp.username.toLowerCase() === enteredUser && emp.password === enteredPass);
+        if (!empMatch) {
+          empMatch = DEFAULT_EMPLOYEES.find(emp => emp.username.toLowerCase() === enteredUser && emp.password === enteredPass);
+        }
+
+        if (empMatch) {
+          const sessionData = {
+            username: empMatch.username,
+            employeeId: empMatch.id,
+            role: "employee",
+            loginTime: new Date().toISOString()
+          };
+          sessionStorage.setItem(STORAGE_KEYS.CURRENT_SESSION, JSON.stringify(sessionData));
+          localStorage.setItem(STORAGE_KEYS.CURRENT_SESSION, JSON.stringify(sessionData));
+          showToast(`Welcome ${empMatch.name}! Opening Employee Portal...`, "info");
+          setTimeout(() => { window.location.href = "index.html"; }, 350);
+          return;
+        }
+
+        // If neither matched:
+        if (errorAlert) {
+          errorAlert.style.display = "flex";
+          errorAlert.classList.remove("shake");
+          void errorAlert.offsetWidth;
+          errorAlert.classList.add("shake");
+        }
+        showToast("Invalid credentials. Try admin / admin123", "error");
+      };
+    }
+    return false;
+  }
+
+  if (overlay) overlay.style.display = "none";
+  return true;
 }
 
 function initAdminClock() {
@@ -220,9 +209,9 @@ function initAdminTabs() {
     localStorage.removeItem("apex_session_v5");
     localStorage.removeItem("vkon_session_v6");
     showToast("Logged out of Admin Console.", "info");
-    const redirect = () => { setTimeout(() => { window.location.href = "index.html"; }, 400); };
-    if (window.VKON && VKON.logout) { VKON.logout().then(redirect).catch(redirect); }
-    else { redirect(); }
+    setTimeout(() => {
+      window.location.href = "index.html";
+    }, 400);
   });
 }
 
@@ -2573,27 +2562,6 @@ function initAdminAccountForm() {
       }
     });
   }
-
-  // MFA enrollment (server-owned secret) -> shown in the Admin Security tab.
-  const mfaBtn = document.getElementById("adminMfaSetupBtn");
-  const mfaPanel = document.getElementById("adminMfaSetupPanel");
-  if (mfaBtn && mfaPanel) {
-    mfaBtn.addEventListener("click", () => {
-      if (mfaPanel.style.display !== "none") { mfaPanel.style.display = "none"; return; }
-      if (!window.VKON || !VKON.mfaSetup) { showToast("MFA setup requires the backend service.", "error"); return; }
-      VKON.mfaSetup().then((r) => {
-        if (r.ok && r.data) {
-          const secretEl = document.getElementById("adminMfaSecret");
-          const uriEl = document.getElementById("adminMfaUri");
-          if (secretEl) secretEl.value = r.data.secret || "";
-          if (uriEl) uriEl.value = r.data.otpauth_uri || "";
-          mfaPanel.style.display = "block";
-        } else {
-          showToast("Could not load MFA enrollment details.", "error");
-        }
-      }).catch(() => showToast("Network error loading MFA details.", "error"));
-    });
-  }
 }
 
 // ============================================================================
@@ -3058,20 +3026,7 @@ function startAdminConsole() {
 
 window.addEventListener("DOMContentLoaded", () => {
   initThemeSystem();
-
-  // Server (cookie) is authoritative. VKON.ready resolves after /api/session + hydration.
-  if (window.VKON && VKON.ready) {
-    VKON.ready.then((user) => {
-      if (user && user.kind === "admin") {
-        hideAdminOverlay();
-        startAdminConsole();
-      } else if (user && user.kind === "employee") {
-        window.location.href = "index.html";
-      } else {
-        showAdminOverlay();
-      }
-    });
-  } else {
-    showAdminOverlay();
+  if (checkAdminAuth()) {
+    startAdminConsole();
   }
 });

@@ -21,7 +21,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="styles.css?v=20261016_sec1">
+  <link rel="stylesheet" href="styles.css?v=20261016_cal2">
 </head>
 <body class="light-theme">
   
@@ -55,19 +55,19 @@
 
       <!-- Quick Fill Credentials Pill -->
       <div class="quick-credentials-hint auth-quick-fill-wrap">
-        <span class="auth-quick-fill-label">Demo</span>
+        <span class="auth-quick-fill-label">Default Account</span>
         <button type="button" class="quick-fill-emp-btn auth-quick-fill-btn" data-user="mukesh" data-pass="mukesh123">
-          <i class="fa-solid fa-user-check text-primary"></i> Mukesh Sharma (EMP001) &bull; tap to sign in
+          <i class="fa-solid fa-user-check text-primary"></i> Mukesh Sharma (EMP001) &bull; mukesh / mukesh123
         </button>
       </div>
 
       <!-- Employee Login Form -->
       <form id="employeeLoginForm" class="auth-form">
         <div class="form-group">
-          <label for="loginUsername">Employee ID or Work Email <span class="req">*</span></label>
+          <label for="loginUsername">Username / ID <span class="req">*</span></label>
           <div class="input-icon-wrap">
             <i class="fa-solid fa-id-badge input-icon"></i>
-            <input type="text" id="loginUsername" required class="form-control" placeholder="e.g. EMP001 or you@vkon.in" autocomplete="username">
+            <input type="text" id="loginUsername" required class="form-control" placeholder="mukesh" value="mukesh">
           </div>
         </div>
 
@@ -75,8 +75,7 @@
           <label for="loginPassword">Password <span class="req">*</span></label>
           <div class="input-icon-wrap">
             <i class="fa-solid fa-lock input-icon"></i>
-            <input type="password" id="loginPassword" required class="form-control" placeholder="Enter your password" autocomplete="current-password">
-            <button type="button" class="input-affix-btn toggle-password" aria-pressed="false" aria-label="Show password" tabindex="-1"><i class="fa-solid fa-eye" aria-hidden="true"></i></button>
+            <input type="password" id="loginPassword" required class="form-control" placeholder="mukesh123" value="mukesh123">
           </div>
         </div>
 
@@ -926,10 +925,8 @@
   <div class="toast-container" id="toastContainer"></div>
 
   <!-- Shared Engine & App Controller -->
-  <script src="shared.js?v=20261013_ist_sec1"></script>
-  <script src="js/server-client.js?v=20261016_sec1"></script>
-  <script src="app.js?v=20261016_sec1"></script>
-  <script src="js/password-toggle.js?v=20261016_sec1"></script>
+  <script src="shared.js?v=20261013_ist_clarity1"></script>
+  <script src="app.js?v=20261015_mob1"></script>
 
   <!-- Present Day & Migration Guarantee -->
   <script>

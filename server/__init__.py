@@ -1,1 +1,0 @@
-"""VKON Attendance backend package."""
