@@ -1648,7 +1648,11 @@ function evaluateModalLocation() {
       fixInfo.style.display = "none";
     } else {
       const acc = employeeState.userLocation.accuracy;
-      fixInfo.innerHTML = `<i class="fa-solid fa-satellite-dish"></i> Device reported <strong>${Number(employeeState.userLocation.lat).toFixed(5)}, ${Number(employeeState.userLocation.lng).toFixed(5)}</strong>${acc ? ` &plusmn;${acc}m accuracy` : ""} &middot; ${formatTimeString(new Date())}`;
+      let fixHtml = `<i class="fa-solid fa-satellite-dish"></i> Device reported <strong>${Number(employeeState.userLocation.lat).toFixed(5)}, ${Number(employeeState.userLocation.lng).toFixed(5)}</strong>${acc ? ` &plusmn;${acc}m accuracy` : ""} &middot; ${formatTimeString(new Date())}`;
+      if (acc && acc > 200) {
+        fixHtml += ` &middot; <span class="gps-acc-warn"><i class="fa-solid fa-triangle-exclamation"></i> Low-accuracy network fix \u2014 distance may be off by many km. Turn off VPN / use a GPS device.</span>`;
+      }
+      fixInfo.innerHTML = fixHtml;
       fixInfo.style.display = "block";
     }
   }
