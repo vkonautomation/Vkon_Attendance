@@ -490,6 +490,9 @@ function renderMonthlyCalendar() {
             <span class="day-badge-pill badge-today-active" title="Today &ndash; ready to punch in"><i class="fa-solid fa-clock"></i> Today (Active)</span>
             <span class="day-meta-text">Ready to Punch</span>
           `;
+        } else if (dayDate > nowZero && !isWeekend && !isBeforeEnrollment) {
+          // Upcoming working day: tidy subtle placeholder (weekends are labelled above).
+          badgeHtml = `<span class="day-future-ph" title="Upcoming working day">&mdash;</span>`;
         }
       }
     }
@@ -2754,9 +2757,29 @@ function initPortalSideNav() {
     if (burger) burger.setAttribute("aria-expanded", "false");
   }
 
+  // Policy summary: full inline row on Dashboard, collapsed info popover elsewhere.
+  const policyZone = document.getElementById("policyZone");
+  const policyToggle = document.getElementById("policyToggle");
+  function closePolicyPopover() {
+    if (policyZone) policyZone.classList.remove("open");
+    if (policyToggle) policyToggle.setAttribute("aria-expanded", "false");
+  }
+  if (policyToggle && policyZone) {
+    policyToggle.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const open = policyZone.classList.toggle("open");
+      policyToggle.setAttribute("aria-expanded", open ? "true" : "false");
+    });
+    document.addEventListener("click", (e) => {
+      if (policyZone.classList.contains("open") && !policyZone.contains(e.target)) closePolicyPopover();
+    });
+  }
+
   function switchView(viewId) {
     links.forEach(l => l.classList.toggle("active", l.dataset.view === viewId));
     views.forEach(v => v.classList.toggle("portal-view-active", v.dataset.portalView === viewId));
+    document.body.classList.toggle("policy-collapsed", viewId !== "dashboard");
+    closePolicyPopover();
     const meta = VIEW_META[viewId];
     if (meta && titleEl && subEl) {
       titleEl.textContent = meta[0];
@@ -2801,6 +2824,43 @@ function setDashText(id, val) {
   if (el) el.textContent = val;
 }
 
+// ----------------------------------------------------------------------------
+// Dashboard: Upcoming Holidays panel (fills otherwise-empty dashboard space)
+// ----------------------------------------------------------------------------
+function renderUpcomingHolidays() {
+  const list = document.getElementById("upcomingHolidaysList");
+  const empty = document.getElementById("upcomingHolidaysEmpty");
+  if (!list) return;
+  // Include BOTH declared and restricted holidays (getDeclaredHolidays() filters to declared only).
+  let holidays = [];
+  try {
+    holidays = getStore(STORAGE_KEYS.HOLIDAYS, (typeof DEFAULT_HOLIDAYS !== "undefined" ? DEFAULT_HOLIDAYS : []));
+  } catch (e) {
+    holidays = (typeof getDeclaredHolidays === "function") ? getDeclaredHolidays() : [];
+  }
+  const now = (typeof getPresentDate === "function") ? getPresentDate() : new Date();
+  const nowZero = new Date(now); nowZero.setHours(0, 0, 0, 0);
+  const upcoming = holidays
+    .map(h => ({ name: h.name, type: h.type || "", dObj: new Date(h.date + "T00:00:00") }))
+    .filter(h => h.dObj >= nowZero)
+    .sort((a, b) => a.dObj - b.dObj)
+    .slice(0, 4);
+  if (!upcoming.length) { list.innerHTML = ""; if (empty) empty.style.display = ""; return; }
+  if (empty) empty.style.display = "none";
+  list.innerHTML = upcoming.map(h => {
+    const days = Math.round((h.dObj - nowZero) / 86400000);
+    const when = days === 0 ? "Today" : days === 1 ? "Tomorrow" : `in ${days} days`;
+    const dow = h.dObj.toLocaleDateString("en-US", { weekday: "short", timeZone: "Asia/Kolkata" });
+    const dm = h.dObj.toLocaleDateString("en-US", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" });
+    const isRh = /restricted/i.test(h.type);
+    return `<li class="uh-item ${isRh ? "uh-rh" : "uh-declared"}">`
+      + `<span class="uh-date-badge"><span class="uh-dow">${dow}</span><span class="uh-dm">${dm}</span></span>`
+      + `<span class="uh-info"><span class="uh-name">${h.name}</span><span class="uh-type">${isRh ? "Restricted Holiday" : "Declared Holiday"}</span></span>`
+      + `<span class="uh-when">${when}</span>`
+      + `</li>`;
+  }).join("");
+}
+
 function renderDashboardStats() {
   if (!employeeState.currentEmployee) return;
   const emp = employeeState.currentEmployee;
@@ -2837,6 +2897,7 @@ function renderDashboardStats() {
   setDashText("dashStatLeaveSub", `${leavesUsed} used of ${quota.personalLeave} / year`);
   setDashText("dashStatHours", Math.round(hours));
   setDashText("dashStatHoursSub", monthName);
+  try { renderUpcomingHolidays(); } catch (e) { console.error("renderUpcomingHolidays err:", e); }
 }
 
 // ============================================================================

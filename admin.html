@@ -24,7 +24,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="styles.css?v=20261019_ui2">
+  <link rel="stylesheet" href="styles.css?v=20261019_ui3">
 </head>
 <body class="light-theme admin-page">
 
@@ -254,7 +254,7 @@
               <tbody id="dashTodayTableBody"></tbody>
             </table>
           </div>
-          <p class="dash-empty-note" id="dashEmptyToday" style="display: none;"><i class="fa-regular fa-mug-hot"></i> Nobody has punched in yet today &mdash; the list fills up as the team checks in.</p>
+          <p class="dash-empty-note" id="dashEmptyToday" style="display: none;"><i class="fa-solid fa-mug-hot"></i> Nobody has punched in yet today &mdash; the list fills up as the team checks in.</p>
 
           <h3 class="dash-sub-heading"><i class="fa-solid fa-inbox"></i> Latest Requests</h3>
           <div class="dash-request-list" id="dashRecentRequests"></div>
@@ -272,10 +272,25 @@
             </div>
           </div>
 
-          <form id="candidateAddForm" class="inline-add-form">
-            <input type="text" id="candidateNameInput" class="form-control" placeholder="Candidate name" required>
-            <input type="text" id="candidateRoleInput" class="form-control" placeholder="Position (e.g. Frontend Engineer)" required>
+          <form id="candidateAddForm" class="inline-add-form cand-add-form" novalidate>
+            <div class="cand-field">
+              <input type="text" id="candidateNameInput" class="form-control" placeholder="Candidate name" aria-label="Candidate name" maxlength="60" autocomplete="off" required>
+            </div>
+            <div class="cand-field">
+              <input type="text" id="candidateRoleInput" class="form-control" placeholder="Position (e.g. Frontend Engineer)" aria-label="Position" maxlength="60" autocomplete="off" required>
+            </div>
+            <div class="cand-field">
+              <label class="cand-stage-label" for="candidateStageInput">Stage</label>
+              <select id="candidateStageInput" class="form-control" aria-label="Initial stage">
+                <option value="Applied" selected>Applied</option>
+                <option value="Screening">Screening</option>
+                <option value="Interview">Interview</option>
+                <option value="Offered">Offered</option>
+                <option value="Hired">Hired</option>
+              </select>
+            </div>
             <button type="submit" class="btn btn-primary"><i class="fa-solid fa-plus"></i> Add Candidate</button>
+            <p class="cand-form-error" id="candidateFormError" role="alert" style="display: none;"></p>
           </form>
 
           <div class="table-responsive master-table-wrap">
@@ -403,8 +418,8 @@
                 </select>
               </div>
 
-              <button id="exportMonthlyExcelBtn" class="btn btn-warning">
-                <i class="fa-solid fa-file-excel"></i> Download Monthly Excel (CSV)
+              <button id="exportMonthlyExcelBtn" class="btn btn-warning" title="Exports a .csv file that opens in Excel / Google Sheets">
+                <i class="fa-solid fa-file-csv"></i> Download Monthly CSV
               </button>
             </div>
           </div>
@@ -1458,7 +1473,7 @@
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="shared.js?v=20261013_ist_att_fix1"></script>
-  <script src="admin.js?v=20261019_att_fix1"></script>
+  <script src="admin.js?v=20261019_ui3"></script>
   <script src="js/password-toggle.js?v=20261019_ui1"></script>
 </body>
 </html>

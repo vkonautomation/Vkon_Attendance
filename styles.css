@@ -14,7 +14,7 @@
   --bg-glass-overlay: rgba(15, 18, 22, 0.88);
   --border-glass: #2a323d;         /* VKON Boundary Line */
   --border-line-strong: #3b4654;
-  --border-focus: rgba(249, 115, 22, 0.6);
+  --border-focus: rgb(225, 111, 17);
 
   /* VKON Brand Accents & Gradients */
   --color-primary: #f97316;        /* VKON Flame Orange */
@@ -10193,6 +10193,112 @@ body.light-theme ::-webkit-scrollbar-thumb:hover { background: #b3c0d4; backgrou
   body.light-theme .kpi-card:hover,
   body.light-theme .auth-quick-fill-btn:hover { transform: none; }
 }
+
+
+/* ==========================================================================
+   v8 — DASHBOARD HOLIDAYS, POLICY POPOVER, CALENDAR TAP/NOISE,
+        ADMIN DENSITY, RECRUITMENT FORM, LOGIN DISCRETION (2026-10-19)
+   ========================================================================== */
+
+/* ---- Dashboard: Upcoming Holidays panel ---- */
+.upcoming-holidays-section { margin-top: 1rem; }
+.uh-card { padding: 1.05rem 1.15rem; border-radius: var(--radius-lg, 14px); }
+.uh-head { display: flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 0.85rem; }
+.uh-head h3 { margin: 0; font-size: 1.02rem; font-weight: 800; color: var(--text-main, #17221c); }
+.uh-head h3 i { color: var(--color-primary, #ea580c); margin-right: 0.35rem; }
+.uh-sub { font-size: 0.78rem; color: var(--text-muted, #64748b); }
+.uh-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.7rem; }
+.uh-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.6rem 0.75rem; border-radius: 12px; border: 1px solid #e7eaf0; background: #ffffff; }
+body:not(.light-theme) .uh-item { background: var(--bg-card); border-color: var(--border-glass); }
+.uh-item.uh-rh { border-color: #f3d9c0; }
+.uh-date-badge { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 48px; padding: 0.35rem 0.4rem; border-radius: 10px; background: rgba(234, 88, 12, 0.1); color: #c2410c; line-height: 1.1; }
+body:not(.light-theme) .uh-date-badge { background: rgba(234, 88, 12, 0.16); color: #fdba74; }
+.uh-dow { font-size: 0.62rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; }
+.uh-dm { font-size: 0.82rem; font-weight: 800; }
+.uh-info { display: flex; flex-direction: column; min-width: 0; }
+.uh-name { font-weight: 700; font-size: 0.9rem; color: var(--text-main, #17221c); }
+.uh-type { font-size: 0.72rem; color: var(--text-muted, #64748b); }
+.uh-when { margin-left: auto; font-size: 0.74rem; font-weight: 800; color: var(--color-primary, #ea580c); white-space: nowrap; }
+.uh-empty { color: var(--text-muted, #64748b); font-size: 0.85rem; margin: 0.2rem 0 0; }
+body.light-theme .uh-card { background: #ffffff; }
+
+/* ---- Policy summary: inline on dashboard, info popover elsewhere ---- */
+.policy-zone { position: relative; display: flex; align-items: center; }
+.policy-toggle { display: none; align-items: center; gap: 0.4rem; padding: 0.42rem 0.75rem; border-radius: 9999px; border: 1px solid #d7deea; background: #ffffff; color: #475569; font-family: inherit; font-size: 0.8rem; font-weight: 700; cursor: pointer; }
+.policy-toggle i { color: var(--color-primary, #ea580c); }
+body:not(.light-theme) .policy-toggle { background: var(--bg-card); border-color: var(--border-glass); color: var(--text-main); }
+body.policy-collapsed .policy-toggle { display: inline-flex; }
+body.policy-collapsed .policy-badges-row { display: none; }
+body.policy-collapsed .policy-zone.open .policy-badges-row {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 0.5rem;
+  position: absolute; top: calc(100% + 8px); left: 0; z-index: 45;
+  padding: 0.85rem 0.9rem; min-width: min(360px, 88vw); max-width: 88vw;
+  background: #ffffff; border: 1px solid #dbe3f0; border-radius: 14px;
+  box-shadow: 0 18px 40px -18px rgba(30, 41, 59, 0.35);
+}
+body:not(.light-theme).policy-collapsed .policy-zone.open .policy-badges-row { background: var(--bg-card); border-color: var(--border-glass); }
+body.policy-collapsed .policy-zone.open .policy-chip { white-space: normal; width: auto; }
+
+/* ---- Calendar: larger tap targets + lighter "Not Marked" noise ---- */
+.cell-reg-view {
+  display: inline-flex; align-items: center; gap: 0.3rem; margin-top: 0.35rem;
+  padding: 0.4rem 0.68rem; min-height: 38px; border-radius: var(--radius-sm, 8px);
+  border: 1px solid #d7deea; background: #f8fafc; color: #475569;
+  font-family: inherit; font-size: 0.74rem; font-weight: 700; cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.cell-reg-view:hover { background: #eef2f7; }
+body:not(.light-theme) .cell-reg-view { background: var(--bg-card); border-color: var(--border-glass); color: var(--text-main); }
+.cell-reg-quick { padding: 0.42rem 0.7rem; min-height: 38px; font-size: 0.74rem; background: #f8fafc; border: 1px solid #d7deea; color: #475569; }
+.cell-reg-quick i { color: var(--color-primary, #ea580c); font-size: 0.7rem; }
+.cell-reg-quick:hover { background: #fff4ec; border-color: #f0b98a; color: #b1440c; transform: none; }
+body.light-theme .cell-reg-quick { background: #f8fafc; border-color: #d7deea; color: #475569; }
+body.light-theme .cell-reg-quick:hover { background: #fff4ec; border-color: #f0b98a; color: #b1440c; }
+/* lighter, less repetitive "Not Marked" chip + cell fill */
+body.light-theme .day-badge-pill.badge-notmarked { background: #f8fafc; color: #64748b; border: 1px dashed #cbd5e1; }
+body.light-theme .calendar-day-cell:has(.badge-notmarked) { background: #fcfdff; border-color: #eef1f6; }
+/* subtle placeholder for upcoming working days */
+.day-future-ph { display: inline-flex; align-items: center; justify-content: center; color: #cbd5e1; font-size: 1.05rem; font-weight: 700; margin-top: 0.15rem; }
+body:not(.light-theme) .day-future-ph { color: #3f4756; }
+@media (max-width: 620px) {
+  .calendar-day-cell .cell-reg-quick,
+  .calendar-day-cell .cell-reg-view { min-height: 42px; font-size: 0.72rem; padding: 0.5rem 0.55rem; }
+  .calendar-day-cell .day-meta-text { font-size: 0.72rem; }
+}
+
+/* ---- Attendance table empty states (Check-In & Type cells) ---- */
+.ci-none { color: #cbd5e1; font-weight: 700; }
+body:not(.light-theme) .ci-none { color: #4b5563; }
+.type-empty { color: #cbd5e1; font-weight: 600; }
+body:not(.light-theme) .type-empty { color: #4b5563; }
+
+/* ---- Admin dashboard density: fuller stat cards, calmer whitespace ---- */
+body.admin-page #tab-dashboard .kpi-grid { margin-bottom: 1.1rem; }
+body.admin-page #tab-dashboard .kpi-card { min-height: 92px; }
+body.admin-page #tab-dashboard .kpi-num { font-size: 1.7rem; }
+body.admin-page #tab-dashboard .dash-sub-heading { margin-top: 1.35rem; }
+body.admin-page #tab-dashboard .dash-empty-note { padding: 0.85rem 1rem; border: 1px dashed #d7deea; border-radius: 12px; background: #fbfcfe; text-align: center; }
+body.admin-page #tab-dashboard .dash-empty-note i { color: var(--color-primary, #ea580c); margin-right: 0.35rem; }
+body.admin-page:not(.light-theme) #tab-dashboard .dash-empty-note { background: transparent; border-color: var(--border-glass); }
+
+/* ---- Recruitment: add-candidate form + validation + confirm-delete ---- */
+.cand-add-form { display: flex; flex-wrap: wrap; align-items: center; gap: 0.7rem; padding: 0.85rem 0.95rem; border: 1px solid #e7eaf0; border-radius: 14px; background: #fbfcfe; }
+body:not(.light-theme) .cand-add-form { background: transparent; border-color: var(--border-glass); }
+.cand-field { display: flex; flex-direction: column; gap: 0.25rem; }
+.cand-field .form-control { min-width: 180px; }
+.cand-stage-label { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted, #64748b); }
+.cand-field select.form-control { min-width: 130px; }
+.cand-form-error { flex-basis: 100%; margin: 0; color: #b91c1c; font-size: 0.8rem; font-weight: 600; }
+.input-invalid { border-color: #dc2626 !important; box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.14) !important; }
+.cand-remove-confirm { background: #fef3c7 !important; border-color: #f0b429 !important; color: #92400e !important; }
+
+/* ---- Login: clear "Demo Mode" badge + discreet admin entry ---- */
+.demo-mode-badge { display: inline-flex; align-items: center; gap: 0.3rem; background: #eef2ff; color: #4338ca; border: 1px solid #c7d2fe; border-radius: 9999px; padding: 0.18rem 0.6rem; font-size: 0.68rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; }
+.demo-mode-badge i { font-size: 0.66rem; }
+.auth-admin-link-subtle { margin-top: 0.9rem; padding-top: 0.75rem; border-top: 1px solid rgba(100, 116, 139, 0.16); text-align: center; }
+.auth-admin-link-subtle .auth-admin-link { font-size: 0.74rem; font-weight: 600; color: var(--text-muted, #64748b); opacity: 0.85; letter-spacing: 0.01em; }
+.auth-admin-link-subtle .auth-admin-link:hover { opacity: 1; color: #475569; text-decoration: underline; }
+.auth-admin-link-subtle .auth-admin-link i { font-size: 0.7rem; }
 
 
 

@@ -343,7 +343,7 @@ function renderMonthlyReport() {
     // --- Today snapshot: check-in & out pair, work type, on-time/late pill ---
     const todayRec = records[`${emp.id}_${todayKey}`] || null;
     const LATE_CUTOFF_MIN = 10 * 60; // 10:00 AM IST (9:30 start + 30 min grace)
-    let checkinCell = `<span class="ci-none">&mdash;</span>`;
+    let checkinCell = `<span class="ci-none" title="No check-in recorded yet today">&mdash;</span>`;
     let typeLabel = "&mdash;";
     let todayStatus = "not-in";
     let pillClass = "pill-notin";
@@ -413,7 +413,7 @@ function renderMonthlyReport() {
       <td><span class="day-badge-pill badge-primary font-mono">${emp.id}</span></td>
       <td>${emp.department}</td>
       <td>${checkinCell}</td>
-      <td><span class="type-cell">${typeLabel}</span></td>
+      <td><span class="type-cell${typeLabel === "&mdash;" ? " type-empty" : ""}"${typeLabel === "&mdash;" ? ' title="Work type shows after the first punch-in today"' : ""}>${typeLabel}</span></td>
       <td><span class="today-pill ${pillClass}">${pillLabel}</span></td>
       <td><span class="text-success font-bold">${presentCount} Days</span></td>
       <td><span class="text-danger font-bold">${absentCount} Days</span></td>
@@ -855,7 +855,7 @@ function exportMonthlyExcel() {
   a.click();
   document.body.removeChild(a);
 
-  showToast(`Excel Attendance Report exported for ${monthName} (to-date: Oct ${todayDay})!`, "success");
+  showToast(`Attendance CSV exported for ${monthName} (to-date: Oct ${todayDay})!`, "success");
 }
 
 // ============================================================================
@@ -2722,7 +2722,7 @@ function renderCandidateTable() {
         ${stageIdx < CANDIDATE_STAGES.length - 1
           ? `<button type="button" class="btn btn-ghost btn-sm cand-advance" data-id="${c.id}"><i class="fa-solid fa-arrow-right"></i> ${CANDIDATE_STAGES[stageIdx + 1]}</button>`
           : `<span class="text-success font-bold"><i class="fa-solid fa-circle-check"></i> Joined</span>`}
-        <button type="button" class="btn btn-ghost btn-sm text-danger cand-remove" data-id="${c.id}" title="Remove candidate"><i class="fa-solid fa-xmark"></i></button>
+        <button type="button" class="btn btn-ghost btn-sm text-danger cand-remove" data-id="${c.id}" title="Remove this candidate (click twice to confirm)"><i class="fa-solid fa-xmark"></i> Remove</button>
       </td>
     </tr>`;
   }).join("");
@@ -2850,15 +2850,32 @@ function initExtraModules() {
   if (candForm) {
     candForm.addEventListener("submit", (e) => {
       e.preventDefault();
-      const name = document.getElementById("candidateNameInput").value.trim();
-      const role = document.getElementById("candidateRoleInput").value.trim();
-      if (!name || !role) return;
+      const nameEl = document.getElementById("candidateNameInput");
+      const roleEl = document.getElementById("candidateRoleInput");
+      const stageEl = document.getElementById("candidateStageInput");
+      const errEl = document.getElementById("candidateFormError");
+      const name = (nameEl.value || "").trim();
+      const role = (roleEl.value || "").trim();
+      const stage = stageEl ? stageEl.value : "Applied";
+      const showErr = (msg, el) => {
+        if (errEl) { errEl.textContent = msg; errEl.style.display = ""; }
+        nameEl.classList.remove("input-invalid");
+        roleEl.classList.remove("input-invalid");
+        if (el) { el.classList.add("input-invalid"); el.focus(); }
+      };
+      if (errEl) errEl.style.display = "none";
+      nameEl.classList.remove("input-invalid");
+      roleEl.classList.remove("input-invalid");
+      if (name.length < 2) { showErr("Please enter the candidate's name (at least 2 characters).", nameEl); return; }
+      if (role.length < 2) { showErr("Please enter the position / role (at least 2 characters).", roleEl); return; }
       const cands = getCandidates();
-      cands.push({ id: "C" + Date.now().toString().slice(-6), name, role, stage: "Applied", addedAt: formatDateKey(new Date()) });
+      if (cands.some(c => (c.name || "").toLowerCase() === name.toLowerCase())) { showErr(`${name} is already in the pipeline.`, nameEl); return; }
+      const todayKey0 = formatDateKey((typeof getPresentDate === "function") ? getPresentDate() : new Date());
+      cands.push({ id: "C" + Date.now().toString().slice(-6), name, role, stage, addedAt: todayKey0 });
       setStore(EXTRA_KEYS.RECRUITMENT, cands);
       candForm.reset();
       renderCandidateTable();
-      showToast(`Candidate ${name} added to the pipeline.`, "success");
+      showToast(`Candidate ${name} added at stage \u201c${stage}\u201d.`, "success");
     });
   }
   const candBody = document.getElementById("candidateTableBody");
@@ -2871,11 +2888,26 @@ function initExtraModules() {
       if (adv) {
         const c = cands.find(x => x.id === adv.dataset.id);
         if (c) c.stage = CANDIDATE_STAGES[Math.min(CANDIDATE_STAGES.length - 1, CANDIDATE_STAGES.indexOf(c.stage) + 1)];
+        setStore(EXTRA_KEYS.RECRUITMENT, cands);
+        renderCandidateTable();
+        if (c) showToast(`${c.name} moved to \u201c${c.stage}\u201d.`, "success");
       } else if (rem) {
-        cands.splice(cands.findIndex(x => x.id === rem.dataset.id), 1);
+        // Two-step inline confirm to prevent accidental deletion.
+        if (rem.dataset.confirm !== "1") {
+          rem.dataset.confirm = "1";
+          rem.classList.add("cand-remove-confirm");
+          rem.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Confirm?';
+          rem.title = "Click again to permanently remove this candidate";
+          setTimeout(() => { if (rem.isConnected) renderCandidateTable(); }, 4000);
+          return;
+        }
+        const idx = cands.findIndex(x => x.id === rem.dataset.id);
+        const removed = idx > -1 ? cands[idx] : null;
+        if (idx > -1) cands.splice(idx, 1);
+        setStore(EXTRA_KEYS.RECRUITMENT, cands);
+        renderCandidateTable();
+        showToast(`Removed ${removed ? removed.name : "candidate"} from the pipeline.`, "success");
       }
-      setStore(EXTRA_KEYS.RECRUITMENT, cands);
-      renderCandidateTable();
     });
   }
 

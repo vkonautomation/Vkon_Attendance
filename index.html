@@ -21,7 +21,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="styles.css?v=20261019_ui2">
+  <link rel="stylesheet" href="styles.css?v=20261019_ui3">
 </head>
 <body class="light-theme">
   
@@ -53,9 +53,9 @@
         </div>
       </div>
 
-      <!-- Quick Fill Credentials Pill -->
+      <!-- Quick Fill Credentials Pill (Demo Mode only) -->
       <div class="quick-credentials-hint auth-quick-fill-wrap">
-        <span class="auth-quick-fill-label">Demo</span>
+        <span class="auth-quick-fill-label demo-mode-badge"><i class="fa-solid fa-flask"></i> Demo Mode</span>
         <button type="button" class="quick-fill-emp-btn auth-quick-fill-btn" data-user="mukesh" data-pass="mukesh123">
           <i class="fa-solid fa-user-check text-primary"></i> Mukesh Sharma (EMP001) &bull; tap to sign in
         </button>
@@ -85,10 +85,10 @@
         </button>
       </form>
 
-      <!-- Executive Admin Direct Navigation Link -->
-      <div class="auth-admin-link-wrap">
+      <!-- Executive Admin Direct Navigation Link (discreet) -->
+      <div class="auth-admin-link-wrap auth-admin-link-subtle">
         <a href="admin.html" class="auth-admin-link">
-          <i class="fa-solid fa-shield-halved"></i> Executive Admin Console &rarr;
+          <i class="fa-solid fa-shield-halved"></i> Administrator sign-in
         </a>
       </div>
     </div>
@@ -171,13 +171,18 @@
       </div>
     </header>
 
-    <!-- Sub-bar: Policy Summary (today's status badge now lives on the action hub) -->
+    <!-- Sub-bar: Policy Summary (full inline row on Dashboard; collapsed to an info popover on other pages) -->
     <div class="sub-bar">
-      <div class="policy-badges-row">
-        <span class="policy-chip chip-present"><i class="fa-solid fa-location-dot"></i> Office Geofence: <strong>&le; 500m</strong> &bull; Photo Check</span>
-        <span class="policy-chip chip-wfh"><i class="fa-solid fa-house-laptop"></i> Hybrid Policy: <strong id="headerWfhQuota">2 Days / Week</strong></span>
-        <span class="policy-chip chip-leave"><i class="fa-solid fa-calendar-days"></i> Annual Leave: <strong id="headerLeaveQuota">14 Days / Year</strong></span>
-        <span class="policy-chip chip-rh"><i class="fa-solid fa-calendar-check"></i> Restricted Holidays: <strong id="headerRhQuota">2 / Month</strong></span>
+      <div class="policy-zone" id="policyZone">
+        <button type="button" class="policy-toggle" id="policyToggle" aria-expanded="false" aria-controls="policyBadgesRow">
+          <i class="fa-solid fa-circle-info"></i> <span>Policy summary</span>
+        </button>
+        <div class="policy-badges-row" id="policyBadgesRow">
+          <span class="policy-chip chip-present"><i class="fa-solid fa-location-dot"></i> Office Geofence: <strong>&le; 500m</strong> &bull; Photo Check</span>
+          <span class="policy-chip chip-wfh"><i class="fa-solid fa-house-laptop"></i> Hybrid Policy: <strong id="headerWfhQuota">2 Days / Week</strong></span>
+          <span class="policy-chip chip-leave"><i class="fa-solid fa-calendar-days"></i> Annual Leave: <strong id="headerLeaveQuota">14 Days / Year</strong></span>
+          <span class="policy-chip chip-rh"><i class="fa-solid fa-calendar-check"></i> Restricted Holidays: <strong id="headerRhQuota">2 / Month</strong></span>
+        </div>
       </div>
     </div>
 
@@ -276,6 +281,18 @@
               <span class="dash-stat-sub" id="dashStatHoursSub">This month</span>
             </div>
           </div>
+        </div>
+      </section>
+
+      <!-- ================= DASHBOARD: UPCOMING HOLIDAYS ================= -->
+      <section class="portal-view upcoming-holidays-section" id="sectionUpcomingHolidays" data-portal-view="dashboard">
+        <div class="uh-card glass-panel">
+          <div class="uh-head">
+            <h3><i class="fa-solid fa-gift"></i> Upcoming Holidays</h3>
+            <span class="uh-sub">Company &amp; restricted holidays still ahead of today</span>
+          </div>
+          <ul class="uh-list" id="upcomingHolidaysList"></ul>
+          <p class="uh-empty" id="upcomingHolidaysEmpty" style="display: none;"><i class="fa-regular fa-calendar"></i> No upcoming holidays declared.</p>
         </div>
       </section>
 
@@ -927,7 +944,7 @@
 
   <!-- Shared Engine & App Controller -->
   <script src="shared.js?v=20261013_ist_att_fix1"></script>
-  <script src="app.js?v=20261019_att_fix1"></script>
+  <script src="app.js?v=20261019_ui4"></script>
   <script src="js/password-toggle.js?v=20261019_ui1"></script>
 
   <!-- Present Day & Migration Guarantee -->
