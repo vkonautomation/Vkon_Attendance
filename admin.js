@@ -10,6 +10,7 @@ let editCapturedMasterPhoto = null;
 let adminMap = null;
 let adminOfficeMarker = null;
 let adminGeofenceCircle = null;
+let adminRadiusHandle = null;
 
 // ============================================================================
 // 1. AUTHENTICATION & ACCESS CONTROL
@@ -2347,25 +2348,113 @@ function initAdminGeofence() {
     radiusVal.textContent = e.target.value;
     if (adminGeofenceCircle) {
       adminGeofenceCircle.setRadius(parseInt(e.target.value, 10));
+      const c = adminGeofenceCircle.getLatLng();
+      placeRadiusHandle(c.lat, c.lng, adminGeofenceCircle.getRadius());
     }
   });
 
   calibrateBtn.addEventListener("click", () => {
     if (!navigator.geolocation) {
-      showToast("GPS not available.", "error");
+      showToast("GPS not available on this device.", "error");
       return;
     }
+    calibrateBtn.disabled = true;
+    calibrateBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Fetching your GPS\u2026`;
+    const restoreBtn = () => {
+      calibrateBtn.disabled = false;
+      calibrateBtn.innerHTML = `<i class="fa-solid fa-location-dot"></i> Calibrate to My Current Device GPS`;
+    };
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         latInput.value = pos.coords.latitude.toFixed(6);
         lngInput.value = pos.coords.longitude.toFixed(6);
         updateAdminMap(parseFloat(latInput.value), parseFloat(lngInput.value), parseInt(radiusInput.value, 10));
-        showToast("Office calibrated to your device GPS coordinates!", "success");
+        showToast(`Office previewed at your current GPS (\u00b1${Math.round(pos.coords.accuracy)}m). Click Save & Enforce to apply.`, "success");
+        restoreBtn();
       },
       (err) => {
-        showToast("Failed to fetch GPS.", "warning");
-      }
+        const codes = { 1: "Location permission denied", 2: "Location unavailable", 3: "Location request timed out" };
+        showToast(`${codes[err.code] || "Failed to fetch GPS"} \u2014 use the map or place search instead.`, "warning");
+        restoreBtn();
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
     );
+  });
+
+  // ---- Address / place search above the map (OpenStreetMap Nominatim, no API key) ----
+  const searchInput = document.getElementById("geofencePlaceSearch");
+  const searchBtn = document.getElementById("geofenceSearchBtn");
+  const resultsBox = document.getElementById("geofenceSearchResults");
+
+  const renderSearchResults = (hits) => {
+    if (!resultsBox) return;
+    resultsBox.innerHTML = "";
+    if (!hits.length) {
+      const empty = document.createElement("div");
+      empty.className = "map-search-empty";
+      empty.textContent = "No matches found. Try a broader query (area + city).";
+      resultsBox.appendChild(empty);
+    } else {
+      hits.forEach((h) => {
+        const row = document.createElement("button");
+        row.type = "button";
+        row.className = "map-search-item";
+        const ic = document.createElement("i");
+        ic.className = "fa-solid fa-location-dot";
+        const span = document.createElement("span");
+        span.textContent = h.display_name;
+        row.append(ic, " ", span);
+        row.addEventListener("click", () => {
+          const la = parseFloat(h.lat);
+          const lo = parseFloat(h.lon);
+          applyOfficeCenter(la, lo, { pan: false });
+          if (adminMap) adminMap.setView([la, lo], 17);
+          resultsBox.style.display = "none";
+          if (searchInput) searchInput.value = h.display_name.split(",")[0];
+          showToast("Pin placed \u2014 fine-tune by dragging, then click Save & Enforce.", "success");
+        });
+        resultsBox.appendChild(row);
+      });
+    }
+    resultsBox.style.display = "block";
+  };
+
+  const runPlaceSearch = async () => {
+    const q = ((searchInput && searchInput.value) || "").trim();
+    if (q.length < 3) {
+      showToast("Type at least 3 characters to search a place.", "warning");
+      return;
+    }
+    if (searchBtn) {
+      searchBtn.disabled = true;
+      searchBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Searching\u2026`;
+    }
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&q=${encodeURIComponent(q)}`, {
+        headers: { "Accept": "application/json" }
+      });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const hits = await res.json();
+      renderSearchResults(Array.isArray(hits) ? hits : []);
+    } catch (err) {
+      showToast("Place search failed \u2014 check your network and retry, or set the pin on the map.", "error");
+      if (resultsBox) resultsBox.style.display = "none";
+    } finally {
+      if (searchBtn) {
+        searchBtn.disabled = false;
+        searchBtn.innerHTML = `<i class="fa-solid fa-magnifying-glass"></i> Search`;
+      }
+    }
+  };
+
+  if (searchBtn) searchBtn.addEventListener("click", runPlaceSearch);
+  if (searchInput) searchInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); runPlaceSearch(); }
+  });
+  document.addEventListener("click", (e) => {
+    if (resultsBox && !(e.target && e.target.closest && e.target.closest("#geofenceSearchBar"))) {
+      resultsBox.style.display = "none";
+    }
   });
 
   form.addEventListener("submit", (e) => {
@@ -2401,17 +2490,82 @@ function initAdminLeafletMap(lat, lng, radius) {
     iconAnchor: [18, 18]
   });
 
-  adminOfficeMarker = L.marker([lat, lng], { icon: officeIcon })
+  adminOfficeMarker = L.marker([lat, lng], { icon: officeIcon, draggable: true, title: "Drag to move the office center", alt: "Office geofence center" })
     .addTo(adminMap)
-    .bindPopup("<strong>Company Headquarters</strong><br>Enforced Geofence Center");
+    .bindPopup("<strong>Company Headquarters</strong><br>Drag me \u2014 or click anywhere on the map \u2014 to move the geofence center");
 
   adminGeofenceCircle = L.circle([lat, lng], {
     color: "#10b981",
     fillColor: "#10b981",
     fillOpacity: 0.15,
     radius: radius,
-    weight: 2
+    weight: 2,
+    interactive: false
   }).addTo(adminMap);
+
+  // Draggable edge handle: resizing the circle shouldn't need the keyboard.
+  const handleIcon = L.divIcon({
+    className: "custom-radius-handle",
+    html: `<div style="background:#fff;color:#0f766e;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;border:2px solid #10b981;box-shadow:0 1px 6px rgba(0,0,0,0.35);"><i class="fa-solid fa-arrows-left-right" style="font-size:10px;"></i></div>`,
+    iconSize: [22, 22],
+    iconAnchor: [11, 11]
+  });
+  adminRadiusHandle = L.marker([lat + radius / 111320, lng], { icon: handleIcon, draggable: true, title: "Drag to resize the geofence radius", alt: "Geofence radius handle" }).addTo(adminMap);
+
+  adminOfficeMarker.on("dragend", () => {
+    const p = adminOfficeMarker.getLatLng();
+    applyOfficeCenter(p.lat, p.lng, { pan: false });
+    showToast("Office center moved \u2014 click Save & Enforce Geofence Coordinates to apply.", "warning");
+  });
+
+  adminRadiusHandle.on("drag", () => {
+    const c = adminGeofenceCircle.getLatLng();
+    const h = adminRadiusHandle.getLatLng();
+    const r = clampRadius(calculateDistanceInMeters(c.lat, c.lng, h.lat, h.lng));
+    adminGeofenceCircle.setRadius(r);
+    syncRadiusInputs(r);
+  });
+
+  adminRadiusHandle.on("dragend", () => {
+    const c = adminGeofenceCircle.getLatLng();
+    placeRadiusHandle(c.lat, c.lng, adminGeofenceCircle.getRadius());
+    showToast(`Geofence radius set to ${Math.round(adminGeofenceCircle.getRadius())}m \u2014 click Save & Enforce to apply.`, "warning");
+  });
+
+  adminMap.on("click", (e) => {
+    applyOfficeCenter(e.latlng.lat, e.latlng.lng, { pan: false });
+    showToast("Office pin moved \u2014 click Save & Enforce Geofence Coordinates to apply.", "warning");
+  });
+}
+
+// Keep the edge handle aligned due-east of the center at the given radius.
+function placeRadiusHandle(lat, lng, radius) {
+  if (adminRadiusHandle) adminRadiusHandle.setLatLng([lat + radius / 111320, lng]);
+}
+
+function clampRadius(meters) {
+  return Math.min(2000, Math.max(100, meters || 500));
+}
+
+function syncRadiusInputs(r) {
+  const radiusInput = document.getElementById("adminOfficeRadius");
+  const radiusVal = document.getElementById("adminRadiusVal");
+  const rounded = Math.round(r);
+  if (radiusInput) radiusInput.value = rounded;
+  if (radiusVal) radiusVal.textContent = rounded;
+}
+
+// Preview-only: syncs marker/circle/handle + form fields. Saving still enforces.
+function applyOfficeCenter(lat, lng, opts) {
+  const latInput = document.getElementById("adminOfficeLat");
+  const lngInput = document.getElementById("adminOfficeLng");
+  if (latInput) latInput.value = Number(lat).toFixed(6);
+  if (lngInput) lngInput.value = Number(lng).toFixed(6);
+  if (adminOfficeMarker) adminOfficeMarker.setLatLng([lat, lng]);
+  const r = adminGeofenceCircle ? adminGeofenceCircle.getRadius() : 500;
+  if (adminGeofenceCircle) adminGeofenceCircle.setLatLng([lat, lng]);
+  placeRadiusHandle(lat, lng, r);
+  if (adminMap && opts && opts.pan) adminMap.panTo([lat, lng], { animate: true });
 }
 
 function updateAdminMap(lat, lng, radius) {
@@ -2419,6 +2573,7 @@ function updateAdminMap(lat, lng, radius) {
   adminOfficeMarker.setLatLng([lat, lng]);
   adminGeofenceCircle.setLatLng([lat, lng]);
   adminGeofenceCircle.setRadius(radius);
+  placeRadiusHandle(lat, lng, radius);
   adminMap.setView([lat, lng], 16);
 }
 
