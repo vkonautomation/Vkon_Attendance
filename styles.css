@@ -10098,6 +10098,103 @@ body.light-theme .reg-cal-cell.reg-eligible {
 }
 
 
+/* ==========================================================================
+   v7 — LIGHT REFRESH & MICRO-POLISH
+   A brighter, airier light theme + small interaction / accessibility
+   refinements so the portal feels more inviting, without breaking the
+   Clean Corporate system. Colour tints are scoped to body.light-theme
+   (dark theme is left untouched); interaction + a11y rules are theme-neutral.
+   ========================================================================== */
+
+/* ---- Smooth in-page scrolling (disabled under reduced-motion below) ---- */
+html { scroll-behavior: smooth; }
+
+/* ---- Airier light canvas: a soft cool tint instead of flat grey ---- */
+body.light-theme {
+  background: linear-gradient(180deg, #f7f9ff 0%, #eef3fb 55%, #eaf0f9 100%);
+  background-attachment: fixed;
+}
+body.light-theme .admin-main-col,
+body.light-theme .auth-screen-overlay {
+  background: linear-gradient(180deg, #f6f8ff 0%, #eef3fb 100%) !important;
+}
+
+/* ---- Cards: gentle lift + cooler shadow on hover ---- */
+body.light-theme .dash-stat-card,
+body.light-theme .kpi-card,
+body.light-theme .glass-panel {
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
+}
+body.light-theme .dash-stat-card:hover,
+body.light-theme .kpi-card:hover {
+  transform: translateY(-2px);
+  border-color: #dbe3f0 !important;
+  box-shadow: 0 10px 26px -14px rgba(30, 41, 59, 0.28) !important;
+}
+
+/* ---- Buttons: friendly press state + visible keyboard focus ---- */
+.btn:focus-visible,
+.quick-fill-emp-btn:focus-visible,
+.input-affix-btn:focus-visible,
+.portal-nav-link:focus-visible,
+.nav-tab:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+.btn:active { transform: translateY(0) scale(0.985); }
+.btn:disabled,
+.btn[aria-disabled="true"] { opacity: 0.55; cursor: not-allowed; transform: none; filter: none; }
+
+/* ---- Inputs: brighter focus, softer resting border, lighter placeholder ---- */
+body.light-theme .form-control { border-color: #dfe5ee; }
+body.light-theme .form-control::placeholder { color: #9aa6b6; opacity: 1; }
+body.light-theme .form-control:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.14);
+  background: #ffffff;
+}
+
+/* ---- Demo quick-fill: a soft, inviting accent pill ---- */
+body.light-theme .auth-quick-fill-btn {
+  background: #fff4ec;
+  border: 1px solid #ffd9c2;
+  color: #b1440c;
+  border-radius: var(--radius-full);
+  padding: 0.5rem 0.9rem;
+  transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
+}
+body.light-theme .auth-quick-fill-btn:hover {
+  background: #ffe9db;
+  border-color: #ffc39c;
+  transform: translateY(-1px);
+}
+body.light-theme .auth-quick-fill-label { color: #94a3b8; }
+
+/* ---- Auth card: thin brand accent cap + brighter, softer elevation ---- */
+body.light-theme .auth-card {
+  border-top: 3px solid var(--color-primary);
+  border-radius: var(--radius-xl, 18px);
+  box-shadow: 0 24px 48px -24px rgba(30, 41, 59, 0.35) !important;
+}
+
+/* ---- Delightful touches: accent text selection + slim light scrollbar ---- */
+::selection { background: rgba(234, 88, 12, 0.16); color: inherit; }
+body.light-theme ::-webkit-scrollbar { width: 11px; height: 11px; }
+body.light-theme ::-webkit-scrollbar-thumb {
+  background: #cdd6e4; border-radius: 9999px; border: 3px solid transparent; background-clip: content-box;
+}
+body.light-theme ::-webkit-scrollbar-thumb:hover { background: #b3c0d4; background-clip: content-box; }
+
+/* ---- Respect reduced-motion: drop transforms, keep colour feedback ---- */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .btn:active,
+  body.light-theme .dash-stat-card:hover,
+  body.light-theme .kpi-card:hover,
+  body.light-theme .auth-quick-fill-btn:hover { transform: none; }
+}
+
+
 
 
 
