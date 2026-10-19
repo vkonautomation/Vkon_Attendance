@@ -13,10 +13,15 @@ const employeeState = {
   currentEmployee: null,
   officeSettings: DEFAULT_OFFICE,
   userLocation: {
-    lat: 12.9718, // defaults near office (~25m)
+    // These are only placeholders. The real device GPS is fetched when the
+    // punch modal opens (see startGpsFetch). `located` stays false until a
+    // fresh fix is obtained, so a punch can never be trusted on stale coords.
+    lat: 12.9718,
     lng: 77.5948,
-    distanceMeters: 25,
-    isWithinGeofence: true
+    distanceMeters: null,
+    isWithinGeofence: false,
+    located: false,
+    accuracy: null
   },
   calendarCurrentDate: (typeof getPresentDate === "function") ? getPresentDate() : new Date() // calendarCurrentDate: new Date()
 };
@@ -1481,10 +1486,63 @@ function startGpsFetch() {
   if (gpsPill) {
     gpsPill.className = "verification-status-pill pill-fetching";
     gpsPill.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Fetching GPS location\u2026`;
+    gpsPill.style.cursor = "default";
+    gpsPill.onclick = null;
   }
   if (distVal) distVal.textContent = "\u2026";
-  // Brief visible fetch state before the geofence evaluation resolves
-  setTimeout(() => evaluateModalLocation(), 700);
+
+  // Require a fresh, real device fix before any punch can be accepted.
+  employeeState.userLocation.located = false;
+  employeeState.userLocation.isWithinGeofence = false;
+
+  const isExempt = employeeState.currentEmployee && employeeState.currentEmployee.geofenceEnforcement === "exempt";
+  // Employees marked Exempt by Admin are allowed everywhere and need no GPS.
+  if (isExempt) {
+    employeeState.userLocation.located = true;
+    setTimeout(() => evaluateModalLocation(), 500);
+    return;
+  }
+
+  if (!navigator.geolocation) {
+    setGpsUnavailable("Geolocation isn't supported on this device, so your location can't be verified.");
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      employeeState.userLocation.lat = pos.coords.latitude;
+      employeeState.userLocation.lng = pos.coords.longitude;
+      employeeState.userLocation.accuracy = Math.round(pos.coords.accuracy || 0);
+      employeeState.userLocation.located = true;
+      evaluateModalLocation();
+    },
+    (err) => {
+      const codes = { 1: "Location permission was denied", 2: "Your location is currently unavailable", 3: "The location request timed out" };
+      setGpsUnavailable(`${codes[err.code] || "Could not determine your location"}. Allow location access, then tap \"Retry\" near the office.`);
+    },
+    { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+  );
+}
+
+// Fail-closed state: no usable location means no punch can proceed (unless exempt).
+function setGpsUnavailable(message) {
+  const gpsPill = document.getElementById("modalGpsPill");
+  const distVal = document.getElementById("modalDistValue");
+  const guidance = document.getElementById("modalVerifyGuidanceText");
+  employeeState.userLocation.located = false;
+  employeeState.userLocation.isWithinGeofence = false;
+  employeeState.userLocation.distanceMeters = null;
+  if (distVal) distVal.textContent = "\u2014";
+  if (gpsPill) {
+    gpsPill.className = "verification-status-pill pill-danger";
+    gpsPill.innerHTML = `<i class="fa-solid fa-location-crosshairs"></i> Retry location`;
+    gpsPill.style.cursor = "pointer";
+    gpsPill.onclick = () => startGpsFetch();
+    gpsPill.title = "Tap to request your location again";
+  }
+  if (guidance) guidance.innerHTML = `<span class="text-danger"><i class="fa-solid fa-circle-xmark"></i> ${message}</span>`;
+  showToast(message, "error");
+  playSound("error");
 }
 
 // ----------------------------------------------------------------------------
@@ -1591,8 +1649,20 @@ async function handleCaptureLivePhoto() {
   const guidance = document.getElementById("modalVerifyGuidanceText");
   const confirmBtn = document.getElementById("confirmVerificationBtn");
 
-  // Geofence Rule Check
+  // Geofence Rule Check (requires a real, fresh device location fix)
   const settings = getStore(STORAGE_KEYS.SETTINGS, DEFAULT_OFFICE);
+  const isExempt = employeeState.currentEmployee && employeeState.currentEmployee.geofenceEnforcement === "exempt";
+  const located = Boolean(employeeState.userLocation.located);
+
+  if (!isExempt && !located) {
+    if (guidance) {
+      guidance.innerHTML = `<span class="text-danger"><i class="fa-solid fa-circle-xmark"></i> Location not verified yet \u2014 allow location access and wait for the GPS fix before capturing.</span>`;
+    }
+    showToast("Location not verified. Allow location access, then try again.", "error");
+    playSound("error");
+    return;
+  }
+
   const distance = calculateDistanceInMeters(
     employeeState.userLocation.lat,
     employeeState.userLocation.lng,
@@ -1600,8 +1670,7 @@ async function handleCaptureLivePhoto() {
     settings.lng
   );
   employeeState.userLocation.distanceMeters = distance;
-  const isExempt = employeeState.currentEmployee && employeeState.currentEmployee.geofenceEnforcement === "exempt";
-  const withinGeofence = isExempt ? true : (distance <= settings.radius);
+  const withinGeofence = isExempt ? true : (located && distance <= settings.radius);
 
   if (!withinGeofence) {
     if (guidance) {
@@ -1735,7 +1804,8 @@ async function handleConfirmVerification() {
     settings.lng
   );
   const isExempt = employeeState.currentEmployee && employeeState.currentEmployee.geofenceEnforcement === "exempt";
-  const withinGeofence = isExempt ? true : (distance <= settings.radius);
+  const located = Boolean(employeeState.userLocation.located);
+  const withinGeofence = isExempt ? true : (located && distance <= settings.radius);
 
   if (!withinGeofence) {
     showToast(`Check-in rejected: ${distance}m distance exceeds office radius limit.`, "error");
