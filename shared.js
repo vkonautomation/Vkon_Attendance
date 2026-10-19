@@ -208,6 +208,55 @@ function getEmployeeLeaveQuota(empId) {
   };
 }
 
+// ============================================================================
+//  Shared calculation helpers — SINGLE SOURCE OF TRUTH for employee & admin
+//  views so the dashboard, calendar and master sheet can never disagree.
+// ============================================================================
+
+// A punch that has a check-in but no check-out yet (still open / In Progress).
+function isOpenPunch(rec) {
+  if (!rec) return false;
+  const noOut = !rec.checkOutTime || rec.checkOutTime === "-";
+  return noOut && (rec.status === "Present" || rec.status === "WFH");
+}
+
+// Completed hours for a record. An open punch (no check-out) is NOT a finished
+// shift, so it contributes 0 hours regardless of any stored hoursDecimal value.
+function effectiveHoursDecimal(rec) {
+  if (!rec) return 0;
+  if (isOpenPunch(rec)) return 0;
+  return Number(rec.hoursDecimal) || 0;
+}
+
+// Annual leave days actually used = APPROVED leaves only. A pending request is
+// not yet "used" leave (this is the one source both the portal and admin use).
+function computeApprovedLeaveDaysUsed(empId) {
+  const allLeaves = getStore(STORAGE_KEYS.LEAVES, []);
+  return allLeaves
+    .filter(l => l.employeeId === empId && l.status === "Approved")
+    .reduce((sum, l) => sum + (parseInt(l.daysCount, 10) || 1), 0);
+}
+
+// WFH days used in a week = approved WFH requests + actual WFH punch records,
+// de-duplicated by date, so a worked WFH day always counts toward its week.
+function countWfhUsedInWeek(empId, weekKey) {
+  const dates = new Set();
+  const allWfh = getStore(STORAGE_KEYS.WFH, []);
+  allWfh.forEach(w => {
+    if (w.employeeId === empId && w.status === "Approved" && w.weekKey === weekKey && w.date) dates.add(w.date);
+  });
+  const recs = getStore(STORAGE_KEYS.RECORDS, {});
+  Object.keys(recs).forEach(k => {
+    const r = recs[k];
+    if (r && r.employeeId === empId && r.status === "WFH" && r.date) {
+      try {
+        if (getWeekKey(new Date(r.date + "T00:00:00")) === weekKey) dates.add(r.date);
+      } catch (e) { /* ignore malformed date */ }
+    }
+  });
+  return dates.size;
+}
+
 function setEmployeeLeaveQuota(empId, personalLeave, restrictedLeave) {
   let employees = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
   const emp = employees.find(e => e.id === empId);

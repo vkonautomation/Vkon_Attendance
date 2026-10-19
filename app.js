@@ -358,11 +358,13 @@ function renderMonthlyCalendar() {
   // "9h 05m" style worked-hours label from a punch record
   const fmtHoursLabel = (dec) => `${Math.floor(dec)}h ${String(Math.round((dec - Math.floor(dec)) * 60)).padStart(2, "0")}m`;
   const workedMeta = (record) => {
-    const dec = Number(record.hoursDecimal);
-    const hrs = (dec > 0) ? fmtHoursLabel(dec) : null;
+    const open = (typeof isOpenPunch === "function") && isOpenPunch(record);
+    const dec = (typeof effectiveHoursDecimal === "function") ? effectiveHoursDecimal(record) : Number(record.hoursDecimal);
+    const hrs = (!open && dec > 0) ? fmtHoursLabel(dec) : null;
     const inT = record.checkInTime && record.checkInTime !== "-" ? record.checkInTime : null;
     const outT = record.checkOutTime && record.checkOutTime !== "-" ? record.checkOutTime : null;
     const span = inT && outT ? `${inT} \u2192 ${outT}` : (inT ? `${inT} \u2192 \u2014` : null);
+    if (open) return `<span class="day-meta-text"><span class="meta-hours">In Progress</span>${span ? ` &bull; ${span}` : ""}</span>`;
     if (hrs && span) return `<span class="day-meta-text"><span class="meta-hours">${hrs}</span> &bull; ${span}</span>`;
     if (hrs) return `<span class="day-meta-text"><span class="meta-hours">${hrs}</span></span>`;
     return `<span class="day-meta-text">${span || (inT || "Remote")}</span>`;
@@ -670,10 +672,10 @@ function initCalendarNav() {
 // ============================================================================
 
 function calculatePersonalLeavesUsed(empId) {
-  const allLeaves = getStore(STORAGE_KEYS.LEAVES, []);
-  return allLeaves
-    .filter(l => l.employeeId === empId && l.category === "Personal" && l.status !== "Rejected" && l.status !== "Cancelled")
-    .reduce((sum, l) => sum + Number(l.daysCount || 0), 0);
+  // Single source of truth: only APPROVED leave counts as "used" (pending \u2260 used).
+  return (typeof computeApprovedLeaveDaysUsed === "function")
+    ? computeApprovedLeaveDaysUsed(empId)
+    : 0;
 }
 
 function calculateWorkingDaysBetween(startDateStr, endDateStr) {
@@ -1752,7 +1754,7 @@ async function handleConfirmVerification() {
       checkInTime: timeStr,
       checkOutTime: "-",
       duration: "In Progress",
-      hoursDecimal: 9.0,
+      hoursDecimal: 0,
       distance: distance,
       locationType: isExempt ? `Office (Exempt - ${distance}m)` : `Office (Geofenced \u2264 500m)`,
       bioVerified: true,
@@ -1941,8 +1943,8 @@ function renderWfhBox() {
   if (!employeeState.currentEmployee) return;
   const empId = employeeState.currentEmployee.id;
   const currentWeekKey = getWeekKey(employeeState.calendarCurrentDate);
-  const approvedThisWeek = countApprovedWfhDaysInWeek(empId, currentWeekKey);
-  const activeThisWeek = countWfhDaysInWeek(empId, currentWeekKey);
+  const approvedThisWeek = (typeof countWfhUsedInWeek === "function") ? countWfhUsedInWeek(empId, currentWeekKey) : countApprovedWfhDaysInWeek(empId, currentWeekKey);
+  const activeThisWeek = (typeof countWfhUsedInWeek === "function") ? countWfhUsedInWeek(empId, currentWeekKey) : countWfhDaysInWeek(empId, currentWeekKey);
 
   const counterEl = document.getElementById("wfhQuotaCounter");
   const barEl = document.getElementById("wfhProgressBar");
@@ -2292,11 +2294,11 @@ function renderRegularisationCalendar() {
     // 4) leave accepted
     // Also: future dates, declared holidays, already regularised
     const isWfh = empWfh.some(w => w.date === dateStr);
+    // Leave blocks regularisation whether Approved or still Pending (Rejected/Cancelled
+    // were already filtered out of empLeaves) \u2014 mirrors the eligible-dates dropdown.
     const isLeave = empLeaves.some(l => {
-      if (l.status === "Approved") {
-        if (l.date && l.date === dateStr) return true;
-        if (l.startDate && l.endDate && dateStr >= l.startDate && dateStr <= l.endDate) return true;
-      }
+      if (l.date && l.date === dateStr) return true;
+      if (l.startDate && l.endDate && dateStr >= l.startDate && dateStr <= l.endDate) return true;
       return false;
     });
 
@@ -2307,6 +2309,7 @@ function renderRegularisationCalendar() {
     );
 
     const isFuture = dayDateZero > nowZero;
+    const isTodayReg = dayDateZero.getTime() === nowZero.getTime();
     const isAlreadyReg = empRegs.some(r => r.date === dateStr);
 
     let isRestricted = false;
@@ -2319,6 +2322,11 @@ function renderRegularisationCalendar() {
       restrictionType = "reg-future";
       badgeText = "Future";
       restrictionReason = "Cannot regularise future date";
+    } else if (isTodayReg) {
+      isRestricted = true;
+      restrictionType = "reg-future";
+      badgeText = "Today";
+      restrictionReason = "Today is still open \u2014 you can regularise from the next day";
     } else if (isWeekend) {
       isRestricted = true;
       restrictionType = "reg-weekend";
@@ -2342,12 +2350,12 @@ function renderRegularisationCalendar() {
     } else if (isLeave) {
       isRestricted = true;
       restrictionType = "reg-leave";
-      badgeText = "Leave Accepted";
-      restrictionReason = "Leave accepted by admin";
+      badgeText = "On Leave";
+      restrictionReason = "Leave on record (approved or pending) \u2014 cannot regularise";
     } else if (isAlreadyReg) {
       isRestricted = true;
       restrictionType = "reg-already-applied";
-      badgeText = "Requested";
+      badgeText = "Reg. Pending";
       restrictionReason = "Regularisation already requested";
     }
 
@@ -2431,8 +2439,8 @@ function populateRegularisationEligibleDates() {
   const baseDate = new Date(employeeState.calendarCurrentDate || CURRENT_DATE);
   const eligibleDates = [];
 
-  // Scan the past 30 days up to current simulated date
-  for (let i = 0; i <= 30; i++) {
+  // Scan the past 30 days up to the day BEFORE today (today is still open).
+  for (let i = 1; i <= 31; i++) {
     const d = new Date(baseDate);
     d.setDate(baseDate.getDate() - i);
     const dayOfWeek = d.getDay();
@@ -2806,13 +2814,13 @@ function renderDashboardStats() {
   let hours = 0;
   for (let d = 1; d <= daysInMonth; d++) {
     const rec = records[`${emp.id}_${formatDateKey(new Date(year, month, d))}`];
-    if (rec && rec.status === "Present") { present++; hours += (rec.hoursDecimal || 0); }
-    else if (rec && rec.status === "WFH") { hours += (rec.hoursDecimal || 0); }
+    const h = (typeof effectiveHoursDecimal === "function") ? effectiveHoursDecimal(rec) : ((rec && rec.hoursDecimal) || 0);
+    if (rec && rec.status === "Present") { present++; hours += h; }
+    else if (rec && rec.status === "WFH") { hours += h; }
   }
 
   const weekKey = getWeekKey(now);
-  const allWfh = getStore(STORAGE_KEYS.WFH, []);
-  const wfhUsed = allWfh.filter(w => w.employeeId === emp.id && w.weekKey === weekKey && w.status === "Approved").length;
+  const wfhUsed = (typeof countWfhUsedInWeek === "function") ? countWfhUsedInWeek(emp.id, weekKey) : 0;
   const wfhRemaining = Math.max((typeof WEEKLY_WFH_ALLOWANCE !== "undefined" ? WEEKLY_WFH_ALLOWANCE : 2) - wfhUsed, 0);
 
   const quota = getEmployeeLeaveQuota(emp.id);
