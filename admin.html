@@ -24,7 +24,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="styles.css?v=20261016_cal2">
+  <link rel="stylesheet" href="styles.css?v=20261019_ui1">
 </head>
 <body class="light-theme admin-page">
 
@@ -61,7 +61,7 @@
           <label for="adminOverlayUsername">Administrator Username <span class="req">*</span></label>
           <div class="input-icon-wrap">
             <i class="fa-solid fa-user-shield input-icon"></i>
-            <input type="text" id="adminOverlayUsername" required class="form-control" placeholder="admin" value="admin">
+            <input type="text" id="adminOverlayUsername" required class="form-control" placeholder="admin" autocomplete="username">
           </div>
         </div>
 
@@ -69,15 +69,16 @@
           <label for="adminOverlayPassword">Master Password <span class="req">*</span></label>
           <div class="input-icon-wrap">
             <i class="fa-solid fa-key input-icon"></i>
-            <input type="password" id="adminOverlayPassword" required class="form-control" placeholder="Enter master password" value="admin123">
+            <input type="password" id="adminOverlayPassword" required class="form-control" placeholder="Enter master password" autocomplete="current-password">
+            <button type="button" class="input-affix-btn toggle-password" aria-pressed="false" aria-label="Show password" tabindex="-1"><i class="fa-solid fa-eye" aria-hidden="true"></i></button>
           </div>
         </div>
 
         <div class="quick-credentials-hint" style="text-align: center;">
-          <span>Default Administrator: <strong>admin</strong> / <strong>admin123</strong></span>
+          <span>Restricted area &mdash; administrator credentials required.</span>
           <div style="margin-top: 0.5rem;">
             <button type="button" id="quickFillAdminBtn" class="btn btn-ghost btn-xs" style="border: 1px solid var(--border-glass); padding: 5px 12px; border-radius: 6px; cursor: pointer; color: var(--text-muted); background: var(--bg-surface);">
-              <i class="fa-solid fa-key"></i> Auto-Fill Credentials
+              <i class="fa-solid fa-key"></i> Auto-Fill Demo Credentials
             </button>
           </div>
         </div>
@@ -590,7 +591,11 @@
 
               <div class="form-group">
                 <label for="newEmpPassword">Login Password <span class="req">*</span></label>
-                <input type="password" id="newEmpPassword" required class="form-control" placeholder="Create password">
+                <div class="input-icon-wrap">
+                  <i class="fa-solid fa-key input-icon"></i>
+                  <input type="password" id="newEmpPassword" required class="form-control" placeholder="Create password" autocomplete="new-password">
+                  <button type="button" class="input-affix-btn toggle-password" aria-pressed="false" aria-label="Show password" tabindex="-1"><i class="fa-solid fa-eye" aria-hidden="true"></i></button>
+                </div>
               </div>
 
               <div class="form-group">
@@ -1161,7 +1166,8 @@
                   <label for="currentAdminPassword">Current Master Password <span class="req">*</span></label>
                   <div class="input-icon-wrap">
                     <i class="fa-solid fa-lock input-icon"></i>
-                    <input type="password" id="currentAdminPassword" required class="form-control" placeholder="Enter current master password">
+                    <input type="password" id="currentAdminPassword" required class="form-control" placeholder="Enter current master password" autocomplete="current-password">
+                    <button type="button" class="input-affix-btn toggle-password" aria-pressed="false" aria-label="Show password" tabindex="-1"><i class="fa-solid fa-eye" aria-hidden="true"></i></button>
                   </div>
                   <span class="form-hint">Required for security verification before making changes.</span>
                 </div>
@@ -1182,7 +1188,8 @@
                     <label for="newAdminPassword">New Master Password <span class="req">*</span></label>
                     <div class="input-icon-wrap">
                       <i class="fa-solid fa-key input-icon"></i>
-                      <input type="password" id="newAdminPassword" required class="form-control" placeholder="Minimum 6 characters" minlength="6">
+                      <input type="password" id="newAdminPassword" required class="form-control" placeholder="Minimum 6 characters" minlength="6" autocomplete="new-password">
+                      <button type="button" class="input-affix-btn toggle-password" aria-pressed="false" aria-label="Show password" tabindex="-1"><i class="fa-solid fa-eye" aria-hidden="true"></i></button>
                     </div>
                   </div>
 
@@ -1190,7 +1197,8 @@
                     <label for="confirmAdminPassword">Confirm New Password <span class="req">*</span></label>
                     <div class="input-icon-wrap">
                       <i class="fa-solid fa-check-double input-icon"></i>
-                      <input type="password" id="confirmAdminPassword" required class="form-control" placeholder="Re-type new password" minlength="6">
+                      <input type="password" id="confirmAdminPassword" required class="form-control" placeholder="Re-type new password" minlength="6" autocomplete="new-password">
+                      <button type="button" class="input-affix-btn toggle-password" aria-pressed="false" aria-label="Show password" tabindex="-1"><i class="fa-solid fa-eye" aria-hidden="true"></i></button>
                     </div>
                   </div>
                 </div>
@@ -1451,5 +1459,6 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="shared.js?v=20261013_ist_clarity1"></script>
   <script src="admin.js?v=20261016_ds5"></script>
+  <script src="js/password-toggle.js?v=20261019_ui1"></script>
 </body>
 </html>
