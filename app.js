@@ -8,6 +8,7 @@ let currentVerifyMode = "in"; // "in" or "out"
 let capturedLiveSelfie = null;
 let currentMatchScore = 0;
 let isLivePhotoVerified = false;
+let gpsWatchId = null; // in-flight watchPosition collector, so refreshes don't stack
 
 const employeeState = {
   currentEmployee: null,
@@ -1510,21 +1511,57 @@ function startGpsFetch() {
     return;
   }
 
-  navigator.geolocation.getCurrentPosition(
-    (pos) => {
-      employeeState.userLocation.lat = pos.coords.latitude;
-      employeeState.userLocation.lng = pos.coords.longitude;
-      employeeState.userLocation.accuracy = Math.round(pos.coords.accuracy || 0);
-      employeeState.userLocation.located = true;
-      console.log("[Geofence] Device GPS fix:", pos.coords.latitude.toFixed(6), pos.coords.longitude.toFixed(6), "accuracy(m):", Math.round(pos.coords.accuracy || 0));
-      evaluateModalLocation();
-    },
-    (err) => {
+  // Best-sample collection: the FIRST fix is usually a coarse Wi-Fi/IP guess.
+  // Keep watching briefly and use the most accurate reading so real GPS can
+  // settle in and overwrite it (resolves early once accuracy is GPS-grade).
+  if (gpsWatchId !== null) { navigator.geolocation.clearWatch(gpsWatchId); gpsWatchId = null; }
+  const TARGET_ACCURACY_M = 30;
+  const MAX_WAIT_MS = 9000;
+  let best = null;
+  let lastError = null;
+  let settled = false;
+
+  const finishFetch = () => {
+    if (settled) return;
+    settled = true;
+    if (gpsWatchId !== null) { navigator.geolocation.clearWatch(gpsWatchId); gpsWatchId = null; }
+    if (best) {
+      applyDeviceFix(best);
+    } else if (lastError) {
       const codes = { 1: "Location permission was denied", 2: "Your location is currently unavailable", 3: "The location request timed out" };
-      setGpsUnavailable(`${codes[err.code] || "Could not determine your location"}. Allow location access, then tap \"Retry\" near the office.`);
+      setGpsUnavailable(`${codes[lastError.code] || "Could not determine your location"}. Allow location access, then tap \"Retry\" near the office.`);
+    } else {
+      setGpsUnavailable("Could not get a GPS reading in time. Stay still and tap \"Retry\".");
+    }
+  };
+
+  gpsWatchId = navigator.geolocation.watchPosition(
+    (pos) => {
+      if (!best || pos.coords.accuracy < best.coords.accuracy) {
+        best = pos;
+        // Live feedback while the receiver refines the fix
+        const accPill = document.getElementById("modalGpsPill");
+        if (accPill) {
+          accPill.className = "verification-status-pill pill-fetching";
+          accPill.innerHTML = `<i class="fa-solid fa-satellite-dish"></i> Refining fix (\u00b1${Math.round(pos.coords.accuracy || 0)}m)\u2026`;
+        }
+      }
+      if (best && best.coords.accuracy <= TARGET_ACCURACY_M) finishFetch();
     },
-    { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+    (err) => { lastError = err; if (!best) finishFetch(); },
+    { enableHighAccuracy: true, timeout: MAX_WAIT_MS + 5000, maximumAge: 0 }
   );
+  setTimeout(finishFetch, MAX_WAIT_MS);
+}
+
+// Apply the most accurate device sample and evaluate the geofence against it.
+function applyDeviceFix(pos) {
+  employeeState.userLocation.lat = pos.coords.latitude;
+  employeeState.userLocation.lng = pos.coords.longitude;
+  employeeState.userLocation.accuracy = Math.round(pos.coords.accuracy || 0);
+  employeeState.userLocation.located = true;
+  console.log("[Geofence] Best GPS fix:", pos.coords.latitude.toFixed(6), pos.coords.longitude.toFixed(6), "accuracy(m):", Math.round(pos.coords.accuracy || 0));
+  evaluateModalLocation();
 }
 
 // Fail-closed state: no usable location means no punch can proceed (unless exempt).
@@ -1650,7 +1687,7 @@ function evaluateModalLocation() {
       const acc = employeeState.userLocation.accuracy;
       let fixHtml = `<i class="fa-solid fa-satellite-dish"></i> Device reported <strong>${Number(employeeState.userLocation.lat).toFixed(5)}, ${Number(employeeState.userLocation.lng).toFixed(5)}</strong>${acc ? ` &plusmn;${acc}m accuracy` : ""} &middot; ${formatTimeString(new Date())}`;
       if (acc && acc > 200) {
-        fixHtml += ` &middot; <span class="gps-acc-warn"><i class="fa-solid fa-triangle-exclamation"></i> Low-accuracy network fix \u2014 distance may be off by many km. Turn off VPN / use a GPS device.</span>`;
+        fixHtml += ` &middot; <span class="gps-acc-warn"><i class="fa-solid fa-triangle-exclamation"></i> Low-accuracy network fix \u2014 allow <strong>Precise location</strong> for this site, turn off VPN, or punch from a phone GPS.</span>`;
       }
       fixInfo.innerHTML = fixHtml;
       fixInfo.style.display = "block";
