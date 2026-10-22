@@ -10332,6 +10332,102 @@ body:not(.light-theme) .gps-acc-warn { color: #fbbf24; }
 body:not(.light-theme) .verification-status-pill.pill-warning { background: rgba(217, 119, 6, 0.18); color: #fbbf24; border-color: rgba(251, 191, 36, 0.4); }
 
 /* ==========================================================================
+   v8.5 NOTIFICATIONS BELL + MY TASKS — employee-side visibility for every
+   admin action (approval decisions and task assignments).
+   ========================================================================== */
+
+/* --- Bell + unread badge (portal navbar) --- */
+.nav-notifications { position: relative; display: flex; align-items: center; }
+.notif-bell-btn { width: 2.35rem; height: 2.35rem; border: 1px solid #e2e8f0; background: #fff; color: #475569; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 0.95rem; }
+.notif-bell-btn:hover { border-color: #6366f1; color: #6366f1; }
+body:not(.light-theme) .notif-bell-btn { background: rgba(148, 163, 184, 0.08); border-color: var(--border-glass, rgba(148, 163, 184, 0.2)); color: #cbd5e1; }
+.notif-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #f43f5e;
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+/* --- Dropdown panel --- */
+.notif-dropdown {
+  position: absolute;
+  top: calc(100% + 0.55rem);
+  right: 0;
+  width: min(340px, calc(100vw - 2rem));
+  max-height: 420px;
+  overflow: hidden auto;
+  z-index: 900;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.2);
+  padding: 0;
+}
+body:not(.light-theme) .notif-dropdown { background: #101725; border-color: var(--border-glass); }
+.notif-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.7rem 0.9rem; border-bottom: 1px solid rgba(100, 116, 139, 0.16); position: sticky; top: 0; background: inherit; }
+.notif-title { font-size: 0.82rem; font-weight: 800; }
+.notif-list { display: flex; flex-direction: column; }
+.notif-item {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid rgba(100, 116, 139, 0.12);
+  padding: 0.65rem 0.9rem;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+.notif-item:last-child { border-bottom: 0; }
+.notif-item:hover { background: rgba(99, 102, 241, 0.06); }
+.notif-item > i { margin-top: 0.2rem; font-size: 0.85rem; flex: 0 0 auto; }
+.notif-approved > i { color: #16a34a; }
+.notif-rejected > i { color: #dc2626; }
+.notif-cancelled > i { color: #d97706; }
+.notif-task > i { color: #6366f1; }
+.notif-info > i { color: #64748b; }
+.notif-item.unread { background: rgba(99, 102, 241, 0.05); }
+.notif-item.unread .ni-title::after { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #f43f5e; margin-left: 0.4rem; vertical-align: middle; }
+.ni-body { display: flex; flex-direction: column; gap: 0.12rem; min-width: 0; }
+.ni-title { font-size: 0.8rem; font-weight: 700; }
+.ni-text { font-size: 0.75rem; color: var(--text-muted, #64748b); line-height: 1.45; }
+.ni-when { font-size: 0.68rem; color: var(--text-muted, #94a3b8); }
+.notif-empty { padding: 1rem 1.1rem; font-size: 0.78rem; color: var(--text-muted, #64748b); line-height: 1.55; margin: 0; }
+
+/* --- My Tasks (portal view) --- */
+.my-tasks-summary { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.9rem; }
+.my-tasks-list { display: flex; flex-direction: column; gap: 0.55rem; }
+.my-task-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+}
+body:not(.light-theme) .my-task-item { background: rgba(148, 163, 184, 0.06); border-color: var(--border-glass, rgba(148, 163, 184, 0.18)); }
+.my-task-item.overdue { border-color: #fecdd3; background: #fff1f2; }
+body:not(.light-theme) .my-task-item.overdue { background: rgba(244, 63, 94, 0.08); border-color: rgba(244, 63, 94, 0.35); }
+.my-task-item .mr-icon { background: rgba(99, 102, 241, 0.12); color: #6366f1; }
+.my-task-item.overdue .mr-icon { background: rgba(244, 63, 94, 0.12); color: #e11d48; }
+.task-overdue-tag { color: #be123c; font-weight: 700; }
+
+/* ==========================================================================
    v8.4 LOSS OF PAY + MY REQUESTS — rose LoP identity across portal & admin,
    plus the employee "My Requests" tracker list.
    ========================================================================== */

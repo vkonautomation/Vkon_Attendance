@@ -285,6 +285,9 @@ function loadEmployeeSession(emp) {
   try { renderWfhBox(); } catch (e) { console.error("renderWfhBox err:", e); }
   try { renderMyRegularisationsList(); } catch (e) { console.error("renderMyRegularisationsList err:", e); }
   try { renderMyRequests(); } catch (e) { console.error("renderMyRequests err:", e); }
+  try { renderMyTasks(); } catch (e) { console.error("renderMyTasks err:", e); }
+  // Surface admin decisions (approvals, task assignments) as notifications.
+  try { syncAdminUpdates(emp.id); renderNotifications(emp.id); } catch (e) { console.error("notifications err:", e); }
 }
 
 // ============================================================================
@@ -2981,6 +2984,178 @@ function renderMyRequests() {
 }
 
 // ============================================================================
+// 8c. NOTIFICATIONS & MY TASKS — the employee side of admin actions: approval
+// decisions arrive as bell notifications, and Task-board items get a real view.
+// ============================================================================
+
+// Diff this employee's request statuses against the last seen snapshot and
+// raise a notification for every admin decision (covers even an admin that
+// decided while this tab was closed — both consoles share localStorage).
+function syncAdminUpdates(empId) {
+  if (!empId || typeof pushNotification !== "function") return;
+  const snaps = getStore(STORAGE_KEYS.ADMIN_DECISION_SNAP, {}) || {};
+  const snap = snaps[empId] || {};
+  const nowSnap = {};
+  const at = new Date().toISOString();
+
+  getStore(STORAGE_KEYS.LEAVES, []).forEach(l => {
+    if (l.employeeId !== empId) return;
+    const key = `LEAVE:${l.id}`;
+    nowSnap[key] = l.status;
+    if (snap[key] && snap[key] !== l.status && l.status !== "Pending") {
+      pushNotification(empId, l.status === "Approved" ? "approved" : (l.status === "Rejected" ? "rejected" : "cancelled"),
+        `${l.status === "Rejected" ? "Leave Rejected" : (l.status === "Cancelled" ? "Leave Cancelled" : "Leave Approved")}`,
+        `Your ${l.type || "leave"} request (${l.startDate}${l.endDate !== l.startDate ? " \u2192 " + l.endDate : ""}) is now ${l.status}.`, "requests");
+    }
+  });
+  getStore(STORAGE_KEYS.WFH, []).forEach(w => {
+    if (w.employeeId !== empId) return;
+    const key = `WFH:${w.id}`;
+    nowSnap[key] = w.status;
+    if (snap[key] && snap[key] !== w.status && (w.status === "Approved" || w.status === "Rejected")) {
+      pushNotification(empId, w.status === "Approved" ? "approved" : "rejected",
+        `WFH ${w.status}`, `Your WFH request for ${w.date} is now ${w.status}.`, "requests");
+    }
+  });
+  getStore(STORAGE_KEYS.REGULARISATIONS, []).forEach(r => {
+    if (r.employeeId !== empId) return;
+    const key = `REG:${r.id}`;
+    nowSnap[key] = r.status;
+    if (snap[key] && snap[key] !== r.status && (r.status === "Approved" || r.status === "Rejected")) {
+      pushNotification(empId, r.status === "Approved" ? "approved" : "rejected",
+        `Regularisation ${r.status}`, `Your regularisation for ${r.date} is now ${r.status}.`, "requests");
+    }
+  });
+  getStore("vkon_tasks_v1", []).forEach(t => {
+    if (t.assigneeId !== empId) return;
+    const key = `TASK:${t.id}`;
+    nowSnap[key] = t.status;
+    if (!snap[key] && t.status !== "Done") {
+      pushNotification(empId, "task", "New Task Assigned", `"${t.title}"${t.due ? ` is due on ${t.due}` : ""}.`, "tasks");
+    } else if (snap[key] && snap[key] !== t.status) {
+      pushNotification(empId, "info", `Task now ${t.status}`, `"${t.title}" was moved to ${t.status} by the admin.`, "tasks");
+    }
+  });
+
+  // Drop snapshot entries for deleted requests, then persist.
+  Object.keys(snap).forEach(k => { if (!(k in nowSnap)) delete snap[k]; });
+  snaps[empId] = nowSnap;
+  setStore(STORAGE_KEYS.ADMIN_DECISION_SNAP, snaps);
+}
+
+function notifTimeAgo(iso) {
+  const then = new Date(iso).getTime();
+  if (!then) return "";
+  const mins = Math.max(0, Math.round((Date.now() - then) / 60000));
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.round(hrs / 24)}d ago`;
+}
+
+function renderNotifications(empId) {
+  const badge = document.getElementById("notifBadge");
+  const listEl = document.getElementById("notifList");
+  const emptyEl = document.getElementById("notifEmpty");
+  if (!badge || !listEl) return;
+  if (!empId && employeeState.currentEmployee) empId = employeeState.currentEmployee.id;
+  if (!empId) return;
+
+  const items = getNotificationsFor(empId).slice().reverse(); // newest first
+  const unread = items.filter(n => !n.read).length;
+  badge.textContent = unread > 9 ? "9+" : String(unread);
+  badge.style.display = unread ? "" : "none";
+  if (emptyEl) emptyEl.style.display = items.length ? "none" : "";
+
+  const ICONS = { task: "fa-list-check", approved: "fa-circle-check", rejected: "fa-circle-xmark", cancelled: "fa-rotate-left", info: "fa-circle-info" };
+  listEl.innerHTML = items.map(n => `
+    <button type="button" class="notif-item notif-${n.kind}${n.read ? "" : " unread"}" data-link="${n.linkView || ""}">
+      <i class="fa-solid ${ICONS[n.kind] || ICONS.info}"></i>
+      <span class="ni-body">
+        <span class="ni-title">${n.title}</span>
+        <span class="ni-text">${n.text}</span>
+        <span class="ni-when">${notifTimeAgo(n.at)}</span>
+      </span>
+    </button>`).join("");
+}
+
+function initNotifications() {
+  const bell = document.getElementById("notifBellBtn");
+  const dd = document.getElementById("notifDropdown");
+  const markBtn = document.getElementById("notifMarkReadBtn");
+  const listEl = document.getElementById("notifList");
+  if (!bell || !dd) return;
+
+  bell.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const open = dd.style.display !== "none";
+    dd.style.display = open ? "none" : "";
+    bell.setAttribute("aria-expanded", String(!open));
+  });
+  document.addEventListener("click", (e) => {
+    if (dd.style.display === "none") return;
+    if (!dd.contains(e.target) && e.target !== bell) { dd.style.display = "none"; bell.setAttribute("aria-expanded", "false"); }
+  });
+  if (markBtn) {
+    markBtn.addEventListener("click", () => {
+      if (employeeState.currentEmployee) {
+        markNotificationsRead(employeeState.currentEmployee.id);
+        renderNotifications(employeeState.currentEmployee.id);
+      }
+    });
+  }
+  if (listEl) {
+    listEl.addEventListener("click", (e) => {
+      const item = e.target.closest(".notif-item");
+      if (!item) return;
+      const link = item.getAttribute("data-link");
+      dd.style.display = "none";
+      bell.setAttribute("aria-expanded", "false");
+      if (link && typeof window.switchPortalView === "function") window.switchPortalView(link);
+    });
+  }
+}
+
+// My Tasks — read mirror of the Admin Task Board for the logged-in employee.
+function renderMyTasks() {
+  if (!employeeState.currentEmployee) return;
+  const empId = employeeState.currentEmployee.id;
+  const todayKey = (typeof getPresentDate === "function") ? formatDateKey(getPresentDate()) : formatDateKey(new Date());
+  const my = getStore("vkon_tasks_v1", []).filter(t => t.assigneeId === empId);
+  const open = my.filter(t => t.status !== "Done");
+  const overdue = open.filter(t => t.due && t.due < todayKey);
+
+  const listEl = document.getElementById("myTasksList");
+  const summaryEl = document.getElementById("myTasksSummary");
+  const emptyEl = document.getElementById("emptyMyTasksMsg");
+  if (!listEl) return;
+
+  if (emptyEl) emptyEl.style.display = my.length ? "none" : "block";
+  if (summaryEl) {
+    summaryEl.innerHTML = my.length ? `
+      <span class="mr-chip mr-pending"><i class="fa-solid fa-briefcase"></i> Open ${open.length}</span>
+      <span class="mr-chip ${overdue.length ? "mr-rejected" : "mr-approved"}"><i class="fa-solid fa-triangle-exclamation"></i> Overdue ${overdue.length}</span>` : "";
+  }
+
+  const PILL = { "Open": "badge-leave-day", "In Progress": "badge-wfh-day", "Done": "badge-present" };
+  const order = { "In Progress": 0, "Open": 1, "Done": 2 };
+  const sorted = my.slice().sort((a, b) => (order[a.status] - order[b.status]) || String(a.due || "9999").localeCompare(String(b.due || "9999")));
+  listEl.innerHTML = sorted.map(t => {
+    const isOverdue = t.due && t.due < todayKey && t.status !== "Done";
+    return `
+      <div class="my-task-item${isOverdue ? " overdue" : ""}">
+        <div class="mr-icon"><i class="fa-solid ${isOverdue ? "fa-triangle-exclamation" : "fa-list-check"}"></i></div>
+        <div class="mr-main">
+          <div class="mr-kind">${t.title}</div>
+          <div class="mr-dates">${t.due ? `Due ${t.due}` : "No due date"}${isOverdue ? ' \u00b7 <span class="task-overdue-tag">Overdue</span>' : ""}</div>
+        </div>
+        <span class="day-badge-pill ${PILL[t.status] || "badge-neutral"}">${t.status}</span>
+      </div>`;
+  }).join("");
+}
+
+// ============================================================================
 // 9. PORTAL SIDEBAR NAV (dedicated views: Dashboard / Attendance / Regularisation)
 // ============================================================================
 
@@ -2992,6 +3167,7 @@ function initPortalSideNav() {
     dashboard: ["Dashboard", "Your day at a glance \u2022 punch in, leave & WFH"],
     attendance: ["My Attendance & Leaves", "Full calendar history, leave applications & WFH"],
     requests: ["My Requests", "Track every leave, Loss of Pay, WFH & regularisation you raised"],
+    tasks: ["My Tasks", "Work assigned to you by the Admin \u2022 due dates & status"],
     regularisation: ["Regularisation Requests", "Raise & track missed-punch fixes"]
   };
 
@@ -3031,6 +3207,9 @@ function initPortalSideNav() {
     if (viewId === "requests") {
       try { renderMyRequests(); } catch (e) { console.error(e); }
     }
+    if (viewId === "tasks") {
+      try { renderMyTasks(); } catch (e) { console.error(e); }
+    }
     document.body.classList.toggle("policy-collapsed", viewId !== "dashboard");
     closePolicyPopover();
     const meta = VIEW_META[viewId];
@@ -3041,6 +3220,9 @@ function initPortalSideNav() {
     window.scrollTo({ top: 0, behavior: "smooth" });
     closeMobileDrawer();
   }
+
+  // Exposed so notification clicks can deep-link into a view.
+  window.switchPortalView = switchView;
 
   links.forEach(link => {
     link.addEventListener("click", (e) => {
@@ -3162,6 +3344,7 @@ window.addEventListener("DOMContentLoaded", () => {
   try { initTheme(); } catch (e) { console.error("Error in initTheme:", e); }
   try { initAuthSystem(); } catch (e) { console.error("Error in initAuthSystem:", e); }
   try { initPortalSideNav(); } catch (e) { console.error("Error in initPortalSideNav:", e); }
+    try { initNotifications(); } catch (e) { console.error("Error in initNotifications:", e); }
   try { initActionHubToggles(); } catch (e) { console.error("Error in initActionHubToggles:", e); }
   try { initCalendarNav(); } catch (e) { console.error("Error in initCalendarNav:", e); }
   try { initLeaveBox(); } catch (e) { console.error("Error in initLeaveBox:", e); }

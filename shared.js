@@ -16,7 +16,9 @@ const STORAGE_KEYS = {
   ADMIN_CREDENTIALS: "vkon_admin_creds_v6",
   REGULARISATIONS: "vkon_regularisations_v6",
   LEAVE_QUOTAS: "vkon_leave_quotas_v6",
-  MIN_WORK_POLICY: "vkon_min_work_policy_v6"
+  MIN_WORK_POLICY: "vkon_min_work_policy_v6",
+  NOTIFICATIONS: "vkon_notifications_v6",
+  ADMIN_DECISION_SNAP: "vkon_admin_decision_snap_v6"
 };
 
 // Default Company Geofence Coordinates
@@ -236,6 +238,40 @@ function computeApprovedLeaveDaysUsed(empId) {
   return allLeaves
     .filter(l => l.employeeId === empId && l.status === "Approved" && l.category !== "LossOfPay")
     .reduce((sum, l) => sum + (parseInt(l.daysCount, 10) || 1), 0);
+}
+
+// ============================================================================
+// EMPLOYEE NOTIFICATIONS — admin actions (approval decisions, task
+// assignments) are pushed here so the employee portal can surface them.
+// ============================================================================
+function pushNotification(empId, kind, title, text, linkView) {
+  if (!empId) return null;
+  const list = getStore(STORAGE_KEYS.NOTIFICATIONS, []);
+  const n = {
+    id: "NT-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 6),
+    empId,
+    kind: kind || "info", // task | approved | rejected | cancelled | info
+    title: title || "Update",
+    text: text || "",
+    linkView: linkView || null,
+    at: new Date().toISOString(),
+    read: false
+  };
+  list.push(n);
+  // Cap per employee so localStorage stays small.
+  const kept = list.filter(x => x.empId !== empId).concat(list.filter(x => x.empId === empId).slice(-40));
+  setStore(STORAGE_KEYS.NOTIFICATIONS, kept);
+  return n;
+}
+
+function getNotificationsFor(empId) {
+  return getStore(STORAGE_KEYS.NOTIFICATIONS, []).filter(n => n.empId === empId);
+}
+
+function markNotificationsRead(empId) {
+  const list = getStore(STORAGE_KEYS.NOTIFICATIONS, []);
+  list.forEach(n => { if (n.empId === empId) n.read = true; });
+  setStore(STORAGE_KEYS.NOTIFICATIONS, list);
 }
 
 // WFH days used in a week = approved WFH requests + actual WFH punch records,

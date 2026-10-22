@@ -21,7 +21,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="styles.css?v=20261022_lop1">
+  <link rel="stylesheet" href="styles.css?v=20261022_tsk1">
 </head>
 <body class="light-theme">
   
@@ -123,6 +123,9 @@
         <a href="#" class="portal-nav-link" data-view="requests" role="button">
           <i class="fa-solid fa-inbox"></i> My Requests
         </a>
+        <a href="#" class="portal-nav-link" data-view="tasks" role="button">
+          <i class="fa-solid fa-list-check"></i> My Tasks
+        </a>
         <a href="#" class="portal-nav-link" data-view="regularisation" role="button">
           <i class="fa-solid fa-clipboard-check"></i> Regularisation Requests
         </a>
@@ -159,6 +162,22 @@
       <div class="realtime-clock" id="liveClockWidget">
         <div class="clock-time" id="clockTime">--:--:--</div>
         <div class="clock-date" id="clockDate">Loading date...</div>
+      </div>
+
+      <!-- Notifications: admin decisions & task assignments land here -->
+      <div class="nav-notifications">
+        <button type="button" class="icon-btn notif-bell-btn" id="notifBellBtn" title="Notifications" aria-label="Notifications" aria-expanded="false" aria-controls="notifDropdown">
+          <i class="fa-regular fa-bell"></i>
+          <span class="notif-badge" id="notifBadge" style="display: none;">0</span>
+        </button>
+        <div class="notif-dropdown glass-panel" id="notifDropdown" style="display: none;">
+          <div class="notif-head">
+            <span class="notif-title"><i class="fa-solid fa-bell"></i> Notifications</span>
+            <button type="button" class="btn btn-ghost btn-sm" id="notifMarkReadBtn">Mark all read</button>
+          </div>
+          <div class="notif-list" id="notifList"></div>
+          <p class="notif-empty" id="notifEmpty" style="display: none;"><i class="fa-regular fa-bell-slash"></i> No notifications yet &mdash; admin approvals and task assignments will appear here.</p>
+        </div>
       </div>
 
       <!-- User Profile -->
@@ -674,6 +693,26 @@
         </div>
       </section>
 
+      <!-- ================= SECTION: MY TASKS (ASSIGNED BY ADMIN) ================= -->
+      <section class="portal-view glass-panel" id="sectionMyTasks" data-portal-view="tasks">
+        <div class="box-header">
+          <div class="box-icon icon-leave">
+            <i class="fa-solid fa-list-check"></i>
+          </div>
+          <div class="box-title">
+            <h3>My Tasks</h3>
+            <span class="box-policy-tag">Assigned by Admin &bull; live status</span>
+          </div>
+        </div>
+        <p class="subtitle" style="margin-bottom: 1.25rem;">Work assigned to you from the Admin Task Board &mdash; with due dates and live status.</p>
+        <div class="my-tasks-summary" id="myTasksSummary"></div>
+        <div class="my-tasks-list" id="myTasksList"></div>
+        <div class="empty-state-card" id="emptyMyTasksMsg" style="display: none;">
+          <i class="fa-solid fa-list-check"></i>
+          <p>No tasks assigned yet. The admin can assign work from the Task board.</p>
+        </div>
+      </section>
+
       <!-- ================= SECTION 2: ATTENDANCE REGULARISATION (AFTER CALENDAR) ================= -->
       <section class="regularisation-section glass-panel portal-view" id="sectionAttendanceRegularisation" data-portal-view="regularisation">
         <div class="box-header">
@@ -970,8 +1009,8 @@
   <div class="toast-container" id="toastContainer"></div>
 
   <!-- Shared Engine & App Controller -->
-  <script src="shared.js?v=20261013_ist_lop1"></script>
-  <script src="app.js?v=20261022_lop1"></script>
+  <script src="shared.js?v=20261013_ist_tsk1"></script>
+  <script src="app.js?v=20261022_tsk1"></script>
   <script src="js/password-toggle.js?v=20261019_ui1"></script>
 
   <!-- Present Day & Migration Guarantee -->

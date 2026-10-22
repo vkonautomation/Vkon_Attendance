@@ -428,6 +428,7 @@ function renderMonthlyReport() {
       <td><span class="text-danger font-bold">${absentCount} Days</span></td>
       <td><span class="unmarked-cell${unmarkedCount > 0 ? " has-unmarked" : ""}" title="${unmarkedCount} past working day(s) with no punch or request \u2014 needs regularisation, NOT counted as Absent">${unmarkedCount} Days</span></td>
       <td><span class="text-primary font-bold">${wfhCount} Days</span></td>
+      <td><span class="${lopCount ? 'day-badge-pill badge-lop-day' : 'text-muted'}">${lopCount} Days</span></td>
       <td><span class="day-badge-pill badge-neutral font-mono font-bold" title="Annual Leaves Taken / Total Leave Quota">${leaveCellFormatted}</span>${lopCount ? ` <span class="lop-mini-pill" title="Approved Loss of Pay days (unpaid)">LoP ${lopCount}</span>` : ""}</td>
       <td class="font-mono">${empTotalHours.toFixed(1)} hrs</td>
     `;
@@ -1441,6 +1442,11 @@ function handleWfhDecision(id, decision) {
   }
 
   setStore(STORAGE_KEYS.WFH, wfhList);
+  if (typeof pushNotification === "function") {
+    const WFH_MSG = { Approved: `Your WFH request for ${req.date} was approved.`, Rejected: `Your WFH request for ${req.date} was rejected.`, Cancelled: `Your WFH cancellation for ${req.date} was approved — the day is no longer marked WFH.`, ApprovedAgain: `Your WFH cancellation for ${req.date} was rejected; WFH remains approved.` };
+    const msgKey = decision === "ApproveCancellation" ? "Cancelled" : (decision === "RejectCancellation" ? "ApprovedAgain" : decision);
+    if (WFH_MSG[msgKey]) pushNotification(req.employeeId, msgKey === "Rejected" ? "rejected" : (msgKey === "Approved" ? "approved" : "info"), msgKey === "Approved" ? "WFH Approved" : (msgKey === "Rejected" ? "WFH Rejected" : "WFH Update"), WFH_MSG[msgKey], "requests");
+  }
   renderApprovalsCenter();
   renderMonthlyReport();
 }
@@ -1595,6 +1601,13 @@ function handleLeaveDecision(id, decision) {
   }
 
   setStore(STORAGE_KEYS.LEAVES, leaves);
+  if (typeof pushNotification === "function") {
+    const kind = decision === "Approved" ? "approved" : (decision === "Rejected" ? "rejected" : (decision === "ApproveCancellation" ? "cancelled" : "info"));
+    const dates = req.startDate === req.endDate ? req.startDate : `${req.startDate} → ${req.endDate}`;
+    const TITLE = { Approved: "Leave Approved", Rejected: "Leave Rejected", ApproveCancellation: "Leave Cancelled", RejectCancellation: "Cancellation Rejected" };
+    const TEXT = { Approved: `Your ${req.type || "leave"} request (${dates}) was approved.`, Rejected: `Your ${req.type || "leave"} request (${dates}) was rejected.`, ApproveCancellation: `Your cancellation for ${dates} was approved — the days are back on the floor.`, RejectCancellation: `Your cancellation for ${dates} was rejected; the leave remains approved.` };
+    if (TITLE[decision]) pushNotification(req.employeeId, kind, TITLE[decision], TEXT[decision], "requests");
+  }
   renderApprovalsCenter();
   renderMonthlyReport();
 }
@@ -1704,6 +1717,12 @@ function handleRegularisationDecision(id, decision) {
     showToast(`Regularisation request for ${req.date} rejected.`, "warning");
   }
 
+  if (typeof pushNotification === "function") {
+    pushNotification(req.employeeId, decision === "Approved" ? "approved" : "rejected",
+      decision === "Approved" ? "Regularisation Approved" : "Regularisation Rejected",
+      decision === "Approved" ? `Your regularisation for ${req.date} was approved — you're marked Present.` : `Your regularisation for ${req.date} was rejected.`,
+      "requests");
+  }
   renderApprovalsCenter();
   renderMonthlyReport();
 }
@@ -3101,6 +3120,9 @@ function initExtraModules() {
         status: "Open"
       });
       setStore(EXTRA_KEYS.TASKS, tasks);
+      if (typeof pushNotification === "function" && emp) {
+        pushNotification(emp.id, "task", "New Task Assigned", `"${title}"${document.getElementById("taskDueInput").value ? ` is due on ${document.getElementById("taskDueInput").value}` : ""}. Check My Tasks for details.`, "tasks");
+      }
       document.getElementById("taskTitleInput").value = "";
       renderTaskTable();
       showToast("Task assigned.", "success");
