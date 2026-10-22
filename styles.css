@@ -10749,6 +10749,18 @@ body:not(.light-theme) .tc-chip.tc-pending { background: rgba(245, 158, 11, 0.16
 /* Settings approval-flow card */
 .approval-flow-card { margin-top: 1.25rem; }
 
+/* Monthly report grouped "Leave" header (PL / RL sub-columns) */
+.master-table thead th.leave-group-header {
+  text-align: center;
+  border-bottom: 1px solid var(--border-glass, rgba(148, 163, 184, 0.22));
+}
+.master-table thead th.leave-sub-header {
+  text-align: center;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 
 
 

@@ -24,7 +24,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="styles.css?v=20261022_apr1">
+  <link rel="stylesheet" href="styles.css?v=20261022_apr5">
 </head>
 <body class="light-theme admin-page">
 
@@ -533,20 +533,23 @@
             <table class="data-table master-table">
               <thead>
                 <tr>
-                  <th>Employee</th>
-                  <th>Emp ID</th>
-                  <th>Department</th>
-                  <th>Check-In &amp; Out</th>
-                  <th>Type</th>
-                  <th>Today</th>
-                  <th>Present Days</th>
-                  <th>Absent Days</th>
-                  <th title="Past working days with no punch or request &mdash; needs regularisation, not a confirmed absence">Not Marked</th>
-                  <th>WFH Days</th>
-                  <th title="Approved Loss of Pay days (unpaid, does not use the paid-leave quota)">Loss of Pay Days</th>
-                  <th title="Personal Leave: remaining / annual quota">PL (Remaining/Total)</th>
-                  <th title="Restricted Leave: remaining / monthly quota (this month)">RL (Remaining/Total)</th>
-                  <th>Total Work Time</th>
+                  <th rowspan="2">Employee</th>
+                  <th rowspan="2">Emp ID</th>
+                  <th rowspan="2">Department</th>
+                  <th rowspan="2">Check-In &amp; Out</th>
+                  <th rowspan="2">Type</th>
+                  <th rowspan="2">Today</th>
+                  <th rowspan="2">Present Days</th>
+                  <th rowspan="2">Absent Days</th>
+                  <th rowspan="2" title="Past working days with no punch or request &mdash; needs regularisation, not a confirmed absence">Not Marked</th>
+                  <th rowspan="2">WFH Days</th>
+                  <th rowspan="2" title="Approved Loss of Pay days (unpaid, does not use the paid-leave quota)">Loss of Pay Days</th>
+                  <th colspan="2" class="leave-group-header" title="Leave balances (remaining / total)">Leave</th>
+                  <th rowspan="2">Total Work Time</th>
+                </tr>
+                <tr>
+                  <th class="leave-sub-header" title="Personal Leave: remaining / annual quota">PL</th>
+                  <th class="leave-sub-header" title="Restricted Leave: remaining / monthly quota">RL</th>
                 </tr>
               </thead>
               <tbody id="masterReportTableBody">

@@ -100,8 +100,7 @@ def run_tests():
 
     # New Request 4: First page split Leave columns (PL and RL), each remaining / total
     print("\n[New Req 4] First page Master Sheet PL & RL columns (remaining / total quota):")
-    assert 'PL (Remaining/Total)' in admin_html, "Failed PL (Personal Leave) header in admin.html"
-    assert 'RL (Remaining/Total)' in admin_html, "Failed RL (Restricted Leave) header in admin.html"
+    assert 'leave-group-header' in admin_html and '>PL<' in admin_html and '>RL<' in admin_html, "Failed grouped Leave header with PL/RL sub-columns in admin.html"
     assert '${plRemaining} / ${plTotal}' in admin_js, "Failed Personal Leave remaining / total formatted string in admin.js"
     assert '${rlRemaining} / ${rlTotal}' in admin_js, "Failed Restricted Leave remaining / total formatted string in admin.js"
     print("  PASS: First page PL and RL columns verified.")
