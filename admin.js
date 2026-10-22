@@ -917,7 +917,7 @@ function renderRosterTable() {
     const rhTaken = empApprovedLeaves
       .filter(l => l.category === "Restricted" || l.type === "Restricted Holiday")
       .reduce((sum, l) => sum + (parseInt(l.daysCount, 10) || 1), 0);
-    const leaveCellFormatted = `${leavesTaken}/${rhTaken}/${quota}`;
+    const plLeft = Math.max(0, quota - leavesTaken);
 
     tr.innerHTML = `
       <td>
@@ -937,11 +937,9 @@ function renderRosterTable() {
           <i class="fa-solid ${isExempt ? 'fa-shield-halved' : 'fa-location-dot'}"></i> ${isExempt ? 'Geofence OFF (Exempt)' : 'Geofence Applicable (500m)'}
         </span>
       </td>
-      <td>
-        <span class="day-badge-pill badge-neutral font-mono font-bold" title="Leaves Taken / Restricted Holidays Taken / Total Annual Leave Quota">
-          ${leaveCellFormatted}
-        </span>
-      </td>
+      <td><span class="day-badge-pill badge-leave-day font-mono font-bold" title="Personal Leave taken: ${leavesTaken} of ${quota} (${plLeft} left)">${leavesTaken}</span></td>
+      <td><span class="day-badge-pill badge-rh-day font-mono font-bold" title="Restricted Holiday (RH) taken this year: ${rhTaken}">${rhTaken}</span></td>
+      <td><span class="day-badge-pill badge-neutral font-mono font-bold" title="Total annual leave quota">${quota}</span></td>
       <td><span class="font-mono roster-joined" title="Date of joining"><i class="fa-regular fa-calendar-days text-muted"></i> ${joinedStr}</span></td>
       <td>
         <div class="action-btn-cluster">

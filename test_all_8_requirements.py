@@ -56,10 +56,10 @@ def run_tests():
     print("  PASS: Req 5 verified.")
 
     # Requirement 6:
-    print("\n[Req 6] Staff Roster Leave column with leavesTaken/rhTaken/totalLeaves:")
-    assert '<th>Leave</th>' in admin_html, "Failed Leave header in admin.html roster table"
+    print("\n[Req 6] Staff Roster split into Personal Leave / Restricted Leave / Total Leaves:")
+    assert 'Personal Leave' in admin_html and 'Restricted Leave' in admin_html and 'Total Leaves' in admin_html, "Failed Personal/Restricted/Total Leave headers in admin.html roster table"
     assert 'leavesTaken' in admin_js and 'rhTaken' in admin_js, "Failed leave counting logic in admin.js"
-    assert '${leavesTaken}/${rhTaken}/${quota}' in admin_js, "Failed format leavesTaken/rhTaken/quota in admin.js"
+    assert '${leavesTaken}' in admin_js and '${rhTaken}' in admin_js and '${quota}' in admin_js, "Failed individual leavesTaken/rhTaken/quota cells in admin.js"
     print("  PASS: Req 6 verified.")
 
     # Requirement 7:
