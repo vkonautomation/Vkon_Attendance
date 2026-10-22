@@ -2962,7 +2962,7 @@ function renderTaskTable() {
       <td>${t.assigneeName}</td>
       <td class="font-mono">${t.due || "\u2014"}</td>
       <td>${t.status === "Done"
-        ? `<span class="day-badge-pill badge-present"><i class="fa-solid fa-circle-check"></i> Completed${t.completedAt ? ` &middot; ${formatDateKey(new Date(t.completedAt))}` : ""}</span>`
+        ? `<span class="day-badge-pill badge-present"><i class="fa-solid fa-circle-check"></i> Completed &middot; ${t.completedAt ? formatDateKey(new Date(t.completedAt)) : todayKey}</span>`
         : `<select class="form-control task-status-select ${t.status === "In Progress" ? "status-inprogress" : "status-open"}" data-id="${t.id}">${TASK_STATUSES.map(s => `<option${s === t.status ? " selected" : ""}>${s}</option>`).join("")}</select>`}</td>
       <td><button type="button" class="btn btn-ghost btn-sm text-danger task-remove" data-id="${t.id}" title="Delete task"><i class="fa-solid fa-trash"></i></button></td>
     </tr>`;
@@ -3161,7 +3161,18 @@ function initExtraModules() {
       if (!sel) return;
       const tasks = getStore(EXTRA_KEYS.TASKS, []);
       const t = tasks.find(x => x.id === sel.dataset.id);
-      if (t) t.status = sel.value;
+      if (t) {
+        t.status = sel.value;
+        // Stamp a completion date whenever a task is marked Done (so the pill
+        // always shows one), and clear it if moved back to an open state.
+        if (sel.value === "Done") {
+          if (!t.completedAt) t.completedAt = new Date().toISOString();
+          t.completedBy = t.completedBy || "admin";
+        } else {
+          delete t.completedAt;
+          delete t.completedBy;
+        }
+      }
       setStore(EXTRA_KEYS.TASKS, tasks);
       renderTaskTable();
     });
