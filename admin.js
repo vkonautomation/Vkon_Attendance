@@ -927,6 +927,7 @@ function renderRosterTable() {
       .reduce((sum, l) => sum + (parseInt(l.daysCount, 10) || 1), 0);
     const plLeft = Math.max(0, plQuota - leavesTaken);
     const rlLeft = Math.max(0, rlQuota - rhTaken);
+    const totalLeft = plLeft + rlLeft;
 
     tr.innerHTML = `
       <td>
@@ -946,9 +947,9 @@ function renderRosterTable() {
           <i class="fa-solid ${isExempt ? 'fa-shield-halved' : 'fa-location-dot'}"></i> ${isExempt ? 'Geofence OFF (Exempt)' : 'Geofence Applicable (500m)'}
         </span>
       </td>
-      <td><span class="day-badge-pill badge-leave-day font-mono font-bold" title="Personal Leave taken: ${leavesTaken} of ${plQuota} (${plLeft} left)">${leavesTaken}</span></td>
-      <td><span class="day-badge-pill badge-rh-day font-mono font-bold" title="Restricted Holiday (RH) taken: ${rhTaken} of ${rlQuota} (${rlLeft} left)">${rhTaken}</span></td>
-      <td><span class="day-badge-pill badge-neutral font-mono font-bold" title="Total leave quota (Personal ${plQuota} + Restricted ${rlQuota})">${quota}</span></td>
+      <td><span class="day-badge-pill badge-leave-day font-mono font-bold" title="Personal Leave remaining / annual quota">${plLeft} / ${plQuota}</span></td>
+      <td><span class="day-badge-pill badge-leave-day font-mono font-bold" title="Restricted Leave remaining / total">${rlLeft} / ${rlQuota}</span></td>
+      <td><span class="day-badge-pill badge-neutral font-mono font-bold" title="Total Leave remaining / total quota (Personal + Restricted)">${totalLeft} / ${quota}</span></td>
       <td><span class="font-mono roster-joined" title="Date of joining"><i class="fa-regular fa-calendar-days text-muted"></i> ${joinedStr}</span></td>
       <td>
         <div class="action-btn-cluster">
