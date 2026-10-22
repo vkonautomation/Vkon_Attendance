@@ -3223,9 +3223,8 @@ function initExtraModules() {
         status: "Open"
       });
       setStore(EXTRA_KEYS.TASKS, tasks);
-      if (typeof pushNotification === "function" && emp) {
-        pushNotification(emp.id, "task", "New Task Assigned", `"${title}"${document.getElementById("taskDueInput").value ? ` is due on ${document.getElementById("taskDueInput").value}` : ""}. Check My Tasks for details.`, "tasks");
-      }
+      // The employee-side decision sync (app.js) is the single source of the
+      // "New Task Assigned" notification; pushing here too would duplicate it.
       document.getElementById("taskTitleInput").value = "";
       renderTaskTable();
       showToast("Task assigned.", "success");
