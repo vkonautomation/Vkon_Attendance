@@ -275,6 +275,18 @@ function loadEmployeeSession(emp) {
   if (curEmpName) curEmpName.textContent = emp.name;
   const curEmpRole = document.getElementById("currentEmpRole");
   if (curEmpRole) curEmpRole.textContent = `${emp.role} (${emp.department})`;
+  // Assigned manager (empty when none is set by the admin).
+  const mgrEl = document.getElementById("currentEmpManager");
+  if (mgrEl) {
+    const mgrName = (typeof resolveManagerName === "function") ? resolveManagerName(emp.id) : "";
+    if (mgrName) {
+      mgrEl.innerHTML = `<i class="fa-solid fa-user-tie"></i> Manager: <strong>${mgrName}</strong>`;
+      mgrEl.classList.remove("mgr-none");
+    } else {
+      mgrEl.innerHTML = `<i class="fa-solid fa-user-tie"></i> No manager assigned`;
+      mgrEl.classList.add("mgr-none");
+    }
+  }
   const calEmpName = document.getElementById("calendarEmpNameDisplay");
   if (calEmpName) calEmpName.textContent = emp.name;
 

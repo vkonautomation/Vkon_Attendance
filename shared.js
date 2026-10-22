@@ -80,7 +80,8 @@ const DEFAULT_EMPLOYEES = [
     avatar: makeDefaultAvatarSvg("Mukesh Sharma", "#d49b6a", "#1c1917", "#2563eb", "MS"),
     annualLeaveQuota: 14,
     geofenceEnforcement: "required", // "required" (<= 500m) or "exempt" (allowed anywhere)
-    enrolledAt: "2026-01-10"
+    enrolledAt: "2026-01-10",
+    managerId: "EMP003"
   },
   {
     id: "EMP002",
@@ -92,7 +93,8 @@ const DEFAULT_EMPLOYEES = [
     avatar: makeDefaultAvatarSvg("Priya Patel", "#e0a97a", "#292524", "#7c3aed", "PP"),
     annualLeaveQuota: 14,
     geofenceEnforcement: "required",
-    enrolledAt: "2026-02-15"
+    enrolledAt: "2026-02-15",
+    managerId: "EMP003"
   },
   {
     id: "EMP003",
@@ -104,7 +106,8 @@ const DEFAULT_EMPLOYEES = [
     avatar: makeDefaultAvatarSvg("Chiranth Gowda", "#c68b59", "#0f172a", "#059669", "CG"),
     annualLeaveQuota: 14,
     geofenceEnforcement: "exempt", // Manager exempt from 500m radius
-    enrolledAt: "2026-01-05"
+    enrolledAt: "2026-01-05",
+    managerId: ""
   },
   {
     id: "EMP004",
@@ -116,7 +119,8 @@ const DEFAULT_EMPLOYEES = [
     avatar: makeDefaultAvatarSvg("Alex Chen", "#f0c29a", "#1e1b4b", "#0891b2", "AC"),
     annualLeaveQuota: 14,
     geofenceEnforcement: "required",
-    enrolledAt: "2026-03-01"
+    enrolledAt: "2026-03-01",
+    managerId: ""
   }
 ];
 
@@ -272,6 +276,16 @@ function markNotificationsRead(empId) {
   const list = getStore(STORAGE_KEYS.NOTIFICATIONS, []);
   list.forEach(n => { if (n.empId === empId) n.read = true; });
   setStore(STORAGE_KEYS.NOTIFICATIONS, list);
+}
+
+// Assigned manager lookup. Returns "" when no manager is set (or the referenced
+// employee no longer exists) so the console can show an empty state.
+function resolveManagerName(empId) {
+  const employees = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
+  const emp = employees.find(e => e.id === empId);
+  if (!emp || !emp.managerId) return "";
+  const mgr = employees.find(e => e.id === emp.managerId);
+  return mgr ? mgr.name : "";
 }
 
 // WFH days used in a week = approved WFH requests + actual WFH punch records,
@@ -962,6 +976,19 @@ function initializeDatabase() {
   if (!getStore(STORAGE_KEYS.EMPLOYEES, null)) {
     setStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
   }
+  // One-time migration: give pre-seeded employees a manager when the field is
+  // absent (undefined). An explicit empty string means "intentionally none".
+  try {
+    const emps = getStore(STORAGE_KEYS.EMPLOYEES, []);
+    let migrated = false;
+    emps.forEach(e => {
+      if (e.managerId === undefined) {
+        e.managerId = (e.id === "EMP001" || e.id === "EMP002") ? "EMP003" : "";
+        migrated = true;
+      }
+    });
+    if (migrated) setStore(STORAGE_KEYS.EMPLOYEES, emps);
+  } catch (e) { /* non-fatal */ }
   if (!getStore(STORAGE_KEYS.ADMIN_CREDENTIALS, null)) {
     setStore(STORAGE_KEYS.ADMIN_CREDENTIALS, DEFAULT_ADMIN_CREDENTIALS);
   }

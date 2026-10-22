@@ -24,7 +24,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="styles.css?v=20261022_tsk1">
+  <link rel="stylesheet" href="styles.css?v=20261022_mgr1">
 </head>
 <body class="light-theme admin-page">
 
@@ -620,6 +620,14 @@
                   <option value="required">Enforce 500m Geofence (Must be within office)</option>
                   <option value="exempt">Exempt (Allowed to punch in/out anywhere)</option>
                 </select>
+              </div>
+
+              <div class="form-group">
+                <label for="newEmpManager"><i class="fa-solid fa-user-tie text-primary"></i> Assigned Manager</label>
+                <select id="newEmpManager" class="form-control">
+                  <option value="">&mdash; No manager assigned &mdash;</option>
+                </select>
+                <span class="form-hint">Optional. Shown to the employee in their console.</span>
               </div>
 
               <!-- Master Reference Photo Enrollment (Webcam or Laptop Upload) -->
@@ -1346,6 +1354,16 @@
             <span class="form-hint">Turn OFF to allow this employee to mark attendance from any location without 500m geofence restrictions.</span>
           </div>
 
+          <div class="form-group">
+            <label for="editEmpManager" class="font-bold">
+              <i class="fa-solid fa-user-tie text-primary"></i> Assigned Manager
+            </label>
+            <select id="editEmpManager" class="form-control">
+              <option value="">&mdash; No manager assigned &mdash;</option>
+            </select>
+            <span class="form-hint">The selected manager is shown to this employee in their console. Leave blank for none.</span>
+          </div>
+
           <!-- Master Photo Update -->
           <div class="master-photo-box">
             <label class="font-bold"><i class="fa-solid fa-camera"></i> Profile Reference Photo</label>
@@ -1483,8 +1501,8 @@
 
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <script src="shared.js?v=20261013_ist_tsk1"></script>
-  <script src="admin.js?v=20261022_tsk1"></script>
+  <script src="shared.js?v=20261013_ist_mgr1"></script>
+  <script src="admin.js?v=20261022_mgr1"></script>
   <script src="js/password-toggle.js?v=20261019_ui1"></script>
 </body>
 </html>

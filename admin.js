@@ -875,11 +875,26 @@ function exportMonthlyExcel() {
 // 3. TAB 2: STAFF ROSTER & EDIT EMPLOYEE MODAL (PHOTO, USERNAME, PASSWORD, GEOFENCE, LEAVE DAYS)
 // ============================================================================
 
+// Build <option> list for a manager picker: a blank "no manager" choice plus
+// every other employee (optionally excluding the employee being edited).
+function managerOptionsHtml(excludeId, selectedId) {
+  const employees = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
+  let html = `<option value="">&mdash; No manager assigned &mdash;</option>`;
+  employees.filter(e => e.id !== excludeId).forEach(e => {
+    html += `<option value="${e.id}"${e.id === selectedId ? " selected" : ""}>${e.name} (${e.role})</option>`;
+  });
+  return html;
+}
+
 function renderRosterTable() {
   const employees = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
   const allLeaves = getStore(STORAGE_KEYS.LEAVES, []);
   const tbody = document.getElementById("adminRosterTableBody");
   tbody.innerHTML = "";
+
+  // Keep the add-employee manager picker fresh.
+  const newMgrSel = document.getElementById("newEmpManager");
+  if (newMgrSel) newMgrSel.innerHTML = managerOptionsHtml(null, "");
 
   employees.forEach(emp => {
     const tr = document.createElement("tr");
@@ -904,6 +919,7 @@ function renderRosterTable() {
         <div class="roster-info-cell">
           <span class="font-bold">${emp.name}</span>
           <span class="table-sub">${emp.role} &bull; <strong class="text-primary">${emp.department}</strong></span>
+          <span class="table-sub roster-manager-line"><i class="fa-solid fa-user-tie"></i> Manager: <strong>${(typeof resolveManagerName === "function" && resolveManagerName(emp.id)) || "&mdash; None &mdash;"}</strong></span>
           <span class="table-sub font-mono">ID: ${emp.id}</span>
         </div>
       </td>
@@ -971,6 +987,8 @@ function openEditEmployeeModal(empId) {
   document.getElementById("editEmpUsername").value = emp.username;
   document.getElementById("editEmpPassword").value = emp.password;
   document.getElementById("editEmpGeofenceRule").value = emp.geofenceEnforcement || "required";
+  const mgrSel = document.getElementById("editEmpManager");
+  if (mgrSel) mgrSel.innerHTML = managerOptionsHtml(emp.id, emp.managerId || "");
   document.getElementById("editEmpPhotoPreview").src = emp.avatar;
 
   editCapturedMasterPhoto = null;
@@ -1068,6 +1086,8 @@ function initEditEmployeeModal() {
     const username = document.getElementById("editEmpUsername").value.trim().toLowerCase();
     const password = document.getElementById("editEmpPassword").value.trim();
     const geofenceRule = document.getElementById("editEmpGeofenceRule").value;
+    const mgrSel = document.getElementById("editEmpManager");
+    const managerId = mgrSel ? mgrSel.value : "";
 
     let employees = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
     const emp = employees.find(item => item.id === empId);
@@ -1078,6 +1098,8 @@ function initEditEmployeeModal() {
       emp.username = username;
       emp.password = password;
       emp.geofenceEnforcement = geofenceRule;
+      // Never allow an employee to manage themselves.
+      emp.managerId = (managerId && managerId !== empId) ? managerId : "";
       if (editCapturedMasterPhoto) {
         emp.avatar = editCapturedMasterPhoto;
       }
@@ -1166,6 +1188,7 @@ function initEnrollmentForm() {
     const username = document.getElementById("newEmpUsername").value.trim().toLowerCase();
     const password = document.getElementById("newEmpPassword").value.trim();
     const geofenceRule = document.getElementById("newEmpGeofenceRule").value;
+    const newMgrSel = document.getElementById("newEmpManager");
 
     if (!name || !role || !username || !password) return;
 
@@ -1184,6 +1207,7 @@ function initEnrollmentForm() {
       role: role,
       department: dept,
       geofenceEnforcement: geofenceRule,
+      managerId: newMgrSel ? newMgrSel.value : "",
       avatar: adminCapturedMasterPhoto || previewImg.src,
       enrolledAt: formatDateKey(new Date())
     };

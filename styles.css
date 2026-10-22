@@ -10428,6 +10428,28 @@ body:not(.light-theme) .my-task-item.overdue { background: rgba(244, 63, 94, 0.0
 .task-overdue-tag { color: #be123c; font-weight: 700; }
 
 /* ==========================================================================
+   v8.6 ASSIGNED MANAGER — manager line in the profile chip (portal) and the
+   staff roster (admin). Empty state is muted.
+   ========================================================================== */
+.chip-manager {
+  font-size: 0.66rem;
+  color: var(--text-muted, #64748b);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.1rem;
+}
+.chip-manager i { color: #6366f1; font-size: 0.62rem; }
+.chip-manager strong { color: var(--text-main, #0f172a); font-weight: 700; }
+.chip-manager.mgr-none { font-style: italic; opacity: 0.8; }
+.chip-manager.mgr-none i { color: #94a3b8; }
+body:not(.light-theme) .chip-manager strong { color: #eef2f7; }
+
+.roster-manager-line { display: inline-flex; align-items: center; gap: 0.32rem; }
+.roster-manager-line i { color: #6366f1; font-size: 0.68rem; }
+.roster-manager-line strong { color: var(--text-main, #0f172a); }
+
+/* ==========================================================================
    v8.4 LOSS OF PAY + MY REQUESTS — rose LoP identity across portal & admin,
    plus the employee "My Requests" tracker list.
    ========================================================================== */
