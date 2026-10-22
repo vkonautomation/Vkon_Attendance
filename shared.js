@@ -1211,36 +1211,4 @@ function initializeDatabase() {
   cleanExpiredPhotos();
 }
 
-// ============================================================================
-// OFFICE CODE CHECK-IN — time-based rotating 6-digit presence code
-// A screen at the office shows generateOfficeCode() (office-code.html);
-// employees type it in the punch modal. Proof-of-presence without GPS.
-// ============================================================================
-const OFFICE_CODE_SECRET = "VKON-OFFICE-2026-CHANGE-ME"; // rotate before real rollout
-const OFFICE_CODE_SLOT_SECONDS = 60;                      // code refreshes every 60s
-const GPS_ACCURACY_MAX_M = 100;                           // strict mode: trust fixes at/below this
-
-function officeCodeSlot(dateMs) {
-  return Math.floor((dateMs || Date.now()) / (OFFICE_CODE_SLOT_SECONDS * 1000));
-}
-
-async function generateOfficeCode(slot) {
-  const data = OFFICE_CODE_SECRET + "|" + slot;
-  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(data));
-  // First 4 bytes as uint32 → 6-digit zero-padded code (easy to read & type)
-  const num = new DataView(buf).getUint32(0) % 1000000;
-  return String(num).padStart(6, "0");
-}
-
-// Accepts the current slot and the previous one (handles 60s rollover mid-entry).
-async function verifyOfficeCode(entered) {
-  if (!entered) return false;
-  const norm = String(entered).replace(/\D/g, "");
-  if (norm.length !== 6) return false;
-  const slot = officeCodeSlot();
-  const expected = await generateOfficeCode(slot);
-  const prev = await generateOfficeCode(slot - 1);
-  return norm === expected || norm === prev;
-}
-
 initializeDatabase();

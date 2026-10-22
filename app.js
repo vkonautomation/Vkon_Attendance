@@ -9,8 +9,6 @@ let capturedLiveSelfie = null;
 let currentMatchScore = 0;
 let isLivePhotoVerified = false;
 let gpsWatchId = null; // in-flight watchPosition collector, so refreshes don't stack
-let officeCodeVerified = false; // rotating office code presence proof (reset per punch modal)
-let officeCodeVerifiedAt = null;
 
 const employeeState = {
   currentEmployee: null,
@@ -1420,13 +1418,6 @@ function openVerificationModal(mode = "in") {
     guidance.innerHTML = `Click <strong>Capture Live Photo</strong> to snap your photo and mark attendance.`;
   }
 
-  // Presence proof resets with each new punch attempt
-  officeCodeVerified = false;
-  officeCodeVerifiedAt = null;
-  const codeInputReset = document.getElementById("modalOfficeCodeInput");
-  if (codeInputReset) { codeInputReset.value = ""; codeInputReset.disabled = false; }
-  updateCodeStatusRow();
-
   modal.classList.add("open");
   modal.setAttribute("aria-hidden", "false");
   trapFocusActivate(modal);
@@ -1594,61 +1585,6 @@ function setGpsUnavailable(message) {
   playSound("error");
 }
 
-// Presence decision: strict GPS (accurate fix within radius) OR verified office code.
-function evaluatePresence() {
-  const settings = getStore(STORAGE_KEYS.SETTINGS, DEFAULT_OFFICE);
-  const isExempt = employeeState.currentEmployee && employeeState.currentEmployee.geofenceEnforcement === "exempt";
-  const ul = employeeState.userLocation;
-  const accLimit = (typeof GPS_ACCURACY_MAX_M !== "undefined") ? GPS_ACCURACY_MAX_M : 100;
-  const distance = ul.located ? calculateDistanceInMeters(ul.lat, ul.lng, settings.lat, settings.lng) : null;
-  const accOk = ul.located && (ul.accuracy == null || ul.accuracy <= accLimit);
-  const gpsPass = isExempt || Boolean(ul.located && accOk && distance <= settings.radius);
-  const codePass = officeCodeVerified === true;
-  return { settings, isExempt, distance, accuracy: ul.accuracy, located: Boolean(ul.located), accOk, gpsPass, codePass, pass: gpsPass || codePass };
-}
-
-// ---------------------------------------------------------------------------
-// Office code entry — proof of presence when GPS is unreliable
-// ---------------------------------------------------------------------------
-function updateCodeStatusRow() {
-  const row = document.getElementById("modalCodeStatus");
-  if (!row) return;
-  if (officeCodeVerified) {
-    row.className = "code-verify-status code-verified";
-    row.innerHTML = `<i class="fa-solid fa-circle-check"></i> Office code verified at ${officeCodeVerifiedAt} \u2014 presence confirmed.`;
-  } else {
-    row.className = "code-verify-status";
-    row.innerHTML = `<i class="fa-regular fa-circle"></i> Office code: not verified \u2014 optional proof of presence when GPS is unreliable.`;
-  }
-}
-
-async function handleOfficeCodeSubmit() {
-  const input = document.getElementById("modalOfficeCodeInput");
-  if (!input || input.disabled) return;
-  const code = input.value.replace(/\D/g, "");
-  if (code.length !== 6) {
-    showToast("Enter the full 6-digit code shown on the office screen.", "warning");
-    playSound("error");
-    return;
-  }
-  let ok = false;
-  try { ok = await verifyOfficeCode(code); } catch (e) { ok = false; }
-  if (ok) {
-    officeCodeVerified = true;
-    officeCodeVerifiedAt = formatTimeString(new Date());
-    updateCodeStatusRow();
-    input.disabled = true;
-    playSound("success");
-    showToast("Office code verified \u2014 presence confirmed! Now capture your photo.", "success");
-    evaluateModalLocation(); // refresh pill/state to reflect the code pass
-    return;
-  }
-  showToast("That code is not current (it rotates every 60s). Check the office screen and retry.", "error");
-  playSound("error");
-  input.value = "";
-  input.focus();
-}
-
 // ----------------------------------------------------------------------------
 // Modal accessibility: focus trap + focus restore to the triggering control
 // ----------------------------------------------------------------------------
@@ -1730,18 +1666,9 @@ function evaluateModalLocation() {
   if (hint) hint.textContent = isExempt ? `${settings.name} (Exempt by Admin - Allowed Everywhere)` : `${settings.name} (${settings.radius}m limit)`;
 
   if (gpsPill) {
-    const accLimit = (typeof GPS_ACCURACY_MAX_M !== "undefined") ? GPS_ACCURACY_MAX_M : 100;
-    const accNow = employeeState.userLocation.accuracy;
-    const accCoarse = !isExempt && employeeState.userLocation.located && accNow != null && accNow > accLimit;
     if (isExempt) {
       gpsPill.className = "verification-status-pill pill-success";
       gpsPill.innerHTML = `<i class="fa-solid fa-shield-halved"></i> Exempt (${distance}m)`;
-    } else if (officeCodeVerified) {
-      gpsPill.className = "verification-status-pill pill-success";
-      gpsPill.innerHTML = `<i class="fa-solid fa-keyboard"></i> On-site (Code)`;
-    } else if (accCoarse) {
-      gpsPill.className = "verification-status-pill pill-warning";
-      gpsPill.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> Fix \u00b1${accNow}m coarse`;
     } else if (distance <= settings.radius) {
       gpsPill.className = "verification-status-pill pill-success";
       gpsPill.innerHTML = `<i class="fa-solid fa-circle-check"></i> Within ${settings.radius}m`;
@@ -1758,10 +1685,9 @@ function evaluateModalLocation() {
       fixInfo.style.display = "none";
     } else {
       const acc = employeeState.userLocation.accuracy;
-      const accFloor = (typeof GPS_ACCURACY_MAX_M !== "undefined") ? GPS_ACCURACY_MAX_M : 100;
       let fixHtml = `<i class="fa-solid fa-satellite-dish"></i> Device reported <strong>${Number(employeeState.userLocation.lat).toFixed(5)}, ${Number(employeeState.userLocation.lng).toFixed(5)}</strong>${acc ? ` &plusmn;${acc}m accuracy` : ""} &middot; ${formatTimeString(new Date())}`;
-      if (acc && acc > accFloor) {
-        fixHtml += ` &middot; <span class="gps-acc-warn"><i class="fa-solid fa-triangle-exclamation"></i> Coarse fix \u2014 allow <strong>Precise location</strong>, turn off VPN, or <strong>enter the Office Code</strong> below.</span>`;
+      if (acc && acc > 200) {
+        fixHtml += ` &middot; <span class="gps-acc-warn"><i class="fa-solid fa-triangle-exclamation"></i> Low-accuracy network fix \u2014 allow <strong>Precise location</strong> for this site, turn off VPN, or punch from a phone GPS.</span>`;
       }
       fixInfo.innerHTML = fixHtml;
       fixInfo.style.display = "block";
@@ -1779,27 +1705,37 @@ async function handleCaptureLivePhoto() {
   const guidance = document.getElementById("modalVerifyGuidanceText");
   const confirmBtn = document.getElementById("confirmVerificationBtn");
 
-  // Presence Rule: strict GPS (accurate fix within radius) OR verified office code
-  const presence = evaluatePresence();
-  if (!presence.pass) {
-    let msg;
-    if (!presence.located) {
-      msg = `Location not verified yet \u2014 type the <strong>Office Code</strong>, or allow location access and wait for the GPS fix.`;
-    } else if (!presence.accOk) {
-      msg = `GPS fix too coarse (&plusmn;${presence.accuracy}m) \u2014 move near a window and Refresh, or type the <strong>Office Code</strong>.`;
-    } else {
-      msg = `Location Rejected: You are ${presence.distance}m away (exceeds ${presence.settings.radius}m office boundary). On site? Type the <strong>Office Code</strong>.`;
-    }
+  // Geofence Rule Check (requires a real, fresh device location fix)
+  const settings = getStore(STORAGE_KEYS.SETTINGS, DEFAULT_OFFICE);
+  const isExempt = employeeState.currentEmployee && employeeState.currentEmployee.geofenceEnforcement === "exempt";
+  const located = Boolean(employeeState.userLocation.located);
+
+  if (!isExempt && !located) {
     if (guidance) {
-      guidance.innerHTML = `<span class="text-danger"><i class="fa-solid fa-circle-xmark"></i> ${msg}</span>`;
+      guidance.innerHTML = `<span class="text-danger"><i class="fa-solid fa-circle-xmark"></i> Location not verified yet \u2014 allow location access and wait for the GPS fix before capturing.</span>`;
     }
-    showToast("Presence not confirmed \u2014 get a better GPS fix or enter the office code.", "error");
+    showToast("Location not verified. Allow location access, then try again.", "error");
     playSound("error");
     return;
   }
-  const settings = presence.settings;
-  const distance = presence.distance == null ? 0 : presence.distance;
+
+  const distance = calculateDistanceInMeters(
+    employeeState.userLocation.lat,
+    employeeState.userLocation.lng,
+    settings.lat,
+    settings.lng
+  );
   employeeState.userLocation.distanceMeters = distance;
+  const withinGeofence = isExempt ? true : (located && distance <= settings.radius);
+
+  if (!withinGeofence) {
+    if (guidance) {
+      guidance.innerHTML = `<span class="text-danger"><i class="fa-solid fa-circle-xmark"></i> Location Rejected: You are ${distance}m away (exceeds ${settings.radius}m office boundary).</span>`;
+    }
+    showToast(`Check-in rejected: ${distance}m distance exceeds office radius limit.`, "error");
+    playSound("error");
+    return;
+  }
 
   // Draw snapshot to canvas
   canvas.width = (video && video.videoWidth > 0) ? video.videoWidth : 480;
@@ -1916,13 +1852,19 @@ async function handleConfirmVerification() {
   const confirmBtn = document.getElementById("confirmVerificationBtn");
   if (confirmBtn) confirmBtn.disabled = true;
 
-  const presence = evaluatePresence();
-  const settings = presence.settings;
-  const distance = presence.distance == null ? 0 : presence.distance;
-  const isExempt = presence.isExempt;
+  const settings = getStore(STORAGE_KEYS.SETTINGS, DEFAULT_OFFICE);
+  const distance = calculateDistanceInMeters(
+    employeeState.userLocation.lat,
+    employeeState.userLocation.lng,
+    settings.lat,
+    settings.lng
+  );
+  const isExempt = employeeState.currentEmployee && employeeState.currentEmployee.geofenceEnforcement === "exempt";
+  const located = Boolean(employeeState.userLocation.located);
+  const withinGeofence = isExempt ? true : (located && distance <= settings.radius);
 
-  if (!presence.pass) {
-    showToast("Presence not confirmed \u2014 get a better GPS fix or enter the office code.", "error");
+  if (!withinGeofence) {
+    showToast(`Check-in rejected: ${distance}m distance exceeds office radius limit.`, "error");
     playSound("error");
     return;
   }
@@ -1943,9 +1885,7 @@ async function handleConfirmVerification() {
       duration: "In Progress",
       hoursDecimal: 0,
       distance: distance,
-      locationType: (presence.codePass && !presence.gpsPass) ? "Office Code (presence proof)" : (isExempt ? `Office (Exempt - ${distance}m)` : `Office (Geofenced \u2264 ${settings.radius}m)`),
-      checkInMethod: presence.gpsPass ? (presence.codePass ? "GPS + Office Code" : "GPS geofence") : "Office Code",
-      gpsAccuracyM: presence.accuracy == null ? null : presence.accuracy,
+      locationType: isExempt ? `Office (Exempt - ${distance}m)` : `Office (Geofenced \u2264 500m)`,
       bioVerified: true,
       photoVerified: true,
       userPunched: true,
@@ -2035,20 +1975,11 @@ function initVerificationModal() {
     });
   }
 
-  // Manual re-fetch of the device location (real GPS only \u2014 fake preset
+  // Manual re-fetch of the device location (real GPS only — fake preset
   // buttons were removed because they never set `located` and confused UX)
   const gpsRefreshBtn = document.getElementById("modalGpsRefreshBtn");
   if (gpsRefreshBtn) {
     gpsRefreshBtn.addEventListener("click", startGpsFetch);
-  }
-
-  // Office code entry (presence proof without GPS)
-  const officeCodeBtn = document.getElementById("modalOfficeCodeBtn");
-  if (officeCodeBtn) officeCodeBtn.addEventListener("click", handleOfficeCodeSubmit);
-  const officeCodeInput = document.getElementById("modalOfficeCodeInput");
-  if (officeCodeInput) {
-    officeCodeInput.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); handleOfficeCodeSubmit(); } });
-    officeCodeInput.addEventListener("input", () => { officeCodeInput.value = officeCodeInput.value.replace(/\D/g, "").slice(0, 6); });
   }
 }
 

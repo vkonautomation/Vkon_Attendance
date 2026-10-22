@@ -10325,45 +10325,6 @@ body:not(.light-theme) .map-search-results { background: #101725; border-color: 
 .gps-acc-warn i { color: #d97706; }
 body:not(.light-theme) .gps-acc-warn { color: #fbbf24; }
 
-/* ==========================================================================
-   v8.2 OFFICE CODE CHECK-IN — code entry, status, rotating display page
-   ========================================================================== */
-/* Amber pill for coarse GPS fixes */
-.verification-status-pill.pill-warning { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
-body:not(.light-theme) .verification-status-pill.pill-warning { background: rgba(217, 119, 6, 0.18); color: #fbbf24; border-color: rgba(251, 191, 36, 0.4); }
-
-/* Code status row under the GPS card buttons */
-.code-verify-status { margin: 0.45rem 0 0; font-size: 0.76rem; color: var(--text-muted, #64748b); display: flex; align-items: center; gap: 0.4rem; }
-.code-verify-status.code-verified { color: #15803d; font-weight: 700; }
-body:not(.light-theme) .code-verify-status.code-verified { color: #4ade80; }
-
-/* Code entry row inside the punch modal (6-digit rotating office code) */
-.office-code-entry { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.55rem; flex-wrap: wrap; }
-.office-code-input { width: 150px; padding: 0.42rem 0.6rem; border-radius: 10px; border: 1px solid var(--border-color, #cbd5e1); background: var(--bg-primary, #fff); color: var(--text-primary, #0f172a); font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 0.95rem; font-weight: 700; letter-spacing: 0.22em; text-align: center; }
-.office-code-input:focus { outline: 2px solid var(--color-primary, #ea580c); outline-offset: 1px; }
-.office-code-input:disabled { opacity: 0.6; letter-spacing: 0.22em; }
-.btn-code-verify { white-space: nowrap; }
-
-/* Office code display page (office-code.html) */
-.office-code-page { min-height: 100vh; margin: 0; background: #0b1220; color: #e2e8f0; display: grid; place-items: center; font-family: inherit; }
-.oc-wrap { text-align: center; padding: 2rem 1.2rem; width: 100%; max-width: 640px; }
-.oc-head h1 { margin: 0 0 0.4rem; font-size: clamp(1.3rem, 3.4vw, 2rem); color: #fff; }
-.oc-head h1 i { color: var(--color-primary, #ea580c); margin-right: 0.4rem; }
-.oc-sub { margin: 0 0 1.4rem; color: #94a3b8; font-size: 0.95rem; }
-.oc-card { background: #fff; border-radius: 22px; padding: 1.6rem 1.4rem 1.2rem; color: #0f172a; box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55); display: inline-block; min-width: min(420px, 86vw); }
-.oc-label { margin: 0; text-transform: uppercase; letter-spacing: 0.14em; font-size: 0.72rem; font-weight: 700; color: #64748b; }
-.oc-code-big { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-weight: 800; letter-spacing: 0.12em; font-size: clamp(3.4rem, 14vw, 6rem); line-height: 1.1; margin: 0.5rem 0 0.9rem; color: #0f172a; font-variant-numeric: tabular-nums; }
-.oc-timer-row { display: flex; align-items: center; gap: 0.7rem; }
-.oc-timer-bar { flex: 1; height: 8px; border-radius: 999px; background: #e2e8f0; overflow: hidden; }
-.oc-timer-bar span { display: block; height: 100%; width: 100%; background: var(--color-primary, #ea580c); transition: width 0.25s linear; }
-.oc-timer-row strong { min-width: 44px; color: #475569; font-variant-numeric: tabular-nums; }
-.oc-foot { margin-top: 1.2rem; display: flex; gap: 1rem; justify-content: center; align-items: center; color: #64748b; font-size: 0.9rem; }
-.oc-err { color: #fbbf24; font-weight: 700; }
-
-/* Admin geofence card: link to the display page */
-.oq-link-row { display: flex; align-items: center; gap: 0.7rem; flex-wrap: wrap; padding: 0 0.95rem 1rem; }
-.oq-link-row .form-hint { flex: 1; min-width: 180px; }
-
 
 
 
