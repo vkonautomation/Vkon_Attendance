@@ -198,7 +198,6 @@ function initAdminTabs() {
         setTimeout(() => {
           if (adminMap) adminMap.invalidateSize();
         }, 200);
-        if (typeof initLopSettingsTab === "function") initLopSettingsTab();
       } else if (targetId === "tab-account") {
         renderAdminAccountTab();
       }
@@ -1502,11 +1501,9 @@ function renderLeaveApprovals() {
       let lopEstimate = "";
       if (isLop && l.status === "Pending") {
         try {
-          const monthStr = (l.startDate || "").slice(0, 7);
-          const line = computePayrollLine(emp, monthStr);
           const days = Number(l.daysCount) || 1;
-          const amt = round2(perDayRateRaw(line.effGross, line.divisor) * days);
-          lopEstimate = `<span class="lop-est-note"><i class="fa-solid fa-hand-holding-dollar"></i> Est. deduction \u20b9 ${money2(amt)} (\u20b9 ${money2(line.perDayRate)}/day \u00d7 ${days})</span>`;
+          const est = (typeof estimateLopDeduction === "function") ? estimateLopDeduction(l.employeeId, days) : { perDaySalary: 0, amount: 0 };
+          lopEstimate = `<span class="lop-est-note"><i class="fa-solid fa-hand-holding-dollar"></i> Est. deduction \u20b9 ${money2(est.amount)} (\u20b9 ${money2(est.perDaySalary)}/day \u00d7 ${days})</span>`;
         } catch (e) { /* non-fatal */ }
       }
 
@@ -1620,23 +1617,21 @@ function handleLeaveDecision(id, decision) {
     setStore(STORAGE_KEYS.LEAVES, leaves);
 
     if (isLop) {
-      // Rule 3a: an approved LOP leave books one LOP day per working day.
-      const created = (typeof createLopEntriesForLeave === "function") ? createLopEntriesForLeave(req) : 0;
-      if (created) logLopAction("approve", req.employeeId, req.startDate.slice(0, 7), `LOP leave ${req.id} approved \u2014 ${created} LOP day(s) booked`);
+      // An approved LOP leave books one LOP day per working day.
+      if (typeof createLopEntriesForLeave === "function") createLopEntriesForLeave(req);
     } else if (!isRh) {
-      // Rule 3b: paid balance exhausted \u2192 overflow days auto-convert to LOP.
+      // Paid balance exhausted \u2192 overflow days auto-convert to LOP.
       const emp = (getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES).find(x => x.id === req.employeeId));
       if (emp) {
         const quota = (getEmployeeLeaveQuota(emp.id).personalLeave) || 0;
         const used = (typeof computeApprovedLeaveDaysUsed === "function") ? computeApprovedLeaveDaysUsed(emp.id) : 0;
         const overflow = Math.max(0, used - quota);
         if (overflow > 0) {
-          const dates = (typeof lopDatesForRange === "function") ? lopDatesForRange(req.startDate, req.endDate, { sandwichRule: false }) : [];
+          const dates = (typeof lopDatesForRange === "function") ? lopDatesForRange(req.startDate, req.endDate, {}) : [];
           let booked = 0;
           for (let i = dates.length - 1; i >= 0 && booked < overflow; i--) {
-            if (addLopEntry(emp.id, dates[i].date, 1, "excess", req.id)) booked++;
+            if (addLopEntry(emp.id, dates[i].date, dates[i].fraction, "excess", req.id)) booked++;
           }
-          if (booked) logLopAction("convert", emp.id, req.startDate.slice(0, 7), `Paid leave balance exhausted \u2014 ${booked} day(s) auto-converted to LOP`);
         }
       }
     }
@@ -1646,11 +1641,6 @@ function handleLeaveDecision(id, decision) {
     showToast(`Leave request ${id} rejected.`, "warning");
   } else if (decision === "ApproveCancellation") {
     req.status = "Cancelled";
-    // Snapshot the soon-to-be-cancelled active LOP days per month (for credit).
-    const cancelledMonths = {};
-    getLopEntries().forEach(e => {
-      if (e.refId === id && e.status === "active") { const m = e.date.slice(0, 7); cancelledMonths[m] = round2((cancelledMonths[m] || 0) + (Number(e.fraction) || 0)); }
-    });
     const cur = new Date(req.startDate + "T00:00:00");
     const end = new Date(req.endDate + "T00:00:00");
     while (cur <= end) {
@@ -1661,22 +1651,8 @@ function handleLeaveDecision(id, decision) {
       cur.setDate(cur.getDate() + 1);
     }
     setStore(STORAGE_KEYS.RECORDS, records);
+    // Only approved requests count; a cancelled leave reverses its LOP days.
     if (typeof cancelLopEntriesByRef === "function") cancelLopEntriesByRef(id);
-    // Rule 7: cancelling LOP in a LOCKED/PAID month posts a credit next month.
-    Object.keys(cancelledMonths).forEach(m => {
-      const st = getPayrollRunStatus(m);
-      if (st === "LOCKED" || st === "PAID") {
-        const emp = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES).find(x => x.id === req.employeeId) || { id: req.employeeId };
-        const line = computePayrollLine(emp, m);
-        const creditAmount = round2(perDayRateRaw(line.effGross, line.divisor) * cancelledMonths[m]);
-        if (creditAmount > 0) {
-          const tgt = addLopCredit(req.employeeId, m, creditAmount, `LOP ${id} cancelled after ${st}`);
-          logLopAction("cancel", req.employeeId, m, `LOP ${id} cancelled on ${st} month \u2192 credit \u20b9 ${money2(creditAmount)} posted to ${tgt}`);
-        }
-      } else {
-        logLopAction("cancel", req.employeeId, m, `LOP ${id} cancelled (${cancelledMonths[m]} day(s) reversed)`);
-      }
-    });
     showToast(`Leave request ${id} cancelled and calendar reverted.`, "info");
   } else if (decision === "RejectCancellation") {
     req.status = "Approved";
@@ -3029,70 +3005,26 @@ function renderTaskTable() {
   if (empty) empty.style.display = tasks.length ? "none" : "";
 }
 
-// --- Payroll ---
-function getPayRates() {
-  const employees = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
-  const saved = getStore(EXTRA_KEYS.PAY_RATES, {});
-  const rates = {};
-  employees.forEach(e => { rates[e.id] = saved[e.id] || DEFAULT_PAY_BY_DEPT[e.department] || 70000; });
-  return rates;
+// --- Payroll (basic Loss of Pay) ---
+function payrollGrossFor(emp) {
+  return employeeMonthlySalary(emp.id);
 }
 
-// Effective monthly gross for an employee: salary-structure first, else the
-// legacy base rate. Snapshot logic always stores this so past payslips are
-// immune to later salary edits.
-function payrollGrossFor(emp, monthStr) {
-  const saved = (typeof resolveMonthlyGross === "function") ? resolveMonthlyGross(emp.id, monthStr) : null;
-  if (saved !== null && saved !== undefined) return saved;
-  return getPayRates()[emp.id] || 0;
-}
-
-// Credit adjustments posted when a LOCKED month's LOP is cancelled (rule 7).
-const LOP_CREDITS_KEY = "vkon_lop_credits_v1";
-function getLopCredits() { return getStore(LOP_CREDITS_KEY, []); }
-function addLopCredit(empId, fromMonth, amount, reason) {
-  const list = getLopCredits();
-  const parts = fromMonth.split("-").map(Number);
-  const ty = parts[1] === 12 ? parts[0] + 1 : parts[0];
-  const tm = parts[1] === 12 ? 1 : parts[1] + 1;
-  const targetMonth = `${ty}-${String(tm).padStart(2, "0")}`;
-  list.push({ employeeId: empId, fromMonth, targetMonth, amount: round2(amount), reason: reason || "", at: new Date().toISOString(), applied: false });
-  setStore(LOP_CREDITS_KEY, list);
-  return targetMonth;
-}
-function getPendingCredit(empId, monthStr) {
-  return round2(getLopCredits().filter(c => c.employeeId === empId && c.targetMonth === monthStr && !c.applied).reduce((s, c) => s + (Number(c.amount) || 0), 0));
-}
-
-// One authoritative payroll line for an employee/month. Pro-rates the gross for
-// mid-month joiners/leavers, applies LOP, then adds any posted credit.
+// One payroll line for an employee/month: monthly_salary, LOP days, deduction, net.
 function computePayrollLine(emp, monthStr) {
-  const settings = getLopSettings();
-  const parts = monthStr.split("-").map(Number);
-  const year = parts[0], month0 = parts[1] - 1;
-  const holidaySet = new Set(getDeclaredHolidays().map(h => h.date));
-  const gross = payrollGrossFor(emp, monthStr);
-  const effGross = prorateGross(gross, emp.enrolledAt || "", emp.resignedOn || "", year, month0);
-  const divisor = lopDivisorValue(settings.divisorMode, year, month0, holidaySet);
+  const gross = payrollGrossFor(emp);
   const lopDays = computeLopDaysForMonth(emp.id, monthStr);
-  const ded = computeLopDeduction({ monthlyGross: effGross, divisor, lopDays, otherDeductions: 0 });
-  const credit = getPendingCredit(emp.id, monthStr);
+  const ded = computeLopDeduction({ monthlySalary: gross, lopDays });
   return {
     employeeId: emp.id,
     employeeName: emp.name,
     department: emp.department,
     month: monthStr,
-    divisorMode: settings.divisorMode,
-    gross: round2(gross),
-    effGross: round2(effGross),
-    proRated: round2(effGross) !== round2(gross),
-    divisor,
-    perDayRate: ded.perDayRate,
+    gross,
+    perDaySalary: ded.perDaySalary,
     lopDays,
     lopAmount: ded.lopAmount,
-    credit,
-    net: round2(ded.net + credit),
-    snapshotAt: null
+    net: ded.net
   };
 }
 
@@ -3106,34 +3038,24 @@ function currentPayrollMonth() {
 
 function renderPayrollTable() {
   const month = currentPayrollMonth();
-  const status = getPayrollRunStatus(month);
   const employees = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
-  const settings = getLopSettings();
   const tbody = document.getElementById("payrollTableBody");
   if (!tbody) return;
 
-  const STATUS_BADGE = {
-    OPEN: '<span class="pay-status pay-status-open"><i class="fa-solid fa-lock-open"></i> OPEN</span>',
-    LOCKED: '<span class="pay-status pay-status-locked"><i class="fa-solid fa-lock"></i> LOCKED</span>',
-    PAID: '<span class="pay-status pay-status-paid"><i class="fa-solid fa-circle-check"></i> PAID</span>'
-  };
-
   let totalGross = 0, totalLop = 0, totalDed = 0, totalNet = 0;
   const lines = employees.map(e => computePayrollLine(e, month));
-  tbody.innerHTML = lines.map(line => {
+  tbody.innerHTML = lines.map((line, idx) => {
     totalGross += line.gross; totalLop += line.lopDays; totalDed += line.lopAmount; totalNet += line.net;
+    const emp = employees[idx];
     return `
     <tr>
-      <td><div class="table-emp-cell"><img src="${(employees.find(x => x.id === line.employeeId) || {}).avatar}" class="table-avatar" alt="${line.employeeName}"><span class="font-bold">${line.employeeName}</span></div></td>
+      <td><div class="table-emp-cell"><img src="${emp.avatar}" class="table-avatar" alt="${line.employeeName}"><span class="font-bold">${line.employeeName}</span></div></td>
       <td>${line.department}</td>
-      <td class="pay-num"${line.proRated ? ' title="Pro-rated for mid-month join/leave"' : ''}>${money2(line.gross)}${line.proRated ? ` <span class="prorate-tag">\u2192 ${money2(line.effGross)}</span>` : ""}</td>
+      <td class="pay-num"><input type="number" min="0" step="500" class="form-control pay-salary-input" data-id="${line.employeeId}" value="${line.gross}" aria-label="Monthly salary for ${line.employeeName}"></td>
       <td class="pay-num">${line.lopDays ? `<span class="lop-days-pill">${line.lopDays}</span>` : '<span class="text-muted">0</span>'}</td>
-      <td class="pay-num">${money2(line.perDayRate)}</td>
+      <td class="pay-num">${money2(line.perDaySalary)}</td>
       <td class="pay-num text-danger">${line.lopAmount ? ("\u2212 " + money2(line.lopAmount)) : "0.00"}</td>
-      <td class="pay-num">${line.credit ? `<span class="text-success">+ ${money2(line.credit)}</span>` : '<span class="text-muted">&mdash;</span>'}</td>
       <td class="pay-num pay-net">${money2(line.net)}</td>
-      <td>${STATUS_BADGE[status] || STATUS_BADGE.OPEN}</td>
-      <td>${status === "OPEN" ? `<button type="button" class="btn btn-ghost btn-sm convert-absent-btn" data-id="${line.employeeId}" title="Convert unregularised Absent / Not-Marked days to LOP"><i class="fa-solid fa-hand-holding-dollar"></i> Absents\u2192LOP</button>` : '<span class="text-muted font-mono">Locked</span>'}</td>
     </tr>`;
   }).join("");
 
@@ -3143,129 +3065,31 @@ function renderPayrollTable() {
       <div class="pr-chip"><span>Gross</span><strong>\u20b9 ${money2(totalGross)}</strong></div>
       <div class="pr-chip pr-lop"><span>LOP Days</span><strong>${round2(totalLop)}</strong></div>
       <div class="pr-chip pr-ded"><span>LOP Deduction</span><strong>\u20b9 ${money2(totalDed)}</strong></div>
-      <div class="pr-chip pr-net"><span>Net Payable</span><strong>\u20b9 ${money2(totalNet)}</strong></div>
-      <div class="pr-chip pr-mode"><span>Divisor</span><strong>${settings.divisorMode} (${lines[0] ? lines[0].divisor : 30})</strong></div>`;
+      <div class="pr-chip pr-net"><span>Net Payable</span><strong>\u20b9 ${money2(totalNet)}</strong></div>`;
   }
 
   const actEl = document.getElementById("payrollMonthActions");
   if (actEl) {
-    if (status === "OPEN") {
-      actEl.innerHTML = `<button id="runPayrollBtn" class="btn btn-secondary"><i class="fa-solid fa-calculator"></i> Recalculate</button>
-        <button id="lockMonthBtn" class="btn btn-warning"><i class="fa-solid fa-lock"></i> Lock month</button>
-        <button id="exportPayrollBtn" class="btn btn-ghost"><i class="fa-solid fa-file-csv"></i> Export CSV</button>`;
-    } else if (status === "LOCKED") {
-      actEl.innerHTML = `<button id="markPaidBtn" class="btn btn-success"><i class="fa-solid fa-sack-dollar"></i> Mark Paid</button>
-        <button id="unlockMonthBtn" class="btn btn-ghost text-danger"><i class="fa-solid fa-key"></i> Override (unlock)</button>
-        <button id="exportPayrollBtn" class="btn btn-ghost"><i class="fa-solid fa-file-csv"></i> Export CSV</button>`;
-    } else {
-      actEl.innerHTML = `<button id="exportPayrollBtn" class="btn btn-ghost"><i class="fa-solid fa-file-csv"></i> Export CSV</button>
-        <span class="paid-on-badge"><i class="fa-solid fa-check"></i> Settled</span>`;
-    }
+    actEl.innerHTML = `<button id="exportPayrollBtn" class="btn btn-ghost"><i class="fa-solid fa-file-csv"></i> Export CSV</button>`;
   }
   bindPayrollActions(lines);
 }
 
 function bindPayrollActions(lines) {
-  const byId = (id) => document.getElementById(id);
-  const runBtn = byId("runPayrollBtn");
-  if (runBtn) runBtn.onclick = () => { snapshotPayrollMonth(currentPayrollMonth()); renderPayrollTable(); showToast("Payroll recalculated for " + currentPayrollMonth() + ".", "success"); };
-  const lockBtn = byId("lockMonthBtn");
-  if (lockBtn) lockBtn.onclick = () => lockPayrollMonth(currentPayrollMonth());
-  const unlockBtn = byId("unlockMonthBtn");
-  if (unlockBtn) unlockBtn.onclick = () => unlockPayrollMonth(currentPayrollMonth());
-  const paidBtn = byId("markPaidBtn");
-  if (paidBtn) paidBtn.onclick = () => markPayrollPaid(currentPayrollMonth());
-  const expBtn = byId("exportPayrollBtn");
+  const expBtn = document.getElementById("exportPayrollBtn");
   if (expBtn) expBtn.onclick = () => exportPayrollCsv(lines, currentPayrollMonth());
-  document.querySelectorAll(".convert-absent-btn").forEach(btn => {
-    btn.onclick = () => convertAbsentsToLop(btn.dataset.id, currentPayrollMonth());
+  document.querySelectorAll(".pay-salary-input").forEach(inp => {
+    inp.onchange = () => {
+      setEmployeeMonthlySalary(inp.dataset.id, inp.value);
+      renderPayrollTable();
+      showToast("Monthly salary updated.", "success");
+    };
   });
 }
 
-// Snapshot every line for the month so later salary/LOP changes don't move it.
-function snapshotPayrollMonth(month) {
-  const employees = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
-  employees.forEach(e => setPayrollLine(month, e.id, computePayrollLine(e, month)));
-}
-
-function lockPayrollMonth(month) {
-  const settings = getLopSettings();
-  if (settings.autoConvertAbsent) {
-    const employees = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
-    employees.forEach(e => convertAbsentsToLop(e.id, month, true));
-  }
-  snapshotPayrollMonth(month);
-  setPayrollRunStatus(month, "LOCKED");
-  logLopAction("lock", null, month, `Payroll for ${month} locked`);
-  showToast(`Payroll for ${month} is now LOCKED.`, "success");
-  renderPayrollTable();
-  renderAuditLog();
-}
-
-function unlockPayrollMonth(month) {
-  const reason = (typeof prompt === "function") ? prompt("Override unlock requires a reason (audit-logged). Why is this locked month being reopened?") : "";
-  if (!reason || !reason.trim()) { showToast("A reason is required to unlock a locked payroll month.", "error"); return; }
-  setPayrollRunStatus(month, "OPEN", reason.trim());
-  logLopAction("reverse", null, month, `Locked payroll ${month} overridden & reopened \u2014 reason: ${reason.trim()}`);
-  showToast(`Payroll for ${month} reopened with override.`, "warning");
-  renderPayrollTable();
-  renderAuditLog();
-}
-
-function markPayrollPaid(month) {
-  snapshotPayrollMonth(month);
-  setPayrollRunStatus(month, "PAID");
-  // Consume any credit that has now been paid out.
-  const credits = getLopCredits();
-  credits.forEach(c => { if (c.targetMonth === month && !c.applied) c.applied = true; });
-  setStore(LOP_CREDITS_KEY, credits);
-  logLopAction("pay", null, month, `Payroll ${month} marked PAID`);
-  showToast(`Payroll for ${month} marked PAID.`, "success");
-  renderPayrollTable();
-  renderAuditLog();
-}
-
-// Convert an employee's unregularised Absent / Not-Marked working days in a
-// month to LOP. Honours the payroll lock (rule 7): a locked month needs an
-// override reason first.
-function convertAbsentsToLop(empId, month, silent) {
-  const status = getPayrollRunStatus(month);
-  if (status !== "OPEN" && !silent) {
-    const reason = (typeof prompt === "function") ? prompt(`This month is ${status}. Overriding a locked payroll requires a reason (audit-logged).`) : "";
-    if (!reason || !reason.trim()) { showToast("Cannot convert LOP in a locked month without an override reason.", "error"); return; }
-    logLopAction("override", empId, month, `Absent\u2192LOP override on ${status} month \u2014 reason: ${reason.trim()}`);
-  }
-  const records = getStore(STORAGE_KEYS.RECORDS, {});
-  const regs = getStore(STORAGE_KEYS.REGULARISATIONS, []);
-  const holidays = new Set(getDeclaredHolidays().map(h => h.date));
-  const parts = month.split("-").map(Number);
-  const year = parts[0], month0 = parts[1] - 1;
-  const dim = daysInMonth(year, month0);
-  const regCovered = new Set(regs.filter(r => r.employeeId === empId && r.status === "Approved").map(r => r.date));
-  let converted = 0;
-  for (let d = 1; d <= dim; d++) {
-    const wd = new Date(year, month0, d).getDay();
-    if (wd === 0 || wd === 6) continue;
-    const key = `${month}-${String(d).padStart(2, "0")}`;
-    if (holidays.has(key) || regCovered.has(key)) continue;
-    const rec = records[`${empId}_${key}`];
-    const isWorkingAbsence = !rec || rec.status === "Absent" || rec.status === "Not Marked" || (rec.status === "Leave" && false);
-    if (isWorkingAbsence) {
-      if (addLopEntry(empId, key, 1, "absent", null)) converted++;
-    }
-  }
-  if (converted) logLopAction("convert", empId, month, `${converted} absent/not-marked day(s) converted to LOP for ${month}`);
-  if (!silent) {
-    showToast(converted ? `${converted} day(s) converted to LOP.` : "No unregularised absences to convert.", converted ? "success" : "info");
-    renderPayrollTable();
-    renderAuditLog();
-  }
-  return converted;
-}
-
 function exportPayrollCsv(lines, month) {
-  const header = ["Employee ID", "Name", "Department", "Month", "Divisor Mode", "Divisor", "Gross", "Per-Day Rate", "LOP Days", "LOP Deduction", "Credit", "Net"];
-  const rows = (lines || []).map(l => [l.employeeId, l.employeeName, l.department, month, l.divisorMode, l.divisor, l.gross.toFixed(2), l.perDayRate.toFixed(2), l.lopDays, l.lopAmount.toFixed(2), l.credit.toFixed(2), l.net.toFixed(2)]);
+  const header = ["Employee ID", "Name", "Department", "Month", "Monthly Salary", "LOP Days", "Per-Day Salary", "LOP Deduction", "Net Salary"];
+  const rows = (lines || []).map(l => [l.employeeId, l.employeeName, l.department, month, money2(l.gross), l.lopDays, money2(l.perDaySalary), money2(l.lopAmount), money2(l.net)]);
   const csv = [header, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
@@ -3273,35 +3097,6 @@ function exportPayrollCsv(lines, month) {
   a.href = url; a.download = `vkon_payroll_${month}.csv`; document.body.appendChild(a); a.click();
   document.body.removeChild(a); URL.revokeObjectURL(url);
   showToast(`Payroll CSV exported for ${month}.`, "success");
-}
-
-// ---- Audit log view ----
-function renderAuditLog() {
-  const box = document.getElementById("lopAuditLog");
-  if (!box) return;
-  const logs = getAuditLog().slice().reverse().slice(0, 40);
-  if (!logs.length) { box.innerHTML = '<p class="text-muted">No LOP / payroll actions logged yet.</p>'; return; }
-  const ACT_ICON = { create: "fa-plus", approve: "fa-check", cancel: "fa-ban", reverse: "fa-rotate-left", convert: "fa-hand-holding-dollar", lock: "fa-lock", pay: "fa-sack-dollar", override: "fa-key", salary: "fa-money-bill", info: "fa-circle-info" };
-  box.innerHTML = logs.map(a => `
-    <div class="audit-row">
-      <i class="fa-solid ${ACT_ICON[a.action] || "fa-circle-info"}"></i>
-      <span class="audit-act">${a.action}</span>
-      <span class="audit-who">${a.employeeId || (a.month || "system")}</span>
-      <span class="audit-detail">${a.detail || ""}</span>
-      <span class="audit-when font-mono">${(a.at || "").slice(0, 16).replace("T", " ")}</span>
-    </div>`).join("");
-}
-
-// Populate the Settings tab LOP/salary controls whenever it is opened.
-function initLopSettingsTab() {
-  if (window.resetLopSettingsForm) window.resetLopSettingsForm();
-  const sel = document.getElementById("salaryEmpSelect");
-  if (sel && !sel.dataset.bound) {
-    const employees = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
-    sel.innerHTML = employees.map(e => `<option value="${e.id}">${e.name} (${e.id})</option>`).join("");
-    sel.dataset.bound = "1";
-  }
-  renderAuditLog();
 }
 
 // --- Help & Support tickets ---
@@ -3466,49 +3261,10 @@ function initExtraModules() {
     });
   }
 
-  // Payroll — month picker re-renders; per-row / per-month actions are bound
-  // inside renderPayrollTable -> bindPayrollActions (they change with status).
+  // Payroll — month picker re-renders; per-row actions (salary edit, CSV export)
+  // are bound inside renderPayrollTable -> bindPayrollActions.
   const payrollMonth = document.getElementById("payrollMonthInput");
   if (payrollMonth) payrollMonth.addEventListener("change", renderPayrollTable);
-
-  // LOP / Payroll settings form (Settings tab).
-  const lopForm = document.getElementById("lopSettingsForm");
-  if (lopForm) {
-    lopForm.addEventListener("submit", (e) => {
-      e.preventDefault();
-      const mode = (document.getElementById("lopDivisorMode") || {}).value || "fixed30";
-      const sandwich = !!(document.getElementById("lopSandwichRule") || {}).checked;
-      const autoConv = !!(document.getElementById("lopAutoConvert") || {}).checked;
-      setLopSettings({ divisorMode: mode, sandwichRule: sandwich, autoConvertAbsent: autoConv });
-      showToast("Loss of Pay / Payroll settings saved.", "success");
-      renderPayrollTable();
-    });
-    const resetLopForm = () => {
-      const s = getLopSettings();
-      const m = document.getElementById("lopDivisorMode"); if (m) m.value = s.divisorMode;
-      const sw = document.getElementById("lopSandwichRule"); if (sw) sw.checked = !!s.sandwichRule;
-      const ac = document.getElementById("lopAutoConvert"); if (ac) ac.checked = !!s.autoConvertAbsent;
-    };
-    resetLopForm();
-    window.resetLopSettingsForm = resetLopForm;
-  }
-
-  // Salary structure editor (Settings tab).
-  const salaryForm = document.getElementById("salaryStructureForm");
-  if (salaryForm) {
-    salaryForm.addEventListener("submit", (e) => {
-      e.preventDefault();
-      const empId = (document.getElementById("salaryEmpSelect") || {}).value;
-      const gross = Number((document.getElementById("salaryGrossInput") || {}).value) || 0;
-      const eff = (document.getElementById("salaryEffectiveInput") || {}).value || "2026-01-01";
-      if (!empId || gross <= 0) { showToast("Pick an employee and enter a valid monthly gross.", "error"); return; }
-      setSalaryStructure(empId, gross, eff);
-      const nm = (getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES).find(x => x.id === empId) || {}).name || empId;
-      logLopAction("salary", empId, null, `Salary structure set: ${nm} \u20b9 ${money2(gross)} effective ${eff}`);
-      showToast(`Salary recorded for ${nm}.`, "success");
-      renderAuditLog();
-    });
-  }
 
   // Help tickets
   const ticketForm = document.getElementById("ticketAddForm");

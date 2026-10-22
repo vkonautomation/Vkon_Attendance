@@ -24,7 +24,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="styles.css?v=20261022_lop1">
+  <link rel="stylesheet" href="styles.css?v=20261022_lop2">
 </head>
 <body class="light-theme admin-page">
 
@@ -346,7 +346,7 @@
           <div class="panel-header-toolbar">
             <div class="toolbar-title-group">
               <h2><i class="fa-solid fa-sack-dollar text-primary"></i> Payroll</h2>
-              <p class="subtitle">Monthly gross, Loss of Pay deductions and net payout per employee.</p>
+              <p class="subtitle">Monthly salary, Loss of Pay deductions and net salary per employee.</p>
             </div>
             <div class="toolbar-actions-cluster">
               <div class="date-selector-group">
@@ -365,20 +365,17 @@
                 <tr>
                   <th>Employee</th>
                   <th>Department</th>
-                  <th title="Monthly gross (pro-rated for mid-month join / leave)">Gross (&#8377;)</th>
+                  <th title="Editable monthly salary (admin). Base for all Loss of Pay maths">Monthly Salary (&#8377;)</th>
                   <th title="Total approved Loss of Pay days this month (half-days supported)">LOP Days</th>
-                  <th title="gross / divisor — see Settings → Loss of Pay &amp; Payroll">Per-Day Rate (&#8377;)</th>
-                  <th title="Per-day rate &times; LOP days">LOP Deduction (&#8377;)</th>
-                  <th title="Credit posted from a locked-month LOP cancellation">Credit</th>
-                  <th title="Gross − LOP deduction − other deductions + credit">Net (&#8377;)</th>
-                  <th>Status</th>
-                  <th>Action</th>
+                  <th title="monthly salary / 30">Per-Day Salary (&#8377;)</th>
+                  <th title="Per-day salary &times; LOP days">LOP Deduction (&#8377;)</th>
+                  <th title="Monthly salary &minus; LOP deduction">Net Salary (&#8377;)</th>
                 </tr>
               </thead>
               <tbody id="payrollTableBody"></tbody>
             </table>
           </div>
-          <p class="form-hint pay-foot-hint"><i class="fa-solid fa-circle-info"></i> A month moves <strong>OPEN &rarr; LOCKED &rarr; PAID</strong>. Once LOCKED, any LOP change needs an override reason and cancelled LOP posts a credit to the next month. Each line is snapshotted so later salary edits never rewrite a past payslip.</p>
+          <p class="form-hint pay-foot-hint"><i class="fa-solid fa-circle-info"></i> Per-day salary = monthly salary &divide; 30. Only <strong>approved</strong> Loss of Pay counts toward the deduction; pending, rejected and cancelled requests do not affect salary. Edit a salary inline and the table recalculates.</p>
         </div>
       </section>
 
@@ -1159,87 +1156,6 @@
           </div>
 
         </div>
-
-        <!-- Loss of Pay & Payroll rules -->
-        <div class="admin-split-grid lop-settings-grid">
-          <div class="glass-panel admin-card">
-            <div class="card-header">
-              <div class="header-icon icon-bg-rose">
-                <i class="fa-solid fa-hand-holding-dollar"></i>
-              </div>
-              <div class="header-title">
-                <h3>Loss of Pay &amp; Payroll Rules</h3>
-                <p>How the per-day rate and Loss of Pay deductions are computed</p>
-              </div>
-            </div>
-            <form id="lopSettingsForm" class="box-form padding-form">
-              <div class="form-group">
-                <label for="lopDivisorMode">Per-day rate divisor <span class="text-muted">(gross &divide; divisor)</span></label>
-                <select id="lopDivisorMode" class="form-control">
-                  <option value="fixed30">Fixed 30 (company standard)</option>
-                  <option value="calendar">Calendar days in the month</option>
-                  <option value="working">Working days (exclude weekends &amp; holidays)</option>
-                </select>
-              </div>
-              <div class="form-group toggle-row">
-                <label class="toggle-label" for="lopSandwichRule">
-                  <input type="checkbox" id="lopSandwichRule" class="form-checkbox">
-                  <span><strong>Sandwich rule</strong> &mdash; weekends / holidays falling between two LOP days also count as LOP</span>
-                </label>
-              </div>
-              <div class="form-group toggle-row">
-                <label class="toggle-label" for="lopAutoConvert">
-                  <input type="checkbox" id="lopAutoConvert" class="form-checkbox">
-                  <span><strong>Auto-convert absences</strong> &mdash; on month lock, unregularised Absent / Not-Marked days become LOP</span>
-                </label>
-              </div>
-              <button type="submit" class="btn btn-primary btn-block"><i class="fa-solid fa-floppy-disk"></i> Save LOP / Payroll Rules</button>
-            </form>
-          </div>
-
-          <div class="glass-panel admin-card">
-            <div class="card-header">
-              <div class="header-icon icon-bg-green">
-                <i class="fa-solid fa-money-bill-transfer"></i>
-              </div>
-              <div class="header-title">
-                <h3>Salary Structure</h3>
-                <p>Effective-dated monthly gross &mdash; later payslips read the value effective for that month</p>
-              </div>
-            </div>
-            <form id="salaryStructureForm" class="box-form padding-form">
-              <div class="form-group">
-                <label for="salaryEmpSelect">Employee</label>
-                <select id="salaryEmpSelect" class="form-control"></select>
-              </div>
-              <div class="form-row-2">
-                <div class="form-group">
-                  <label for="salaryGrossInput">Monthly Gross (&#8377;)</label>
-                  <input type="number" min="0" step="500" id="salaryGrossInput" class="form-control" placeholder="e.g. 50000">
-                </div>
-                <div class="form-group">
-                  <label for="salaryEffectiveInput">Effective From</label>
-                  <input type="date" id="salaryEffectiveInput" class="form-control" value="2026-01-01">
-                </div>
-              </div>
-              <button type="submit" class="btn btn-secondary btn-block"><i class="fa-solid fa-plus"></i> Record Salary Structure</button>
-            </form>
-          </div>
-        </div>
-
-        <!-- LOP / Payroll audit trail -->
-        <div class="glass-panel admin-card lop-audit-card">
-          <div class="card-header">
-            <div class="header-icon icon-bg-blue">
-              <i class="fa-solid fa-clock-rotate-left"></i>
-            </div>
-            <div class="header-title">
-              <h3>LOP &amp; Payroll Audit Log</h3>
-              <p>Every create, approve, cancel, reverse, convert, lock and pay action</p>
-            </div>
-          </div>
-          <div id="lopAuditLog" class="audit-log"></div>
-        </div>
       </section>
 
       <!-- ================= TAB 7: ADMIN ACCOUNT & SECURITY CREDENTIALS ================= -->
@@ -1594,8 +1510,8 @@
 
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <script src="shared.js?v=20261013_ist_lop1"></script>
-  <script src="admin.js?v=20261022_lop1"></script>
+  <script src="shared.js?v=20261013_ist_lop2"></script>
+  <script src="admin.js?v=20261022_lop2"></script>
   <script src="js/password-toggle.js?v=20261019_ui1"></script>
 </body>
 </html>

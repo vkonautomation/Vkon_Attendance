@@ -1110,11 +1110,10 @@ function initLeaveBox() {
       const halfEl = document.getElementById("lopHalfDay");
       const isHalf = !!(halfEl && halfEl.checked);
       const lopDays = isHalf ? 0.5 : workingDays;
-      const monthStr = startInput.value.slice(0, 7);
-      let est = { perDayRate: 0, amount: 0 };
-      try { if (typeof estimateLopDeduction === "function") est = estimateLopDeduction(empId, monthStr, lopDays); } catch (e) { /* non-fatal */ }
+      let est = { perDaySalary: 0, amount: 0 };
+      try { if (typeof estimateLopDeduction === "function") est = estimateLopDeduction(empId, lopDays); } catch (e) { /* non-fatal */ }
       daysNoticeText.textContent = `Loss of Pay: ${lopDays} day(s) requested (unpaid \u2014 paid-leave quota untouched)`;
-      warningText.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> This is an <strong>unpaid</strong> Loss of Pay request. Estimated pay deduction: <strong>\u20b9 ${money2(est.amount)}</strong> (\u20b9 ${money2(est.perDayRate)}/day \u00d7 ${lopDays}). Confirm you want to apply for Loss of Pay.`;
+      warningText.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> This is an <strong>unpaid</strong> Loss of Pay request. Estimated deduction: <strong>\u20b9 ${money2(est.amount)}</strong> for ${lopDays} day(s) (\u20b9 ${money2(est.perDaySalary)}/day). Confirm you want to apply for Loss of Pay.`;
       warningBox.style.display = "flex";
       warningBox.classList.add("warning-box-lop");
       submitBtn.disabled = false;
