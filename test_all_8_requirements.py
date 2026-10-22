@@ -99,11 +99,12 @@ def run_tests():
     print("  PASS: Sidebar active text bold and visible verified.")
 
     # New Request 4: First page split Leave columns (PL and RL), each remaining / total
-    print("\n[New Req 4] First page Master Sheet PL & RL columns (remaining / total quota):")
-    assert 'leave-group-header' in admin_html and '>PL<' in admin_html and '>RL<' in admin_html, "Failed grouped Leave header with PL/RL sub-columns in admin.html"
+    print("\n[New Req 4] First page Master Sheet PL, RL & Total columns (remaining / total quota):")
+    assert 'leave-group-header' in admin_html and '>PL<' in admin_html and '>RL<' in admin_html and '>Total<' in admin_html, "Failed grouped Leave header with PL/RL/Total sub-columns in admin.html"
     assert '${plRemaining} / ${plTotal}' in admin_js, "Failed Personal Leave remaining / total formatted string in admin.js"
     assert '${rlRemaining} / ${rlTotal}' in admin_js, "Failed Restricted Leave remaining / total formatted string in admin.js"
-    print("  PASS: First page PL and RL columns verified.")
+    assert '${leaveTotalRemaining} / ${leaveTotalQuota}' in admin_js, "Failed Total Leave remaining / total formatted string in admin.js"
+    print("  PASS: First page PL, RL and Total columns verified.")
 
     print("\n" + "="*50)
     print(">>> ALL REQUIREMENTS AND ENHANCEMENTS HAVE PASSED VERIFICATION! <<<")

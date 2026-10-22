@@ -399,6 +399,8 @@ function renderMonthlyReport() {
     const rlTotal = _q.restrictedLeave;
     const rlUsed = (typeof computeApprovedRestrictedLeaveDaysInMonth === "function") ? computeApprovedRestrictedLeaveDaysInMonth(emp.id, currentYear, selectedMonth) : 0;
     const rlRemaining = Math.max(0, rlTotal - rlUsed);
+    const leaveTotalQuota = plTotal + rlTotal;
+    const leaveTotalRemaining = plRemaining + rlRemaining;
 
     const tr = document.createElement("tr");
     tr.className = "master-row-clickable";
@@ -435,6 +437,7 @@ function renderMonthlyReport() {
       <td><span class="${lopCount ? 'day-badge-pill badge-lop-day' : 'text-muted'}">${lopCount} Days</span></td>
       <td><span class="day-badge-pill badge-leave-day font-mono font-bold" title="Personal Leave remaining / annual quota">${plRemaining} / ${plTotal}</span></td>
       <td><span class="day-badge-pill badge-leave-day font-mono font-bold" title="Restricted Leave remaining / monthly quota (this month)">${rlRemaining} / ${rlTotal}</span></td>
+      <td><span class="day-badge-pill badge-neutral font-mono font-bold" title="Total Leave remaining / total quota (Personal + Restricted)">${leaveTotalRemaining} / ${leaveTotalQuota}</span></td>
       <td class="font-mono">${empTotalHours.toFixed(1)} hrs</td>
     `;
     tr.addEventListener("click", () => openEmpCalendar(emp.id));
@@ -819,7 +822,7 @@ function exportMonthlyExcel() {
 
   const allLeaves = getStore(STORAGE_KEYS.LEAVES, []);
 
-  csv += "Employee ID,Full Name,Role,Department,Geofence Rule,Present Days,Absent Days,WFH Days,Loss of Pay Days,Personal Leave (Remaining/Total),Restricted Leave (Remaining/Total),Total Work Hours,Biometric Verified\n";
+  csv += "Employee ID,Full Name,Role,Department,Geofence Rule,Present Days,Absent Days,WFH Days,Loss of Pay Days,Personal Leave (Remaining/Total),Restricted Leave (Remaining/Total),Total Leave (Remaining/Total),Total Work Hours,Biometric Verified\n";
 
   employees.forEach(emp => {
     let presentCount = 0;
@@ -860,10 +863,12 @@ function exportMonthlyExcel() {
     const plRemainingCsv = Math.max(0, plTotalCsv - ((typeof computeApprovedPersonalLeaveDaysUsed === "function") ? computeApprovedPersonalLeaveDaysUsed(emp.id) : 0));
     const rlTotalCsv = _cq.restrictedLeave;
     const rlRemainingCsv = Math.max(0, rlTotalCsv - ((typeof computeApprovedRestrictedLeaveDaysInMonth === "function") ? computeApprovedRestrictedLeaveDaysInMonth(emp.id, currentYear, monthIndex) : 0));
+    const leaveTotalQuotaCsv = plTotalCsv + rlTotalCsv;
+    const leaveTotalRemainingCsv = plRemainingCsv + rlRemainingCsv;
 
     const geofenceRule = emp.geofenceEnforcement === "exempt" ? "Exempt (Any Location)" : "Enforced (<= 500m)";
 
-    csv += `"${emp.id}","${emp.name}","${emp.role}","${emp.department}","${geofenceRule}","${presentCount}","${absentCount}","${wfhCount}","${lopCount}","${plRemainingCsv} / ${plTotalCsv}","${rlRemainingCsv} / ${rlTotalCsv}","${empTotalHours.toFixed(1)} hrs","Verified Snapshot"\n`;
+    csv += `"${emp.id}","${emp.name}","${emp.role}","${emp.department}","${geofenceRule}","${presentCount}","${absentCount}","${wfhCount}","${lopCount}","${plRemainingCsv} / ${plTotalCsv}","${rlRemainingCsv} / ${rlTotalCsv}","${leaveTotalRemainingCsv} / ${leaveTotalQuotaCsv}","${empTotalHours.toFixed(1)} hrs","Verified Snapshot"\n`;
   });
 
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
