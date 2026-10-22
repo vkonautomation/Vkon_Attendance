@@ -1572,10 +1572,13 @@ function renderApprovalTrail(req) {
   if (!trail.length) return "";
   const lines = trail.map(t => {
     const stageLabel = t.stage === "manager" ? "Manager" : "Admin";
-    const onBehalf = t.stage === "manager" && (t.actorRole === "admin" || t.approverName === "Admin");
-    let who = "";
-    if (onBehalf) who = "Admin (on manager's behalf)";
-    else if (t.approverName && t.approverName !== stageLabel) who = t.approverName;
+    const byAdmin = t.stage === "manager" && (t.actorRole === "admin" || t.approverName === "Admin");
+    let who;
+    if (t.stage === "admin") who = (t.approverName && t.approverName !== "Admin") ? t.approverName : "";
+    else if (byAdmin) {
+      const mgrName = t.managerName || (typeof resolveManagerName === "function" ? resolveManagerName(req.employeeId) : "");
+      who = mgrName ? `${mgrName} (approved by Admin on their behalf)` : "Admin (on manager's behalf)";
+    } else who = t.approverName || "";
     return `<div class="approval-trail-line"><span class="approval-trail-stage ${t.stage}-stage">${stageLabel}</span> `
     + (who ? `<strong>${who}</strong> ` : "")
     + `<span class="approval-trail-decision ${t.decision}">${t.decision === "approved" ? "approved" : "rejected"}</span>`

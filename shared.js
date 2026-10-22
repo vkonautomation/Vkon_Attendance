@@ -538,6 +538,7 @@ function recordApprovalTrail(req, stage, actor, decision, comment) {
     approverName: name,
     role: stage,
     actorRole: (actor && actor.role) || "",
+    managerName: (stage === "manager" ? resolveManagerName(req.employeeId) : ""),
     decision,
     comment: comment || "",
     at: new Date().toISOString()

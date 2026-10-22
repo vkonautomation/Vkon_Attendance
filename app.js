@@ -3030,13 +3030,18 @@ function renderMyRequests() {
   }
   function trailHtml(trail) {
     if (!trail || !trail.length) return "";
+    const _curEmp = (typeof employeeState !== "undefined" && employeeState.currentEmployee) ? employeeState.currentEmployee.id : "";
     const steps = trail.map(t => {
       const stageLabel = t.stage === "manager" ? "Manager" : "Admin";
-      const onBehalf = t.stage === "manager" && (t.actorRole === "admin" || t.approverName === "Admin");
-      let who = "";
-      if (onBehalf) who = "Admin (on manager's behalf)";
-      else if (t.approverName && t.approverName !== stageLabel) who = t.approverName;
-      return `<span class="mr-trail-step ${t.decision}"><i class="fa-solid ${t.decision === "approved" ? "fa-check" : "fa-xmark"}"></i> `
+      const icon = t.decision === "approved" ? "fa-check" : "fa-xmark";
+      const byAdmin = t.stage === "manager" && (t.actorRole === "admin" || t.approverName === "Admin");
+      let who;
+      if (t.stage === "admin") who = (t.approverName && t.approverName !== "Admin") ? t.approverName : "";
+      else if (byAdmin) {
+        const mgrName = t.managerName || (typeof resolveManagerName === "function" ? resolveManagerName(_curEmp) : "");
+        who = mgrName ? `${mgrName} (approved by Admin on their behalf)` : "Admin (on manager's behalf)";
+      } else who = t.approverName || "";
+      return `<span class="mr-trail-step ${t.decision}"><i class="fa-solid ${icon}"></i> `
         + `${stageLabel}${who ? " \u00b7 " + who : ""}`
         + (t.comment ? ` <em>\u2014 ${t.comment}</em>` : "") + "</span>";
     }).join("");
