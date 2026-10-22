@@ -537,6 +537,7 @@ function recordApprovalTrail(req, stage, actor, decision, comment) {
     approverId: (actor && actor.id) || "",
     approverName: name,
     role: stage,
+    actorRole: (actor && actor.role) || "",
     decision,
     comment: comment || "",
     at: new Date().toISOString()

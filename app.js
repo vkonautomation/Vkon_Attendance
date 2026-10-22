@@ -3030,11 +3030,16 @@ function renderMyRequests() {
   }
   function trailHtml(trail) {
     if (!trail || !trail.length) return "";
-    const steps = trail.map(t =>
-      `<span class="mr-trail-step ${t.decision}"><i class="fa-solid ${t.decision === "approved" ? "fa-check" : "fa-xmark"}"></i> `
-      + `${t.stage === "manager" ? "Manager" : "Admin"}${t.approverName ? " \u00b7 " + t.approverName : ""}`
-      + (t.comment ? ` <em>\u2014 ${t.comment}</em>` : "") + "</span>"
-    ).join("");
+    const steps = trail.map(t => {
+      const stageLabel = t.stage === "manager" ? "Manager" : "Admin";
+      const onBehalf = t.stage === "manager" && (t.actorRole === "admin" || t.approverName === "Admin");
+      let who = "";
+      if (onBehalf) who = "Admin (on manager's behalf)";
+      else if (t.approverName && t.approverName !== stageLabel) who = t.approverName;
+      return `<span class="mr-trail-step ${t.decision}"><i class="fa-solid ${t.decision === "approved" ? "fa-check" : "fa-xmark"}"></i> `
+        + `${stageLabel}${who ? " \u00b7 " + who : ""}`
+        + (t.comment ? ` <em>\u2014 ${t.comment}</em>` : "") + "</span>";
+    }).join("");
     return `<div class="mr-trail">${steps}</div>`;
   }
 

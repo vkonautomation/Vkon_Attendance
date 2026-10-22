@@ -1570,12 +1570,17 @@ function _afterAdminDecision() {
 function renderApprovalTrail(req) {
   const trail = (req && req.approvalTrail) || [];
   if (!trail.length) return "";
-  const lines = trail.map(t =>
-    `<div class="approval-trail-line"><span class="approval-trail-stage ${t.stage}-stage">${t.stage === "manager" ? "Manager" : "Admin"}</span> `
-    + `<strong>${t.approverName || ""}</strong> `
+  const lines = trail.map(t => {
+    const stageLabel = t.stage === "manager" ? "Manager" : "Admin";
+    const onBehalf = t.stage === "manager" && (t.actorRole === "admin" || t.approverName === "Admin");
+    let who = "";
+    if (onBehalf) who = "Admin (on manager's behalf)";
+    else if (t.approverName && t.approverName !== stageLabel) who = t.approverName;
+    return `<div class="approval-trail-line"><span class="approval-trail-stage ${t.stage}-stage">${stageLabel}</span> `
+    + (who ? `<strong>${who}</strong> ` : "")
     + `<span class="approval-trail-decision ${t.decision}">${t.decision === "approved" ? "approved" : "rejected"}</span>`
-    + (t.comment ? ` <em class="approval-trail-comment">\u2014 ${t.comment}</em>` : "") + `</div>`
-  ).join("");
+    + (t.comment ? ` <em class="approval-trail-comment">\u2014 ${t.comment}</em>` : "") + `</div>`;
+  }).join("");
   return `<div class="approval-trail">${lines}</div>`;
 }
 
