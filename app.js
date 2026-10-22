@@ -1666,9 +1666,14 @@ function evaluateModalLocation() {
   if (hint) hint.textContent = isExempt ? `${settings.name} (Exempt by Admin - Allowed Everywhere)` : `${settings.name} (${settings.radius}m limit)`;
 
   if (gpsPill) {
+    const accNow = employeeState.userLocation.accuracy;
+    const accCoarse = !isExempt && employeeState.userLocation.located && accNow != null && accNow > GPS_ACCURACY_MAX_M;
     if (isExempt) {
       gpsPill.className = "verification-status-pill pill-success";
       gpsPill.innerHTML = `<i class="fa-solid fa-shield-halved"></i> Exempt (${distance}m)`;
+    } else if (accCoarse) {
+      gpsPill.className = "verification-status-pill pill-warning";
+      gpsPill.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> Fix \u00b1${accNow}m coarse`;
     } else if (distance <= settings.radius) {
       gpsPill.className = "verification-status-pill pill-success";
       gpsPill.innerHTML = `<i class="fa-solid fa-circle-check"></i> Within ${settings.radius}m`;
@@ -1686,8 +1691,8 @@ function evaluateModalLocation() {
     } else {
       const acc = employeeState.userLocation.accuracy;
       let fixHtml = `<i class="fa-solid fa-satellite-dish"></i> Device reported <strong>${Number(employeeState.userLocation.lat).toFixed(5)}, ${Number(employeeState.userLocation.lng).toFixed(5)}</strong>${acc ? ` &plusmn;${acc}m accuracy` : ""} &middot; ${formatTimeString(new Date())}`;
-      if (acc && acc > 200) {
-        fixHtml += ` &middot; <span class="gps-acc-warn"><i class="fa-solid fa-triangle-exclamation"></i> Low-accuracy network fix \u2014 allow <strong>Precise location</strong> for this site, turn off VPN, or punch from a phone GPS.</span>`;
+      if (acc && acc > GPS_ACCURACY_MAX_M) {
+        fixHtml += ` &middot; <span class="gps-acc-warn"><i class="fa-solid fa-triangle-exclamation"></i> Coarse fix \u2014 punches need \u2264 ${GPS_ACCURACY_MAX_M}m accuracy. Allow <strong>Precise location</strong> for this site, turn off VPN, then Retry.</span>`;
       }
       fixInfo.innerHTML = fixHtml;
       fixInfo.style.display = "block";
@@ -1715,6 +1720,17 @@ async function handleCaptureLivePhoto() {
       guidance.innerHTML = `<span class="text-danger"><i class="fa-solid fa-circle-xmark"></i> Location not verified yet \u2014 allow location access and wait for the GPS fix before capturing.</span>`;
     }
     showToast("Location not verified. Allow location access, then try again.", "error");
+    playSound("error");
+    return;
+  }
+
+  // Strict accuracy: a coarse fix can't prove presence, in either direction.
+  const accNow = employeeState.userLocation.accuracy;
+  if (!isExempt && located && accNow != null && accNow > GPS_ACCURACY_MAX_M) {
+    if (guidance) {
+      guidance.innerHTML = `<span class="text-danger"><i class="fa-solid fa-circle-xmark"></i> GPS fix too coarse (\u00b1${accNow}m) to be trusted. Allow <strong>Precise location</strong>, move near a window, then tap <strong>Retry location</strong> above.</span>`;
+    }
+    showToast(`GPS fix too coarse (\u00b1${accNow}m). Refine the fix and retry.`, "error");
     playSound("error");
     return;
   }
@@ -1861,10 +1877,12 @@ async function handleConfirmVerification() {
   );
   const isExempt = employeeState.currentEmployee && employeeState.currentEmployee.geofenceEnforcement === "exempt";
   const located = Boolean(employeeState.userLocation.located);
-  const withinGeofence = isExempt ? true : (located && distance <= settings.radius);
+  const accConfirm = employeeState.userLocation.accuracy;
+  const accCoarseConfirm = !isExempt && accConfirm != null && accConfirm > GPS_ACCURACY_MAX_M;
+  const withinGeofence = isExempt ? true : (located && !accCoarseConfirm && distance <= settings.radius);
 
   if (!withinGeofence) {
-    showToast(`Check-in rejected: ${distance}m distance exceeds office radius limit.`, "error");
+    showToast(accCoarseConfirm ? `Check-in rejected: GPS fix too coarse (\u00b1${accConfirm}m). Retry for a precise fix.` : `Check-in rejected: ${distance}m distance exceeds office radius limit.`, "error");
     playSound("error");
     return;
   }

@@ -1211,4 +1211,10 @@ function initializeDatabase() {
   cleanExpiredPhotos();
 }
 
+// ============================================================================
+// STRICT GPS ACCURACY — a fix coarser than this is never trusted for the
+// geofence decision (network/IP fixes can be off by hundreds of meters).
+// ============================================================================
+const GPS_ACCURACY_MAX_M = 100;
+
 initializeDatabase();

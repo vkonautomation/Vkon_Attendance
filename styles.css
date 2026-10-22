@@ -10325,6 +10325,12 @@ body:not(.light-theme) .map-search-results { background: #101725; border-color: 
 .gps-acc-warn i { color: #d97706; }
 body:not(.light-theme) .gps-acc-warn { color: #fbbf24; }
 
+/* ==========================================================================
+   v8.3 STRICT GPS ACCURACY — amber pill for coarse (untrusted) fixes
+   ========================================================================== */
+.verification-status-pill.pill-warning { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
+body:not(.light-theme) .verification-status-pill.pill-warning { background: rgba(217, 119, 6, 0.18); color: #fbbf24; border-color: rgba(251, 191, 36, 0.4); }
+
 
 
 
