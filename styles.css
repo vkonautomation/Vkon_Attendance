@@ -10465,6 +10465,15 @@ body:not(.light-theme) .task-done-tag { color: #4ade80; }
 .my-task-item.completed .mr-icon { background: rgba(15, 157, 107, 0.14); color: #16a34a; }
 
 /* ==========================================================================
+   v8.8 TASK STATUS COLORS (admin board) — Open = blue, In Progress = orange.
+   ========================================================================== */
+.task-status-select { font-weight: 700; cursor: pointer; }
+.task-status-select.status-open { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
+.task-status-select.status-inprogress { background: #fff7ed; color: #c2410c; border-color: #fed7aa; }
+body:not(.light-theme) .task-status-select.status-open { background: rgba(37, 99, 235, 0.18); color: #93c5fd; border-color: rgba(147, 197, 253, 0.4); }
+body:not(.light-theme) .task-status-select.status-inprogress { background: rgba(234, 88, 12, 0.18); color: #fdba74; border-color: rgba(253, 186, 116, 0.4); }
+
+/* ==========================================================================
    v8.4 LOSS OF PAY + MY REQUESTS — rose LoP identity across portal & admin,
    plus the employee "My Requests" tracker list.
    ========================================================================== */

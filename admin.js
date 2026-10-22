@@ -2963,7 +2963,7 @@ function renderTaskTable() {
       <td class="font-mono">${t.due || "\u2014"}</td>
       <td>${t.status === "Done"
         ? `<span class="day-badge-pill badge-present"><i class="fa-solid fa-circle-check"></i> Completed${t.completedAt ? ` &middot; ${formatDateKey(new Date(t.completedAt))}` : ""}</span>`
-        : `<select class="form-control task-status-select" data-id="${t.id}">${TASK_STATUSES.map(s => `<option${s === t.status ? " selected" : ""}>${s}</option>`).join("")}</select>`}</td>
+        : `<select class="form-control task-status-select ${t.status === "In Progress" ? "status-inprogress" : "status-open"}" data-id="${t.id}">${TASK_STATUSES.map(s => `<option${s === t.status ? " selected" : ""}>${s}</option>`).join("")}</select>`}</td>
       <td><button type="button" class="btn btn-ghost btn-sm text-danger task-remove" data-id="${t.id}" title="Delete task"><i class="fa-solid fa-trash"></i></button></td>
     </tr>`;
   }).join("");
