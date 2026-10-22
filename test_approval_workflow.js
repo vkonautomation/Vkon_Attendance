@@ -38,7 +38,8 @@ ctx.setStore(KEY.EMPLOYEES, [
   { id: "EMPM", name: "The Manager", managerId: "", department: "Engineering", monthlySalary: 90000 },
   { id: "EMPC", name: "Cart Report", managerId: "EMPM", department: "Engineering", monthlySalary: 60000 },
   { id: "EMPS", name: "Self Boss", managerId: "EMPS", department: "Product", monthlySalary: 60000 },
-  { id: "EMPN", name: "No Manager", managerId: "", department: "Operations", monthlySalary: 50000 }
+  { id: "EMPN", name: "No Manager", managerId: "", department: "Operations", monthlySalary: 50000 },
+  { id: "EMPD", name: "Orphan Report", managerId: "EMPX", department: "Support", monthlySalary: 50000 }
 ]);
 
 // 1) Defaults (Req 2): Leave/WFH/Reg = Manager only; LOP = Manager then Admin.
@@ -53,6 +54,10 @@ ok(JSON.stringify(ctx.resolveApprovalRoute("leave", "EMPN")) === '["admin"]', "N
 ok(JSON.stringify(ctx.resolveApprovalRoute("leave", "EMPS")) === '["admin"]', "Self-manager => [admin] (cannot approve self)");
 ok(ctx.routingForNewRequest("leave", "EMPC").status === "Pending Manager", "New report leave starts Pending Manager");
 ok(ctx.routingForNewRequest("leave", "EMPN").status === "Pending Admin", "New no-manager leave starts Pending Admin");
+// Dangling manager (the referenced manager record was deleted) => treated as no manager.
+ok(JSON.stringify(ctx.resolveApprovalRoute("leave", "EMPD")) === '["admin"]', "Dangling managerId => [admin] (not stuck at Pending Manager)");
+ok(ctx.routingForNewRequest("leave", "EMPD").status === "Pending Admin", "Report of a departed manager starts Pending Admin");
+ok(ctx.resolveManagerName("EMPD") === "", "Dangling managerId shows no manager name");
 
 // 3) Manager scoping (Req 5): a manager only acts on their own reports.
 ok(ctx.isManagerOf("EMPM", "EMPC") === true, "EMPM is manager of EMPC");

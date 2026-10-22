@@ -534,9 +534,13 @@ function _employeeName(empId) {
 // skipped so the request goes straight to Admin.
 function resolveApprovalRoute(type, empId) {
   const flow = getApprovalFlow();
-  const emp = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES).find(e => e.id === empId);
+  const employees = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
+  const emp = employees.find(e => e.id === empId);
   const mgrId = emp ? emp.managerId : "";
-  const hasMgr = !!mgrId && mgrId !== empId;
+  // Treat a dangling managerId (manager record deleted) as "no manager" so the
+  // request routes straight to Admin instead of getting stuck at "Pending
+  // Manager" with no one able to act on it.
+  const hasMgr = !!mgrId && mgrId !== empId && employees.some(e => e.id === mgrId);
   if (!hasMgr) return ["admin"];
   return flow[type] === "manager_then_admin" ? ["manager", "admin"] : ["manager"];
 }
