@@ -98,11 +98,13 @@ def run_tests():
     assert 'color: var(--color-primary, #ea580c) !important' in styles_css, "Failed visible color for active pill in styles.css"
     print("  PASS: Sidebar active text bold and visible verified.")
 
-    # New Request 4: First page Leave column shows whole year count and quota (leavesTaken / totalLeaves)
-    print("\n[New Req 4] First page Master Sheet Leave column (annual taken / total quota):")
-    assert '<th>Leave</th>' in admin_html, "Failed <th>Leave</th> header in admin.html"
-    assert '${annualLeavesTaken} / ${totalLeaveQuota}' in admin_js, "Failed annual leaves taken / quota formatted string in admin.js"
-    print("  PASS: First page Leave column verified.")
+    # New Request 4: First page split Leave columns (PL and RL), each remaining / total
+    print("\n[New Req 4] First page Master Sheet PL & RL columns (remaining / total quota):")
+    assert 'PL (Remaining/Total)' in admin_html, "Failed PL (Personal Leave) header in admin.html"
+    assert 'RL (Remaining/Total)' in admin_html, "Failed RL (Restricted Leave) header in admin.html"
+    assert '${plRemaining} / ${plTotal}' in admin_js, "Failed Personal Leave remaining / total formatted string in admin.js"
+    assert '${rlRemaining} / ${rlTotal}' in admin_js, "Failed Restricted Leave remaining / total formatted string in admin.js"
+    print("  PASS: First page PL and RL columns verified.")
 
     print("\n" + "="*50)
     print(">>> ALL REQUIREMENTS AND ENHANCEMENTS HAVE PASSED VERIFICATION! <<<")

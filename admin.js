@@ -390,11 +390,15 @@ function renderMonthlyReport() {
       typeLabel = "Absent";
     }
 
-    // Requirement 4: Leave taken for the whole year (not for the month): "number of leave taken / total number of leave given"
-    const empApprovedLeaves = leaves.filter(l => l.employeeId === emp.id && l.status === "Approved");
-    const annualLeavesTaken = (typeof computeApprovedLeaveDaysUsed === "function") ? computeApprovedLeaveDaysUsed(emp.id) : empApprovedLeaves.reduce((sum, l) => sum + (parseInt(l.daysCount, 10) || 1), 0);
-    const totalLeaveQuota = emp.annualLeaveQuota || DEFAULT_ANNUAL_LEAVE_ALLOWANCE;
-    const leaveCellFormatted = `${annualLeavesTaken} / ${totalLeaveQuota}`;
+    // Split leave columns: Personal (annual quota) and Restricted (monthly quota),
+    // each shown as REMAINING / TOTAL.
+    const _q = (typeof getEmployeeLeaveQuota === "function") ? getEmployeeLeaveQuota(emp.id) : { personalLeave: emp.annualLeaveQuota || DEFAULT_ANNUAL_LEAVE_ALLOWANCE, restrictedLeave: MONTHLY_RH_ALLOWANCE };
+    const plTotal = _q.personalLeave;
+    const plUsed = (typeof computeApprovedPersonalLeaveDaysUsed === "function") ? computeApprovedPersonalLeaveDaysUsed(emp.id) : 0;
+    const plRemaining = Math.max(0, plTotal - plUsed);
+    const rlTotal = _q.restrictedLeave;
+    const rlUsed = (typeof computeApprovedRestrictedLeaveDaysInMonth === "function") ? computeApprovedRestrictedLeaveDaysInMonth(emp.id, currentYear, selectedMonth) : 0;
+    const rlRemaining = Math.max(0, rlTotal - rlUsed);
 
     const tr = document.createElement("tr");
     tr.className = "master-row-clickable";
@@ -429,7 +433,8 @@ function renderMonthlyReport() {
       <td><span class="unmarked-cell${unmarkedCount > 0 ? " has-unmarked" : ""}" title="${unmarkedCount} past working day(s) with no punch or request \u2014 needs regularisation, NOT counted as Absent">${unmarkedCount} Days</span></td>
       <td><span class="text-primary font-bold">${wfhCount} Days</span></td>
       <td><span class="${lopCount ? 'day-badge-pill badge-lop-day' : 'text-muted'}">${lopCount} Days</span></td>
-      <td><span class="day-badge-pill badge-neutral font-mono font-bold" title="Annual Leaves Taken / Total Leave Quota">${leaveCellFormatted}</span>${lopCount ? ` <span class="lop-mini-pill" title="Approved Loss of Pay days (unpaid)">LoP ${lopCount}</span>` : ""}</td>
+      <td><span class="day-badge-pill badge-leave-day font-mono font-bold" title="Personal Leave remaining / annual quota">${plRemaining} / ${plTotal}</span></td>
+      <td><span class="day-badge-pill badge-leave-day font-mono font-bold" title="Restricted Leave remaining / monthly quota (this month)">${rlRemaining} / ${rlTotal}</span></td>
       <td class="font-mono">${empTotalHours.toFixed(1)} hrs</td>
     `;
     tr.addEventListener("click", () => openEmpCalendar(emp.id));
@@ -814,7 +819,7 @@ function exportMonthlyExcel() {
 
   const allLeaves = getStore(STORAGE_KEYS.LEAVES, []);
 
-  csv += "Employee ID,Full Name,Role,Department,Geofence Rule,Present Days,Absent Days,WFH Days,Loss of Pay Days,Leave Taken (Annual/Quota),Total Work Hours,Biometric Verified\n";
+  csv += "Employee ID,Full Name,Role,Department,Geofence Rule,Present Days,Absent Days,WFH Days,Loss of Pay Days,Personal Leave (Remaining/Total),Restricted Leave (Remaining/Total),Total Work Hours,Biometric Verified\n";
 
   employees.forEach(emp => {
     let presentCount = 0;
@@ -850,13 +855,15 @@ function exportMonthlyExcel() {
       }
     }
 
-    const empApprovedLeaves = allLeaves.filter(l => l.employeeId === emp.id && l.status === "Approved" && l.category !== "LossOfPay");
-    const annualLeavesTaken = empApprovedLeaves.reduce((sum, l) => sum + (parseInt(l.daysCount, 10) || 1), 0);
-    const totalLeaveQuota = emp.annualLeaveQuota || DEFAULT_ANNUAL_LEAVE_ALLOWANCE;
+    const _cq = (typeof getEmployeeLeaveQuota === "function") ? getEmployeeLeaveQuota(emp.id) : { personalLeave: emp.annualLeaveQuota || DEFAULT_ANNUAL_LEAVE_ALLOWANCE, restrictedLeave: MONTHLY_RH_ALLOWANCE };
+    const plTotalCsv = _cq.personalLeave;
+    const plRemainingCsv = Math.max(0, plTotalCsv - ((typeof computeApprovedPersonalLeaveDaysUsed === "function") ? computeApprovedPersonalLeaveDaysUsed(emp.id) : 0));
+    const rlTotalCsv = _cq.restrictedLeave;
+    const rlRemainingCsv = Math.max(0, rlTotalCsv - ((typeof computeApprovedRestrictedLeaveDaysInMonth === "function") ? computeApprovedRestrictedLeaveDaysInMonth(emp.id, currentYear, monthIndex) : 0));
 
     const geofenceRule = emp.geofenceEnforcement === "exempt" ? "Exempt (Any Location)" : "Enforced (<= 500m)";
 
-    csv += `"${emp.id}","${emp.name}","${emp.role}","${emp.department}","${geofenceRule}","${presentCount}","${absentCount}","${wfhCount}","${lopCount}","${annualLeavesTaken} / ${totalLeaveQuota}","${empTotalHours.toFixed(1)} hrs","Verified Snapshot"\n`;
+    csv += `"${emp.id}","${emp.name}","${emp.role}","${emp.department}","${geofenceRule}","${presentCount}","${absentCount}","${wfhCount}","${lopCount}","${plRemainingCsv} / ${plTotalCsv}","${rlRemainingCsv} / ${rlTotalCsv}","${empTotalHours.toFixed(1)} hrs","Verified Snapshot"\n`;
   });
 
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });

@@ -252,6 +252,32 @@ function computeApprovedLeaveDaysUsed(empId) {
     .reduce((sum, l) => sum + (parseInt(l.daysCount, 10) || 1), 0);
 }
 
+// --- Split leave buckets (Personal vs Restricted) --------------------------
+// Restricted/RH leave has its own (monthly) allowance and must not be counted
+// against the annual Personal quota. LOP is unpaid and never touches either.
+function _isRestrictedLeave(l) {
+  return l.category === "Restricted" || l.category === "RH" || ((l.type || "").indexOf("Restricted") !== -1);
+}
+function _isPersonalLeave(l) {
+  return !_isRestrictedLeave(l) && l.category !== "LossOfPay" && ((l.type || "").indexOf("Loss of Pay") === -1);
+}
+// Approved PERSONAL leave days used across the whole year (annual paid quota).
+function computeApprovedPersonalLeaveDaysUsed(empId) {
+  return getStore(STORAGE_KEYS.LEAVES, [])
+    .filter(l => l.employeeId === empId && l.status === "Approved" && _isPersonalLeave(l))
+    .reduce((sum, l) => sum + (parseFloat(l.daysCount) || 1), 0);
+}
+// Approved RESTRICTED (RH) leave days used within a specific month (monthly allowance).
+function computeApprovedRestrictedLeaveDaysInMonth(empId, year, month) {
+  return getStore(STORAGE_KEYS.LEAVES, [])
+    .filter(l => {
+      if (l.employeeId !== empId || l.status !== "Approved" || !_isRestrictedLeave(l)) return false;
+      const d = new Date((l.startDate || "") + "T00:00:00");
+      return d.getFullYear() === year && d.getMonth() === month;
+    })
+    .reduce((sum, l) => sum + (parseFloat(l.daysCount) || 1), 0);
+}
+
 // ============================================================================
 // EMPLOYEE NOTIFICATIONS — admin actions (approval decisions, task
 // assignments) are pushed here so the employee portal can surface them.
