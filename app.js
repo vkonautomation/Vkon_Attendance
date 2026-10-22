@@ -564,8 +564,18 @@ function renderMonthlyCalendar() {
   if (statW) statW.textContent = countWfh;
   const statL = document.getElementById("statsLeaveCount");
   if (statL) statL.textContent = countLeave;
-  const statLop = document.getElementById("statsLopCount");
-  if (statLop) statLop.textContent = countLop;
+    const statLop = document.getElementById("statsLopCount");
+    if (statLop) {
+      // Prefer the authoritative (decimal) LOP day count so half-days show as 0.5.
+      let lopVal = countLop;
+      try {
+        if (employeeState.currentEmployee && typeof computeLopDaysForMonth === "function") {
+          const ms = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}`;
+          lopVal = computeLopDaysForMonth(employeeState.currentEmployee.id, ms);
+        }
+      } catch (e) { /* fall back to record count */ }
+      statLop.textContent = lopVal;
+    }
   const statA = document.getElementById("statsAbsentCount");
   if (statA) statA.textContent = countAbsent;
   const statNM = document.getElementById("statsNotMarkedCount");
@@ -968,6 +978,8 @@ function initLeaveBox() {
 
   function onCategoryChange() {
     const isRh = categorySelect.value === "Restricted" || categorySelect.value === "RH";
+    const lopHalfGroup = document.getElementById("lopHalfDayGroup");
+    if (lopHalfGroup) lopHalfGroup.style.display = (categorySelect.value === "LossOfPay") ? "block" : "none";
     const rhLockHint = document.getElementById("rhLockedHint");
     const rhFixedGroup = document.getElementById("rhFixedDateDisplayGroup");
     const datesRow = document.getElementById("leaveDatesRow");
@@ -1049,6 +1061,8 @@ function initLeaveBox() {
     const category = categorySelect.value;
     const isRh = category === "Restricted" || category === "RH";
     if (isRh) endInput.value = startInput.value;
+    // A Loss of Pay confirmation box is styled differently from an error box.
+    if (warningBox && category !== "LossOfPay") warningBox.classList.remove("warning-box-lop");
 
     // 0. Past-date guard (inline, before any other rule)
     const todayGuardKey = getTodayKey();
@@ -1091,9 +1105,18 @@ function initLeaveBox() {
       warningBox.style.display = "none";
       submitBtn.disabled = false;
     } else if (category === "LossOfPay") {
-      // Loss of Pay: unpaid by choice — the paid-leave quota never blocks it
-      daysNoticeText.textContent = `Loss of Pay: ${workingDays} working day(s) requested (unpaid \u2014 paid-leave quota untouched)`;
-      warningBox.style.display = "none";
+      // Loss of Pay: unpaid by choice — the paid-leave quota never blocks it,
+      // but the employee sees the estimated pay deduction and must confirm.
+      const halfEl = document.getElementById("lopHalfDay");
+      const isHalf = !!(halfEl && halfEl.checked);
+      const lopDays = isHalf ? 0.5 : workingDays;
+      const monthStr = startInput.value.slice(0, 7);
+      let est = { perDayRate: 0, amount: 0 };
+      try { if (typeof estimateLopDeduction === "function") est = estimateLopDeduction(empId, monthStr, lopDays); } catch (e) { /* non-fatal */ }
+      daysNoticeText.textContent = `Loss of Pay: ${lopDays} day(s) requested (unpaid \u2014 paid-leave quota untouched)`;
+      warningText.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> This is an <strong>unpaid</strong> Loss of Pay request. Estimated pay deduction: <strong>\u20b9 ${money2(est.amount)}</strong> (\u20b9 ${money2(est.perDayRate)}/day \u00d7 ${lopDays}). Confirm you want to apply for Loss of Pay.`;
+      warningBox.style.display = "flex";
+      warningBox.classList.add("warning-box-lop");
       submitBtn.disabled = false;
     } else {
       // Personal Leave Rule
@@ -1122,6 +1145,8 @@ function initLeaveBox() {
     validateLeaveSelection();
   });
   endInput.addEventListener("change", validateLeaveSelection);
+  const lopHalfEl = document.getElementById("lopHalfDay");
+  if (lopHalfEl) lopHalfEl.addEventListener("change", validateLeaveSelection);
   validateLeaveSelection();
 
   form.addEventListener("submit", (e) => {
@@ -1129,14 +1154,17 @@ function initLeaveBox() {
     const category = categorySelect.value;
     const isRh = category === "Restricted" || category === "RH";
     const isLop = category === "LossOfPay";
+    const lopHalfEl = document.getElementById("lopHalfDay");
+    const lopHalf = isLop && !!(lopHalfEl && lopHalfEl.checked);
     const startVal = startInput.value;
-    const endVal = isRh ? startVal : endInput.value;
+    const endVal = (isRh || lopHalf) ? startVal : endInput.value;
     const reasonVal = document.getElementById("leaveReasonInput").value.trim();
 
     if (!startVal || !endVal || !reasonVal || !employeeState.currentEmployee) return;
 
     const workingDays = isRh ? 1 : calculateWorkingDaysBetween(startVal, endVal);
-    if (!isRh && workingDays <= 0) {
+    const effDays = lopHalf ? 0.5 : workingDays;
+    if (!isRh && !lopHalf && workingDays <= 0) {
       showToast("End date must be on or after start date.", "error");
       return;
     }
@@ -1172,7 +1200,8 @@ function initLeaveBox() {
       employeeName: employeeState.currentEmployee.name,
       startDate: startVal,
       endDate: endVal,
-      daysCount: workingDays,
+      daysCount: effDays,
+      lopHalfDay: lopHalf || undefined,
       category: isRh ? "Restricted" : (isLop ? "LossOfPay" : "Personal"),
       type: isRh ? "Restricted Holiday" : (isLop ? "Loss of Pay (Unpaid)" : "Personal Leave"),
       reason: reasonVal,

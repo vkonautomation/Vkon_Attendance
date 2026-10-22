@@ -21,7 +21,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="styles.css?v=20261022_tsk4">
+  <link rel="stylesheet" href="styles.css?v=20261022_lop1">
 </head>
 <body class="light-theme">
   
@@ -442,6 +442,15 @@
                   <option value="Restricted">Restricted Leave</option>
                   <option value="LossOfPay">Loss of Pay (Unpaid)</option>
                 </select>
+              </div>
+
+              <!-- Half-day Loss of Pay (shown only when Loss of Pay is selected) -->
+              <div class="form-group" id="lopHalfDayGroup" style="display: none;">
+                <label class="lop-halfday-label" for="lopHalfDay">
+                  <input type="checkbox" id="lopHalfDay" class="form-checkbox">
+                  <span>Half-day Loss of Pay (0.5 day)</span>
+                </label>
+                <span class="form-hint"><i class="fa-solid fa-circle-info text-primary"></i> Applies to a single day; the estimated unpaid deduction updates below.</span>
               </div>
 
               <!-- Dedicated Restricted Holiday Selector (Only shown when Restricted Leave selected) -->
@@ -1010,8 +1019,8 @@
   <div class="toast-container" id="toastContainer"></div>
 
   <!-- Shared Engine & App Controller -->
-  <script src="shared.js?v=20261013_ist_mgr1"></script>
-  <script src="app.js?v=20261022_tsk2"></script>
+  <script src="shared.js?v=20261013_ist_lop1"></script>
+  <script src="app.js?v=20261022_lop1"></script>
   <script src="js/password-toggle.js?v=20261019_ui1"></script>
 
   <!-- Present Day & Migration Guarantee -->

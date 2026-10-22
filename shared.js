@@ -18,7 +18,14 @@ const STORAGE_KEYS = {
   LEAVE_QUOTAS: "vkon_leave_quotas_v6",
   MIN_WORK_POLICY: "vkon_min_work_policy_v6",
   NOTIFICATIONS: "vkon_notifications_v6",
-  ADMIN_DECISION_SNAP: "vkon_admin_decision_snap_v6"
+  ADMIN_DECISION_SNAP: "vkon_admin_decision_snap_v6",
+  // --- Loss of Pay / Payroll engine ---
+  LOP_SETTINGS: "vkon_lop_settings_v1",
+  LOP_ENTRIES: "vkon_lop_entries_v1",
+  SALARY_STRUCTURE: "vkon_salary_structure_v1",
+  PAYROLL_RUNS: "vkon_payroll_runs_v1",
+  PAYROLL_LINES: "vkon_payroll_lines_v1",
+  AUDIT_LOG: "vkon_audit_log_v1"
 };
 
 // Default Company Geofence Coordinates
@@ -286,6 +293,295 @@ function resolveManagerName(empId) {
   if (!emp || !emp.managerId) return "";
   const mgr = employees.find(e => e.id === emp.managerId);
   return mgr ? mgr.name : "";
+}
+
+// ============================================================================
+// LOSS OF PAY (LOP) + PAYROLL ENGINE
+// ----------------------------------------------------------------------------
+// The numeric core below is DOM/localStorage-free so it can be unit-tested
+// in Node (see test_lop_payroll.js). Everything is money-rounded to 2 dp only
+// at the END of a computation; the per-day rate stays un-rounded while it is
+// multiplied by LOP days so (50000 / 30) * 3 is exactly 5000.00.
+// ============================================================================
+
+function round2(n) {
+  n = Number(n) || 0;
+  return Math.round((n + Number.EPSILON) * 100) / 100;
+}
+
+function money2(n) {
+  return round2(n).toFixed(2);
+}
+
+// daysInMonth(year, month0) — month0 is 0-based (0 = January).
+function daysInMonth(year, month0) {
+  return new Date(year, month0 + 1, 0).getDate();
+}
+
+// Working days in a month excluding weekends (Sun/Sat) and declared holidays.
+function workingDaysInMonth(year, month0, holidayDateSet) {
+  const dim = daysInMonth(year, month0);
+  let count = 0;
+  for (let d = 1; d <= dim; d++) {
+    const wd = new Date(year, month0, d).getDay();
+    if (wd === 0 || wd === 6) continue;
+    if (holidayDateSet && holidayDateSet.has) {
+      const key = `${year}-${String(month0 + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+      if (holidayDateSet.has(key)) continue;
+    }
+    count++;
+  }
+  return count;
+}
+
+// Divisor for the per-day rate.
+//   fixed30  -> always 30
+//   calendar -> actual calendar days in the month
+//   working  -> working days (weekends + declared holidays excluded)
+function lopDivisorValue(mode, year, month0, holidayDateSet) {
+  if (mode === "calendar") return daysInMonth(year, month0);
+  if (mode === "working") return workingDaysInMonth(year, month0, holidayDateSet) || 1;
+  return 30;
+}
+
+// UNROUNDED per-day rate (kept precise for the multiply step).
+function perDayRateRaw(monthlyGross, divisor) {
+  const div = Number(divisor) > 0 ? Number(divisor) : 30;
+  return (Number(monthlyGross) || 0) / div;
+}
+
+// Core deduction. Pure function — no storage.
+// opts: { monthlyGross, divisor | (mode,year,month0,holidaySet), lopDays, otherDeductions }
+function computeLopDeduction(opts) {
+  opts = opts || {};
+  const gross = Number(opts.monthlyGross) || 0;
+  let divisor = Number(opts.divisor);
+  if (!(divisor > 0)) {
+    divisor = lopDivisorValue(opts.mode || "fixed30", opts.year, opts.month0, opts.holidaySet);
+  }
+  const raw = perDayRateRaw(gross, divisor);
+  const lopDays = Number(opts.lopDays) || 0;
+  const lopAmount = round2(raw * lopDays);
+  const other = Number(opts.otherDeductions) || 0;
+  const net = round2(gross - lopAmount - other);
+  return {
+    gross: round2(gross),
+    divisor,
+    perDayRate: round2(raw),
+    lopDays,
+    lopAmount,
+    otherDeductions: round2(other),
+    net
+  };
+}
+
+// Pro-rate a monthly gross for a mid-month joiner / leaver, BEFORE LOP.
+// joinStr / leaveStr are 'YYYY-MM-DD' (empty / outside month = no clamp).
+// Proration uses calendar-day presence over the month's calendar days.
+function prorateGross(monthlyGross, joinStr, leaveStr, year, month0) {
+  const gross = Number(monthlyGross) || 0;
+  const dim = daysInMonth(year, month0);
+  const pad = (n) => String(n).padStart(2, "0");
+  const monthStart = `${year}-${pad(month0 + 1)}-01`;
+  const monthEnd = `${year}-${pad(month0 + 1)}-${pad(dim)}`;
+  let from = monthStart, to = monthEnd;
+  if (joinStr && joinStr > monthStart && joinStr <= monthEnd) from = joinStr;
+  if (leaveStr && leaveStr < monthEnd && leaveStr >= monthStart) to = leaveStr;
+  const dFrom = new Date(from + "T00:00:00");
+  const dTo = new Date(to + "T00:00:00");
+  const presentDays = Math.max(0, Math.round((dTo - dFrom) / 86400000) + 1);
+  if (presentDays >= dim) return round2(gross);
+  return round2(gross * presentDays / dim);
+}
+
+// ---- Settings (divisor mode, sandwich rule, auto-convert absent) ----
+const DEFAULT_LOP_SETTINGS = { divisorMode: "fixed30", sandwichRule: false, autoConvertAbsent: false };
+function getLopSettings() {
+  const s = getStore(STORAGE_KEYS.LOP_SETTINGS, {});
+  return Object.assign({}, DEFAULT_LOP_SETTINGS, s || {});
+}
+function setLopSettings(next) {
+  next = next || {};
+  const mode = (next.divisorMode === "calendar" || next.divisorMode === "working") ? next.divisorMode : "fixed30";
+  setStore(STORAGE_KEYS.LOP_SETTINGS, {
+    divisorMode: mode,
+    sandwichRule: !!next.sandwichRule,
+    autoConvertAbsent: !!next.autoConvertAbsent
+  });
+  return getLopSettings();
+}
+
+// ---- Salary structure (effective-dated monthly gross) ----
+function getSalaryStructure() { return getStore(STORAGE_KEYS.SALARY_STRUCTURE, []); }
+// Returns the gross effective for a 'YYYY-MM' month, or null when none is set.
+function resolveMonthlyGross(empId, monthStr) {
+  const first = monthStr ? (monthStr + "-01") : "0000-00-00";
+  const rows = getSalaryStructure()
+    .filter(r => r.employeeId === empId && (!r.effectiveFrom || r.effectiveFrom <= first))
+    .sort((a, b) => (a.effectiveFrom < b.effectiveFrom ? 1 : -1));
+  if (rows.length) return Number(rows[0].monthlyGross) || 0;
+  return null;
+}
+function setSalaryStructure(empId, gross, effectiveFrom) {
+  const list = getSalaryStructure();
+  list.push({
+    employeeId: empId,
+    monthlyGross: Math.max(0, Number(gross) || 0),
+    effectiveFrom: effectiveFrom || "2026-01-01",
+    updatedAt: new Date().toISOString()
+  });
+  setStore(STORAGE_KEYS.SALARY_STRUCTURE, list);
+}
+
+// ---- Payroll runs (month -> status OPEN | LOCKED | PAID) ----
+const PAYROLL_STATUSES = ["OPEN", "LOCKED", "PAID"];
+function getPayrollRuns() { return getStore(STORAGE_KEYS.PAYROLL_RUNS, {}); }
+function getPayrollRun(month) { const r = getPayrollRuns(); return r[month] || { status: "OPEN" }; }
+function getPayrollRunStatus(month) { return (getPayrollRun(month).status) || "OPEN"; }
+function setPayrollRunStatus(month, status, reason) {
+  const runs = getPayrollRuns();
+  const prev = runs[month] || {};
+  runs[month] = Object.assign(prev, { status: status, changedAt: new Date().toISOString() });
+  if (reason) runs[month].reason = reason;
+  setStore(STORAGE_KEYS.PAYROLL_RUNS, runs);
+  return runs[month];
+}
+
+// ---- Payroll lines (immutable snapshot per employee-month) ----
+function getPayrollLines() { return getStore(STORAGE_KEYS.PAYROLL_LINES, {}); }
+function payrollLineKey(month, empId) { return month + "|" + empId; }
+function getPayrollLine(month, empId) { return getPayrollLines()[payrollLineKey(month, empId)] || null; }
+function setPayrollLine(month, empId, line) {
+  const lines = getPayrollLines();
+  const key = payrollLineKey(month, empId);
+  lines[key] = Object.assign({}, lines[key], line, { month, employeeId: empId, snapshotAt: new Date().toISOString() });
+  setStore(STORAGE_KEYS.PAYROLL_LINES, lines);
+  return lines[key];
+}
+
+// ---- Audit log (create / approve / cancel / reverse / lock / convert) ----
+function getAuditLog() { return getStore(STORAGE_KEYS.AUDIT_LOG, []); }
+function logLopAction(action, empId, month, detail) {
+  const logs = getAuditLog();
+  logs.push({
+    id: "AUD-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 6),
+    action: action || "info",
+    employeeId: empId || null,
+    month: month || null,
+    detail: detail || "",
+    at: new Date().toISOString(),
+    by: "admin"
+  });
+  setStore(STORAGE_KEYS.AUDIT_LOG, logs.slice(-500));
+}
+
+// ---- LOP day entries (the single source of truth for LOP day counts) ----
+// { id, employeeId, date 'YYYY-MM-DD', fraction 0.5|1, source leave|excess|absent|sandwich|manual, refId, status active|cancelled }
+function getLopEntries() { return getStore(STORAGE_KEYS.LOP_ENTRIES, []); }
+function addLopEntry(empId, date, fraction, source, refId) {
+  const list = getLopEntries();
+  // Duplicate guard: one active entry per employee/date/source (+refId for leaves).
+  const dup = list.some(e => e.employeeId === empId && e.date === date && e.source === source && e.status === "active" && (source !== "leave" || e.refId === refId));
+  if (dup) return null;
+  const entry = {
+    id: "LOP-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 6),
+    employeeId: empId,
+    date,
+    fraction: Number(fraction) > 0 ? Number(fraction) : 1,
+    source: source || "leave",
+    refId: refId || null,
+    status: "active",
+    createdAt: new Date().toISOString()
+  };
+  list.push(entry);
+  setStore(STORAGE_KEYS.LOP_ENTRIES, list);
+  return entry;
+}
+function cancelLopEntriesByRef(refId) {
+  if (!refId) return false;
+  const list = getLopEntries();
+  let changed = false;
+  list.forEach(e => {
+    if (e.refId === refId && e.status === "active") { e.status = "cancelled"; e.cancelledAt = new Date().toISOString(); changed = true; }
+  });
+  if (changed) setStore(STORAGE_KEYS.LOP_ENTRIES, list);
+  return changed;
+}
+function cancelLopEntryForDate(empId, date, source) {
+  const list = getLopEntries();
+  let changed = false;
+  list.forEach(e => {
+    if (e.employeeId === empId && e.date === date && (!source || e.source === source) && e.status === "active") { e.status = "cancelled"; e.cancelledAt = new Date().toISOString(); changed = true; }
+  });
+  if (changed) setStore(STORAGE_KEYS.LOP_ENTRIES, list);
+  return changed;
+}
+
+// Total (decimal) LOP days for an employee in a 'YYYY-MM' month.
+function computeLopDaysForMonth(empId, monthStr) {
+  const list = getLopEntries().filter(e => e.employeeId === empId && e.status === "active" && e.date.slice(0, 7) === monthStr);
+  return round2(list.reduce((s, e) => s + (Number(e.fraction) || 0), 0));
+}
+
+// Expand an approved leave range into LOP day objects, honouring half-day
+// (single 0.5) and the sandwich rule (off days inside the block count too).
+function lopDatesForRange(startDate, endDate, opts) {
+  opts = opts || {};
+  const sandwich = !!opts.sandwichRule;
+  const out = [];
+  const single = (!endDate || endDate === startDate);
+  if (single && opts.halfDay) { out.push({ date: startDate, fraction: 0.5 }); return out; }
+  const holSet = new Set(getDeclaredHolidays().map(h => h.date));
+  const cur = new Date(startDate + "T00:00:00");
+  const end = new Date((endDate || startDate) + "T00:00:00");
+  while (cur <= end) {
+    const key = formatDateKey(cur);
+    const wd = cur.getDay();
+    const isOff = (wd === 0 || wd === 6 || holSet.has(key));
+    if (!isOff) out.push({ date: key, fraction: opts.halfDay && single ? 0.5 : 1 });
+    else if (sandwich) out.push({ date: key, fraction: 1 }); // sandwich: off day between two LOP days
+    cur.setDate(cur.getDate() + 1);
+  }
+  return out;
+}
+
+// Create the LOP entries for an approved leave request (source 'leave').
+function createLopEntriesForLeave(req) {
+  if (!req || req.status !== "Approved") return 0;
+  const settings = getLopSettings();
+  const half = (Number(req.daysCount) === 0.5);
+  const dates = lopDatesForRange(req.startDate, req.endDate, { sandwichRule: settings.sandwichRule, halfDay: half });
+  let n = 0;
+  dates.forEach(d => { if (addLopEntry(req.employeeId, d.date, d.fraction, "leave", req.id)) n++; });
+  return n;
+}
+
+// Base monthly gross for an employee: effective salary structure first, then the
+// admin's stored base rate, then a department default. Used by the portal to
+// show an employee their estimated Loss of Pay deduction.
+const DEPT_DEFAULT_GROSS = { Engineering: 85000, Product: 78000, Operations: 92000, Infrastructure: 88000 };
+function getBaseGrossFor(emp, monthStr) {
+  if (!emp) return 0;
+  const saved = resolveMonthlyGross(emp.id, monthStr);
+  if (saved !== null && saved !== undefined) return saved;
+  const rates = getStore("vkon_pay_rates_v1", {});
+  if (rates[emp.id]) return Number(rates[emp.id]) || 0;
+  return DEPT_DEFAULT_GROSS[emp.department] || 70000;
+}
+
+// Employee-facing estimate of a Loss of Pay deduction for a month.
+function estimateLopDeduction(empId, monthStr, lopDays) {
+  const emp = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES).find(e => e.id === empId);
+  if (!emp) return { perDayRate: 0, amount: 0, divisor: 30 };
+  const settings = getLopSettings();
+  const parts = monthStr.split("-").map(Number);
+  const year = parts[0], month0 = parts[1] - 1;
+  const holidaySet = new Set(getDeclaredHolidays().map(h => h.date));
+  const gross = getBaseGrossFor(emp, monthStr);
+  const eff = prorateGross(gross, emp.enrolledAt || "", emp.resignedOn || "", year, month0);
+  const divisor = lopDivisorValue(settings.divisorMode, year, month0, holidaySet);
+  const raw = perDayRateRaw(eff, divisor);
+  return { perDayRate: round2(raw), amount: round2(raw * (Number(lopDays) || 0)), divisor };
 }
 
 // WFH days used in a week = approved WFH requests + actual WFH punch records,
