@@ -10450,6 +10450,21 @@ body:not(.light-theme) .chip-manager strong { color: #eef2f7; }
 .roster-manager-line strong { color: var(--text-main, #0f172a); }
 
 /* ==========================================================================
+   v8.7 TASK COMPLETION — employee can Start / Mark Done from My Tasks.
+   ========================================================================== */
+.task-right { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; justify-content: flex-end; }
+.task-actions { display: flex; align-items: center; gap: 0.4rem; }
+.task-act-btn { white-space: nowrap; }
+.task-act-btn.task-done { background: #059669; border-color: #059669; color: #fff; }
+.task-act-btn.task-done:hover { background: #047857; border-color: #047857; color: #fff; }
+body:not(.light-theme) .task-act-btn.task-done { background: rgba(15, 157, 107, 0.9); border-color: #0f9d6b; color: #eafff5; }
+.task-done-tag { color: #15803d; font-weight: 700; }
+body:not(.light-theme) .task-done-tag { color: #4ade80; }
+.my-task-item.completed { opacity: 0.9; }
+.my-task-item.completed .mr-kind { text-decoration: line-through; color: var(--text-muted, #64748b); }
+.my-task-item.completed .mr-icon { background: rgba(15, 157, 107, 0.14); color: #16a34a; }
+
+/* ==========================================================================
    v8.4 LOSS OF PAY + MY REQUESTS — rose LoP identity across portal & admin,
    plus the employee "My Requests" tracker list.
    ========================================================================== */

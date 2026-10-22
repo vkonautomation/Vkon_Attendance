@@ -3129,7 +3129,8 @@ function initNotifications() {
   }
 }
 
-// My Tasks — read mirror of the Admin Task Board for the logged-in employee.
+// My Tasks — the employee's own view of the Admin Task Board. Read the items
+// and act on them (Start / Mark Done); the admin's board reflects it instantly.
 function renderMyTasks() {
   if (!employeeState.currentEmployee) return;
   const empId = employeeState.currentEmployee.id;
@@ -3143,11 +3144,26 @@ function renderMyTasks() {
   const emptyEl = document.getElementById("emptyMyTasksMsg");
   if (!listEl) return;
 
+  // One-time delegated listener for the per-task action buttons.
+  if (!listEl.dataset.bound) {
+    listEl.dataset.bound = "1";
+    listEl.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-task-action]");
+      if (!btn) return;
+      const id = btn.getAttribute("data-id");
+      const action = btn.getAttribute("data-task-action");
+      if (action === "done") updateMyTaskStatus(id, "Done");
+      else if (action === "start") updateMyTaskStatus(id, "In Progress");
+    });
+  }
+
   if (emptyEl) emptyEl.style.display = my.length ? "none" : "block";
   if (summaryEl) {
+    const doneN = my.length - open.length;
     summaryEl.innerHTML = my.length ? `
       <span class="mr-chip mr-pending"><i class="fa-solid fa-briefcase"></i> Open ${open.length}</span>
-      <span class="mr-chip ${overdue.length ? "mr-rejected" : "mr-approved"}"><i class="fa-solid fa-triangle-exclamation"></i> Overdue ${overdue.length}</span>` : "";
+      <span class="mr-chip ${overdue.length ? "mr-rejected" : "mr-approved"}"><i class="fa-solid fa-triangle-exclamation"></i> Overdue ${overdue.length}</span>
+      <span class="mr-chip mr-approved"><i class="fa-solid fa-circle-check"></i> Completed ${doneN}</span>` : "";
   }
 
   const PILL = { "Open": "badge-leave-day", "In Progress": "badge-wfh-day", "Done": "badge-present" };
@@ -3155,16 +3171,53 @@ function renderMyTasks() {
   const sorted = my.slice().sort((a, b) => (order[a.status] - order[b.status]) || String(a.due || "9999").localeCompare(String(b.due || "9999")));
   listEl.innerHTML = sorted.map(t => {
     const isOverdue = t.due && t.due < todayKey && t.status !== "Done";
+    const isDone = t.status === "Done";
+    const doneWhen = isDone && t.completedAt ? ` \u00b7 <span class="task-done-tag">Completed ${formatDateKey(new Date(t.completedAt))}</span>` : "";
+    const actions = isDone ? ""
+      : `<div class="task-actions">${t.status === "Open" ? `<button type="button" class="btn btn-ghost btn-sm task-act-btn task-start" data-task-action="start" data-id="${t.id}" title="Start this task"><i class="fa-solid fa-play"></i> Start</button>` : ""}<button type="button" class="btn btn-primary btn-sm task-act-btn task-done" data-task-action="done" data-id="${t.id}" title="Mark this task as completed"><i class="fa-solid fa-check"></i> Mark Done</button></div>`;
     return `
-      <div class="my-task-item${isOverdue ? " overdue" : ""}">
-        <div class="mr-icon"><i class="fa-solid ${isOverdue ? "fa-triangle-exclamation" : "fa-list-check"}"></i></div>
+      <div class="my-task-item${isOverdue ? " overdue" : ""}${isDone ? " completed" : ""}">
+        <div class="mr-icon"><i class="fa-solid ${isDone ? "fa-circle-check" : (isOverdue ? "fa-triangle-exclamation" : "fa-list-check")}"></i></div>
         <div class="mr-main">
           <div class="mr-kind">${t.title}</div>
-          <div class="mr-dates">${t.due ? `Due ${t.due}` : "No due date"}${isOverdue ? ' \u00b7 <span class="task-overdue-tag">Overdue</span>' : ""}</div>
+          <div class="mr-dates">${t.due ? `Due ${t.due}` : "No due date"}${isOverdue ? ' \u00b7 <span class="task-overdue-tag">Overdue</span>' : ""}${doneWhen}</div>
         </div>
-        <span class="day-badge-pill ${PILL[t.status] || "badge-neutral"}">${t.status}</span>
+        <div class="task-right">
+          <span class="day-badge-pill ${PILL[t.status] || "badge-neutral"}">${isDone ? "Completed" : t.status}</span>
+          ${actions}
+        </div>
       </div>`;
   }).join("");
+}
+
+// Employee updates the status of one of their own tasks (Start / Mark Done).
+function updateMyTaskStatus(taskId, newStatus) {
+  if (!employeeState.currentEmployee) return;
+  const empId = employeeState.currentEmployee.id;
+  const tasks = getStore("vkon_tasks_v1", []);
+  const t = tasks.find(x => x.id === taskId && x.assigneeId === empId);
+  if (!t) { showToast("Task not found.", "error"); return; }
+  if (t.status === newStatus) return;
+
+  t.status = newStatus;
+  if (newStatus === "Done") {
+    t.completedAt = new Date().toISOString();
+    t.completedBy = empId;
+  } else {
+    delete t.completedAt;
+  }
+  setStore("vkon_tasks_v1", tasks);
+
+  // Sync the decision snapshot so the employee's own change doesn't bounce back
+  // as a self-notification on the next syncAdminUpdates pass.
+  const snaps = getStore(STORAGE_KEYS.ADMIN_DECISION_SNAP, {}) || {};
+  if (snaps[empId]) {
+    snaps[empId][`TASK:${taskId}`] = newStatus;
+    setStore(STORAGE_KEYS.ADMIN_DECISION_SNAP, snaps);
+  }
+
+  renderMyTasks();
+  showToast(newStatus === "Done" ? "Task marked as completed." : "Task marked as in progress.", "success");
 }
 
 // ============================================================================
