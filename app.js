@@ -300,6 +300,8 @@ function loadEmployeeSession(emp) {
   try { renderMyTasks(); } catch (e) { console.error("renderMyTasks err:", e); }
   // Surface admin decisions (approvals, task assignments) as notifications.
   try { syncAdminUpdates(emp.id); renderNotifications(emp.id); } catch (e) { console.error("notifications err:", e); }
+  // Reveal the Team Requests manager surface only for employees with reports.
+  try { initTeamRequestsNav(emp); } catch (e) { console.error("initTeamRequestsNav err:", e); }
 }
 
 // ============================================================================
@@ -373,7 +375,7 @@ function renderMonthlyCalendar() {
   const regPendingMap = {};
   try {
     getStore(STORAGE_KEYS.REGULARISATIONS, [])
-      .filter(r => employeeState.currentEmployee && r.employeeId === employeeState.currentEmployee.id && r.status === "Pending")
+      .filter(r => employeeState.currentEmployee && r.employeeId === employeeState.currentEmployee.id && (r.status === "Pending" || r.status === "Pending Manager" || r.status === "Pending Admin"))
       .forEach(r => { regPendingMap[r.date] = r; });
   } catch (e) { console.warn("reg pending map err:", e); }
 
@@ -813,6 +815,14 @@ function renderMyLeavesStatusList() {
       statusClass = "status-badge-rejected";
       statusIcon = "fa-circle-xmark";
       statusLabel = "Rejected";
+    } else if (req.status === "Pending Manager") {
+      statusClass = "badge-pending-manager";
+      statusIcon = "fa-user-tie";
+      statusLabel = "Pending Manager";
+    } else if (req.status === "Pending Admin") {
+      statusClass = "badge-pending-admin";
+      statusIcon = "fa-clock";
+      statusLabel = "Pending Admin";
     } else if (req.status === "Cancellation Requested") {
       statusClass = "status-badge-cancel-pending";
       statusIcon = "fa-triangle-exclamation";
@@ -826,7 +836,7 @@ function renderMyLeavesStatusList() {
     const isRh = req.category === "RH" || req.category === "Restricted";
 
     let actionBtnHtml = "";
-    if (req.status === "Pending") {
+    if (req.status === "Pending Manager" || req.status === "Pending Admin" || req.status === "Pending") {
       actionBtnHtml = `
         <button type="button" class="btn-cancel-req cancel-leave-req-btn" data-id="${req.id}">
           <i class="fa-solid fa-ban"></i> Cancel Request
@@ -861,34 +871,26 @@ function renderMyLeavesStatusList() {
     container.appendChild(item);
   });
 
-  // Attach Self-Cancel (Pending) listeners
+  // Attach Self-Cancel (pending stages) listeners
   container.querySelectorAll(".cancel-leave-req-btn").forEach(btn => {
     btn.addEventListener("click", () => {
-      const id = btn.dataset.id;
-      let leaves = getStore(STORAGE_KEYS.LEAVES, []);
-      const target = leaves.find(l => l.id === id);
-      if (target) {
-        target.status = "Cancelled";
-        setStore(STORAGE_KEYS.LEAVES, leaves);
-        renderLeaveBox();
-        renderMonthlyCalendar();
-        showToast("Leave request withdrawn.", "info");
-      }
+      const res = cancelPendingRequest("leave", btn.dataset.id, empId);
+      if (!res) { showToast("This request can no longer be cancelled.", "warning"); return; }
+      renderLeaveBox();
+      renderMonthlyCalendar();
+      try { renderMyRequests(); } catch (e) { /* non-fatal */ }
+      showToast("Leave request withdrawn.", "info");
     });
   });
 
   // Attach Ask-Admin-To-Cancel (Approved) listeners
   container.querySelectorAll(".ask-cancel-leave-btn").forEach(btn => {
     btn.addEventListener("click", () => {
-      const id = btn.dataset.id;
-      let leaves = getStore(STORAGE_KEYS.LEAVES, []);
-      const target = leaves.find(l => l.id === id);
-      if (target) {
-        target.status = "Cancellation Requested";
-        setStore(STORAGE_KEYS.LEAVES, leaves);
-        renderLeaveBox();
-        showToast("Leave cancellation requested from Admin.", "warning");
-      }
+      const res = requestAdminCancellation("leave", btn.dataset.id, empId);
+      if (!res) { showToast("Could not send the cancellation request.", "warning"); return; }
+      renderLeaveBox();
+      try { renderMyRequests(); } catch (e) { /* non-fatal */ }
+      showToast("Leave cancellation requested from Admin.", "warning");
     });
   });
 }
@@ -1204,9 +1206,10 @@ function initLeaveBox() {
       category: isRh ? "Restricted" : (isLop ? "LossOfPay" : "Personal"),
       type: isRh ? "Restricted Holiday" : (isLop ? "Loss of Pay (Unpaid)" : "Personal Leave"),
       reason: reasonVal,
-      status: "Pending", // Awaiting Admin Review
       createdAt: formatDateKey(new Date())
     };
+    // Route the new request through the configured manager/admin workflow.
+    Object.assign(newLeave, routingForNewRequest(isLop ? "lop" : "leave", empId));
 
     const allLeaves = getStore(STORAGE_KEYS.LEAVES, []);
     allLeaves.push(newLeave);
@@ -2126,7 +2129,7 @@ function initActionHubToggles() {
 
 function countWfhDaysInWeek(empId, weekKey) {
   const allWfh = getStore(STORAGE_KEYS.WFH, []);
-  return allWfh.filter(w => w.employeeId === empId && w.weekKey === weekKey && (w.status === "Approved" || w.status === "Pending")).length;
+  return allWfh.filter(w => w.employeeId === empId && w.weekKey === weekKey && (w.status === "Approved" || w.status === "Pending" || w.status === "Pending Manager" || w.status === "Pending Admin")).length;
 }
 
 function countApprovedWfhDaysInWeek(empId, weekKey) {
@@ -2222,6 +2225,14 @@ function renderWfhBox() {
           statusClass = "status-badge-rejected";
           statusIcon = "fa-circle-xmark";
           statusLabel = "Rejected";
+        } else if (item.status === "Pending Manager") {
+          statusClass = "badge-pending-manager";
+          statusIcon = "fa-user-tie";
+          statusLabel = "Pending Manager";
+        } else if (item.status === "Pending Admin") {
+          statusClass = "badge-pending-admin";
+          statusIcon = "fa-clock";
+          statusLabel = "Pending Admin";
         } else if (item.status === "Cancellation Requested") {
           statusClass = "status-badge-cancel-pending";
           statusIcon = "fa-triangle-exclamation";
@@ -2233,7 +2244,7 @@ function renderWfhBox() {
         }
 
         let actionBtnHtml = "";
-        if (item.status === "Pending") {
+        if (item.status === "Pending Manager" || item.status === "Pending Admin") {
           actionBtnHtml = `
             <button type="button" class="btn-cancel-req cancel-wfh-req-btn" data-id="${item.id}">
               <i class="fa-solid fa-ban"></i> Cancel Request
@@ -2270,31 +2281,23 @@ function renderWfhBox() {
       // Self-cancel pending WFH
       listEl.querySelectorAll(".cancel-wfh-req-btn").forEach(btn => {
         btn.addEventListener("click", () => {
-          const id = btn.dataset.id;
-          let wfhItems = getStore(STORAGE_KEYS.WFH, []);
-          const target = wfhItems.find(w => w.id === id);
-          if (target) {
-            target.status = "Cancelled";
-            setStore(STORAGE_KEYS.WFH, wfhItems);
-            renderWfhBox();
-            renderMonthlyCalendar();
-            showToast("Work From Home request cancelled.", "info");
-          }
+          const res = cancelPendingRequest("wfh", btn.dataset.id, employeeState.currentEmployee.id);
+          if (!res) { showToast("This request can no longer be cancelled.", "warning"); return; }
+          renderWfhBox();
+          renderMonthlyCalendar();
+          try { renderMyRequests(); } catch (e) { /* non-fatal */ }
+          showToast("Work From Home request cancelled.", "info");
         });
       });
 
       // Ask Admin to cancel approved WFH
       listEl.querySelectorAll(".ask-cancel-wfh-btn").forEach(btn => {
         btn.addEventListener("click", () => {
-          const id = btn.dataset.id;
-          let wfhItems = getStore(STORAGE_KEYS.WFH, []);
-          const target = wfhItems.find(w => w.id === id);
-          if (target) {
-            target.status = "Cancellation Requested";
-            setStore(STORAGE_KEYS.WFH, wfhItems);
-            renderWfhBox();
-            showToast("WFH cancellation request sent to Admin.", "warning");
-          }
+          const res = requestAdminCancellation("wfh", btn.dataset.id, employeeState.currentEmployee.id);
+          if (!res) { showToast("Could not send the cancellation request.", "warning"); return; }
+          renderWfhBox();
+          try { renderMyRequests(); } catch (e) { /* non-fatal */ }
+          showToast("WFH cancellation request sent to Admin.", "warning");
         });
       });
     }
@@ -2385,16 +2388,16 @@ function initWfhBox() {
       return;
     }
 
-    // Submit for Admin approval (WFH only applies once approved by Admin)
+    // Submit for approval (WFH only applies once the workflow reaches Approved)
     const newReq = {
       id: `WFH-${Date.now()}`,
       employeeId: empId,
       employeeName: employeeState.currentEmployee.name,
       date: dateVal,
       weekKey: weekKey,
-      status: "Pending", // Sent to admin for approval
       createdAt: formatDateKey(new Date())
     };
+    Object.assign(newReq, routingForNewRequest("wfh", empId));
 
     allWfh.push(newReq);
     setStore(STORAGE_KEYS.WFH, allWfh);
@@ -2797,10 +2800,18 @@ function renderMyRegularisationsList() {
       statusClass = "status-badge-rejected";
       statusIcon = "fa-ban";
       statusLabel = "Cancelled";
+    } else if (req.status === "Pending Manager") {
+      statusClass = "badge-pending-manager";
+      statusIcon = "fa-user-tie";
+      statusLabel = "Pending Manager";
+    } else if (req.status === "Pending Admin") {
+      statusClass = "badge-pending-admin";
+      statusIcon = "fa-clock";
+      statusLabel = "Pending Admin";
     }
 
     let actionBtnHtml = "";
-    if (req.status === "Pending") {
+    if (req.status === "Pending Manager" || req.status === "Pending Admin") {
       actionBtnHtml = `
         <button type="button" class="btn-cancel-req cancel-reg-btn" data-id="${req.id}">
           <i class="fa-solid fa-ban"></i> Cancel Request
@@ -2829,19 +2840,14 @@ function renderMyRegularisationsList() {
     container.appendChild(card);
   });
 
-  // Attach cancel listeners
+  // Attach cancel listeners (engine handles the staged withdrawal)
   container.querySelectorAll(".cancel-reg-btn").forEach(btn => {
     btn.addEventListener("click", () => {
-      const id = btn.dataset.id;
-      let regs = getStore(STORAGE_KEYS.REGULARISATIONS, []);
-      const target = regs.find(r => r.id === id);
-      if (target) {
-        target.status = "Cancelled";
-        setStore(STORAGE_KEYS.REGULARISATIONS, regs);
-        renderMyRegularisationsList();
-        try { renderMonthlyCalendar(); } catch (e) { console.error(e); }
-        showToast("Attendance regularisation request cancelled.", "info");
-      }
+      const res = cancelPendingRequest("regularisation", btn.dataset.id, employeeState.currentEmployee.id);
+      if (!res) { showToast("This request can no longer be cancelled.", "warning"); return; }
+      renderMyRegularisationsList();
+      try { renderMonthlyCalendar(); renderMyRequests(); } catch (e) { console.error(e); }
+      showToast("Attendance regularisation request cancelled.", "info");
     });
   });
 }
@@ -2895,7 +2901,7 @@ function initAttendanceRegularisation() {
     }
 
     const allRegs = getStore(STORAGE_KEYS.REGULARISATIONS, []);
-    const existing = allRegs.find(r => r.employeeId === employeeState.currentEmployee.id && r.date === dateVal && r.status === "Pending");
+    const existing = allRegs.find(r => r.employeeId === employeeState.currentEmployee.id && r.date === dateVal && (r.status === "Pending" || r.status === "Pending Manager" || r.status === "Pending Admin"));
     if (existing) {
       showToast("A pending regularisation request already exists for this date.", "warning");
       return;
@@ -2910,9 +2916,9 @@ function initAttendanceRegularisation() {
       inTime: inVal,
       outTime: outVal,
       reason: reasonVal,
-      status: "Pending",
       createdAt: formatDateKey(new Date())
     };
+    Object.assign(newReq, routingForNewRequest("regularisation", employeeState.currentEmployee.id));
 
     allRegs.push(newReq);
     setStore(STORAGE_KEYS.REGULARISATIONS, allRegs);
@@ -2940,12 +2946,14 @@ function renderMyRequests() {
     if (l.employeeId !== empId) return;
     const isLop = l.category === "LossOfPay" || (l.type || "").indexOf("Loss of Pay") !== -1;
     items.push({
+      type: "leave", id: l.id,
       kind: isLop ? "Loss of Pay" : (l.type || "Personal Leave"),
       icon: isLop ? "fa-hand-holding-dollar" : "fa-umbrella-beach",
       dates: l.startDate === l.endDate ? l.startDate : `${l.startDate} \u2192 ${l.endDate}`,
       days: l.daysCount || 1,
       reason: l.reason || "",
       status: l.status || "Pending",
+      trail: l.approvalTrail || [],
       createdAt: l.createdAt || l.startDate || ""
     });
   });
@@ -2954,12 +2962,14 @@ function renderMyRequests() {
   getStore(STORAGE_KEYS.WFH, []).forEach(w => {
     if (w.employeeId !== empId) return;
     items.push({
+      type: "wfh", id: w.id,
       kind: "Work From Home",
       icon: "fa-house-laptop",
       dates: w.date || "",
       days: 1,
       reason: w.reason || "",
       status: w.status || "Pending",
+      trail: w.approvalTrail || [],
       createdAt: w.createdAt || w.date || ""
     });
   });
@@ -2968,12 +2978,14 @@ function renderMyRequests() {
   getStore(STORAGE_KEYS.REGULARISATIONS, []).forEach(r => {
     if (r.employeeId !== empId) return;
     items.push({
+      type: "regularisation", id: r.id,
       kind: "Regularisation",
       icon: "fa-clock-rotate-left",
       dates: r.date || "",
       days: 1,
       reason: r.reason || "",
       status: r.status || "Pending",
+      trail: r.approvalTrail || [],
       createdAt: r.createdAt || r.date || ""
     });
   });
@@ -2989,8 +3001,9 @@ function renderMyRequests() {
   if (emptyEl) emptyEl.style.display = items.length ? "none" : "block";
   if (!items.length) { listEl.innerHTML = ""; if (summaryEl) summaryEl.innerHTML = ""; return; }
 
+  const isPending = st => st === "Pending Manager" || st === "Pending Admin" || st === "Pending";
   const count = st => items.filter(i => i.status === st).length;
-  const pendingN = count("Pending") + count("Cancellation Requested");
+  const pendingN = items.filter(i => isPending(i.status) || i.status === "Cancellation Requested").length;
   const approvedN = count("Approved");
   const rejectedN = count("Rejected") + count("Cancelled");
   if (summaryEl) {
@@ -3001,6 +3014,8 @@ function renderMyRequests() {
   }
 
   const STATUS_CLASS = {
+    "Pending Manager": "badge-pending-manager",
+    "Pending Admin": "badge-pending-admin",
     "Pending": "badge-leave-day",
     "Approved": "badge-present",
     "Rejected": "badge-absent-day",
@@ -3008,19 +3023,65 @@ function renderMyRequests() {
     "Cancellation Requested": "status-badge-cancel-pending"
   };
 
+  function stageNote(status) {
+    if (status === "Pending Manager") return "Awaiting your manager's approval.";
+    if (status === "Pending Admin") return "Awaiting Admin's approval.";
+    return "";
+  }
+  function trailHtml(trail) {
+    if (!trail || !trail.length) return "";
+    const steps = trail.map(t =>
+      `<span class="mr-trail-step ${t.decision}"><i class="fa-solid ${t.decision === "approved" ? "fa-check" : "fa-xmark"}"></i> `
+      + `${t.stage === "manager" ? "Manager" : "Admin"}${t.approverName ? " \u00b7 " + t.approverName : ""}`
+      + (t.comment ? ` <em>\u2014 ${t.comment}</em>` : "") + "</span>"
+    ).join("");
+    return `<div class="mr-trail">${steps}</div>`;
+  }
+
   listEl.innerHTML = items.map(it => {
     const pillCls = STATUS_CLASS[it.status] || "badge-leave-day";
     const reasonHtml = it.reason ? `<div class="mr-reason" title="${it.reason}">${it.reason}</div>` : "";
+    const noteHtml = stageNote(it.status) ? `<div class="mr-stage-note">${stageNote(it.status)}</div>` : "";
+    let actions = "";
+    if (isPending(it.status)) {
+      actions = `<button type="button" class="btn btn-xs btn-ghost mr-cancel-btn" data-type="${it.type}" data-id="${it.id}"><i class="fa-solid fa-ban"></i> Cancel</button>`;
+    } else if (it.status === "Approved") {
+      actions = `<button type="button" class="btn btn-xs btn-ghost mr-ask-cancel-btn" data-type="${it.type}" data-id="${it.id}"><i class="fa-solid fa-arrow-rotate-left"></i> Ask Admin to Cancel</button>`;
+    }
     return `
       <div class="my-req-item">
         <div class="mr-icon"><i class="fa-solid ${it.icon}"></i></div>
         <div class="mr-main">
           <div class="mr-kind">${it.kind} <span class="mr-dates">\u00b7 ${it.dates} (${it.days} day${it.days > 1 ? "s" : ""})</span></div>
           ${reasonHtml}
+          ${noteHtml}
+          ${trailHtml(it.trail)}
         </div>
-        <span class="day-badge-pill ${pillCls}">${it.status}</span>
+        <div class="mr-right">
+          <span class="day-badge-pill ${pillCls}">${it.status}</span>
+          ${actions}
+        </div>
       </div>`;
   }).join("");
+
+  listEl.querySelectorAll(".mr-cancel-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const res = cancelPendingRequest(btn.dataset.type, btn.dataset.id, empId);
+      if (!res) { showToast("This request can no longer be cancelled.", "warning"); return; }
+      try { renderLeaveBox(); renderWfhBox(); renderMyRegularisationsList(); renderMonthlyCalendar(); } catch (e) { /* non-fatal */ }
+      renderMyRequests();
+      showToast("Request withdrawn.", "info");
+    });
+  });
+  listEl.querySelectorAll(".mr-ask-cancel-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const res = requestAdminCancellation(btn.dataset.type, btn.dataset.id, empId);
+      if (!res) { showToast("Could not send the cancellation request.", "warning"); return; }
+      try { renderLeaveBox(); renderWfhBox(); renderMyRegularisationsList(); } catch (e) { /* non-fatal */ }
+      renderMyRequests();
+      showToast("Cancellation requested from Admin.", "warning");
+    });
+  });
 }
 
 // ============================================================================
@@ -3038,34 +3099,40 @@ function syncAdminUpdates(empId) {
   const nowSnap = {};
   const at = new Date().toISOString();
 
-  getStore(STORAGE_KEYS.LEAVES, []).forEach(l => {
-    if (l.employeeId !== empId) return;
-    const key = `LEAVE:${l.id}`;
-    nowSnap[key] = l.status;
-    if (snap[key] && snap[key] !== l.status && l.status !== "Pending") {
-      pushNotification(empId, l.status === "Approved" ? "approved" : (l.status === "Rejected" ? "rejected" : "cancelled"),
-        `${l.status === "Rejected" ? "Leave Rejected" : (l.status === "Cancelled" ? "Leave Cancelled" : "Leave Approved")}`,
-        `Your ${l.type || "leave"} request (${l.startDate}${l.endDate !== l.startDate ? " \u2192 " + l.endDate : ""}) is now ${l.status}.`, "requests");
-    }
-  });
-  getStore(STORAGE_KEYS.WFH, []).forEach(w => {
-    if (w.employeeId !== empId) return;
-    const key = `WFH:${w.id}`;
-    nowSnap[key] = w.status;
-    if (snap[key] && snap[key] !== w.status && (w.status === "Approved" || w.status === "Rejected")) {
-      pushNotification(empId, w.status === "Approved" ? "approved" : "rejected",
-        `WFH ${w.status}`, `Your WFH request for ${w.date} is now ${w.status}.`, "requests");
-    }
-  });
-  getStore(STORAGE_KEYS.REGULARISATIONS, []).forEach(r => {
-    if (r.employeeId !== empId) return;
-    const key = `REG:${r.id}`;
-    nowSnap[key] = r.status;
-    if (snap[key] && snap[key] !== r.status && (r.status === "Approved" || r.status === "Rejected")) {
-      pushNotification(empId, r.status === "Approved" ? "approved" : "rejected",
-        `Regularisation ${r.status}`, `Your regularisation for ${r.date} is now ${r.status}.`, "requests");
-    }
-  });
+  // Classify a staged status into an employee-facing notification. This diff
+  // (snapshot vs current) is the SINGLE source of approval notifications, so
+  // the engine and admin console never push directly (avoids duplicates).
+  function decisionFor(r, typeLabel) {
+    const st = r.status;
+    const trail = r.approvalTrail || [];
+    const last = trail.length ? trail[trail.length - 1] : null;
+    const reason = r.rejectionReason || (last && last.decision === "rejected" ? last.comment : "");
+    const dates = r.date || (r.startDate ? (r.startDate === r.endDate ? r.startDate : `${r.startDate} \u2192 ${r.endDate}`) : "");
+    if (st === "Approved") return { kind: "approved", title: `${typeLabel} Approved`, text: `Your ${typeLabel} request (${dates}) was approved${last && last.approverName ? " by " + last.approverName : ""}.` };
+    if (st === "Rejected") return { kind: "rejected", title: `${typeLabel} Rejected`, text: `Your ${typeLabel} request (${dates}) was rejected${reason ? ". Reason: " + reason : ""}.` };
+    if (st === "Cancelled") return { kind: "cancelled", title: `${typeLabel} Cancelled`, text: `Your ${typeLabel} request (${dates}) was cancelled.` };
+    if (st === "Cancellation Requested") return { kind: "info", title: `${typeLabel} cancellation sent`, text: `Your cancellation for (${dates}) was sent to Admin.` };
+    if (st === "Pending Admin") return { kind: "info", title: `${typeLabel} forwarded to Admin`, text: `Your manager approved the ${typeLabel} (${dates}); it now awaits Admin.` };
+    return null;
+  }
+  function syncOne(storeKey, typeLabel, prefix) {
+    getStore(storeKey, []).forEach(r => {
+      if (r.employeeId !== empId) return;
+      const key = `${prefix}:${r.id}`;
+      const prev = snap[key];
+      const cur = r.status;
+      nowSnap[key] = cur;
+      const changed = prev !== undefined && prev !== cur;
+      const firstSeenDecision = prev === undefined && (cur === "Approved" || cur === "Rejected" || cur === "Cancelled");
+      if (changed || firstSeenDecision) {
+        const d = decisionFor(r, typeLabel);
+        if (d) pushNotification(empId, d.kind, d.title, d.text, "requests");
+      }
+    });
+  }
+  syncOne(STORAGE_KEYS.LEAVES, "Leave", "LEAVE");
+  syncOne(STORAGE_KEYS.WFH, "WFH", "WFH");
+  syncOne(STORAGE_KEYS.REGULARISATIONS, "Regularisation", "REG");
   getStore("vkon_tasks_v1", []).forEach(t => {
     if (t.assigneeId !== empId) return;
     const key = `TASK:${t.id}`;
@@ -3260,6 +3327,7 @@ function initPortalSideNav() {
     dashboard: ["Dashboard", "Your day at a glance \u2022 punch in, leave & WFH"],
     attendance: ["My Attendance & Leaves", "Full calendar history, leave applications & WFH"],
     requests: ["My Requests", "Track every leave, Loss of Pay, WFH & regularisation you raised"],
+    "team-requests": ["Team Requests", "Approve or reject your team's leave, WFH & regularisation"],
     tasks: ["My Tasks", "Work assigned to you by the Admin \u2022 due dates & status"],
     regularisation: ["Regularisation Requests", "Raise & track missed-punch fixes"]
   };
@@ -3303,6 +3371,9 @@ function initPortalSideNav() {
     if (viewId === "tasks") {
       try { renderMyTasks(); } catch (e) { console.error(e); }
     }
+    if (viewId === "team-requests") {
+      try { renderTeamRequests(); } catch (e) { console.error(e); }
+    }
     document.body.classList.toggle("policy-collapsed", viewId !== "dashboard");
     closePolicyPopover();
     const meta = VIEW_META[viewId];
@@ -3342,6 +3413,143 @@ function initPortalSideNav() {
 
   switchView("dashboard");
   window.__portalSwitchView = switchView;
+}
+
+// ============================================================================
+// 9b. TEAM REQUESTS (MANAGER SURFACE) — shown only to employees with direct
+// reports. Managers approve/reject their reports' Pending Manager requests.
+// ============================================================================
+
+// Show/hide the Team Requests nav item based on whether this employee manages
+// anyone, and refresh its pending-count badge. Called on login (Req 1, 8).
+function initTeamRequestsNav(emp) {
+  const link = document.querySelector('.portal-nav-link[data-view="team-requests"]');
+  const isMgr = !!emp && typeof hasTeam === "function" && hasTeam(emp.id);
+  if (link) link.style.display = isMgr ? "" : "none";
+  updateTeamBadge();
+}
+
+function updateTeamBadge() {
+  const badge = document.getElementById("teamRequestsBadge");
+  const emp = employeeState.currentEmployee;
+  if (!badge || !emp) return;
+  const n = (typeof pendingTeamRequestCount === "function") ? pendingTeamRequestCount(emp.id) : 0;
+  if (n > 0) { badge.textContent = n; badge.style.display = "inline-flex"; }
+  else { badge.textContent = ""; badge.style.display = "none"; }
+}
+
+function _teamReqDates(r) {
+  return r.date || (r.startDate ? (r.startDate === r.endDate ? r.startDate : `${r.startDate} \u2192 ${r.endDate}`) : "");
+}
+function _teamReqLabel(type, r) {
+  if (type === "wfh") return "Work From Home";
+  if (type === "regularisation") return "Regularisation";
+  const isLop = r.category === "LossOfPay" || (r.type || "").indexOf("Loss of Pay") !== -1;
+  return isLop ? "Loss of Pay" : (r.type || "Leave");
+}
+
+function teamReqCardHtml(type, r) {
+  const label = _teamReqLabel(type, r);
+  const icon = type === "wfh" ? "fa-house-laptop" : type === "regularisation" ? "fa-clock-rotate-left" : "fa-umbrella-beach";
+  const dates = _teamReqDates(r);
+  const days = r.daysCount ? ` (${r.daysCount} day${r.daysCount > 1 ? "s" : ""})` : "";
+  const reason = r.reason || (r.missedType ? `${r.missedType}${r.inTime ? ` \u00b7 ${r.inTime}\u2013${r.outTime || ""}` : ""}` : "");
+  return `
+    <div class="team-req-card">
+      <div class="tr-head">
+        <span class="tr-icon"><i class="fa-solid ${icon}"></i></span>
+        <div class="tr-title"><strong>${r.employeeName || r.employeeId}</strong><span class="tr-kind">${label}${days}</span></div>
+        <span class="tr-dates font-mono">${dates}</span>
+      </div>
+      ${reason ? `<div class="tr-reason">${reason}</div>` : ""}
+      <div class="tr-actions">
+        <button type="button" class="btn btn-xs btn-primary team-approve-btn" data-type="${type}" data-id="${r.id}"><i class="fa-solid fa-check"></i> Approve</button>
+        <button type="button" class="btn btn-xs btn-ghost text-danger team-reject-btn" data-type="${type}" data-id="${r.id}"><i class="fa-solid fa-xmark"></i> Reject</button>
+      </div>
+    </div>`;
+}
+
+function renderTeamRequests() {
+  const emp = employeeState.currentEmployee;
+  const listEl = document.getElementById("teamRequestsList");
+  const emptyEl = document.getElementById("emptyTeamRequestsMsg");
+  const heading = document.getElementById("teamRequestsTeamSize");
+  if (!listEl || !emp) return;
+  if (heading && typeof getDirectReports === "function") {
+    const n = getDirectReports(emp.id).length;
+    heading.textContent = `${n} direct report${n === 1 ? "" : "s"}`;
+  }
+  const items = (typeof getTeamRequests === "function") ? getTeamRequests(emp.id, ["Pending Manager"]) : [];
+  if (emptyEl) emptyEl.style.display = items.length ? "none" : "block";
+  listEl.innerHTML = items.map(it => teamReqCardHtml(it.type, it.request)).join("");
+  listEl.querySelectorAll(".team-approve-btn").forEach(btn => btn.addEventListener("click", () => managerDecide(btn.dataset.type, btn.dataset.id, "approve")));
+  listEl.querySelectorAll(".team-reject-btn").forEach(btn => btn.addEventListener("click", () => managerDecide(btn.dataset.type, btn.dataset.id, "reject")));
+  renderTeamCalendar();
+  updateTeamBadge();
+}
+
+function managerDecide(type, id, decision) {
+  const emp = employeeState.currentEmployee;
+  if (!emp) return;
+  let comment = "";
+  if (decision === "reject") {
+    comment = window.prompt("Rejection reason (required, shown to the employee):", "") || "";
+    if (!comment.trim()) { showToast("A rejection reason is required.", "error"); return; }
+  } else {
+    comment = window.prompt("Optional comment (shown to the employee; leave blank for none):", "") || "";
+  }
+  const res = advanceApproval(type, id, { role: "manager", id: emp.id, name: emp.name }, decision, comment);
+  if (res && res.error === "reason_required") { showToast("A rejection reason is required.", "error"); return; }
+  if (!res) { showToast("This request is no longer awaiting your action.", "warning"); return; }
+  showToast(decision === "reject" ? "Request rejected."
+    : (res.status === "Approved" ? "Approved and applied." : "Approved; forwarded to Admin."),
+    decision === "reject" ? "warning" : "success");
+  renderTeamRequests();
+  try { renderMyRequests(); } catch (e) { /* non-fatal */ }
+}
+
+// Who on the team is off this month (pending + approved leave/WFH), by date.
+function renderTeamCalendar() {
+  const emp = employeeState.currentEmployee;
+  const el = document.getElementById("teamCalendarWrap");
+  if (!el || !emp || typeof getDirectReports !== "function") return;
+  const reports = getDirectReports(emp.id);
+  if (!reports.length) { el.innerHTML = `<p class="text-muted">You have no direct reports.</p>`; return; }
+
+  const todayKey = (typeof getTodayKey === "function") ? getTodayKey() : formatDateKey(new Date());
+  const base = new Date(todayKey + "T00:00:00");
+  const year = base.getFullYear(), month = base.getMonth();
+  const monthLabel = new Date(year, month, 1).toLocaleDateString("en-GB", { month: "long", year: "numeric" });
+  const nameOf = id => { const r = reports.find(x => x.id === id); return r ? r.name : id; };
+  const days = {};
+  const add = (d, empId, label, status) => { (days[d] = days[d] || []).push({ name: nameOf(empId), label, status }); };
+  const off = s => s !== "Rejected" && s !== "Cancelled";
+
+  getStore(STORAGE_KEYS.LEAVES, []).forEach(l => {
+    if (!reports.some(r => r.id === l.employeeId) || !off(l.status)) return;
+    const isLop = l.category === "LossOfPay";
+    const cur = new Date(l.startDate + "T00:00:00");
+    const end = new Date(l.endDate + "T00:00:00");
+    while (cur <= end) {
+      if (cur.getFullYear() === year && cur.getMonth() === month) add(formatDateKey(cur), l.employeeId, isLop ? "LOP" : (l.category === "Restricted" ? "RH" : "Leave"), l.status);
+      cur.setDate(cur.getDate() + 1);
+    }
+  });
+  getStore(STORAGE_KEYS.WFH, []).forEach(w => {
+    if (!reports.some(r => r.id === w.employeeId) || !off(w.status) || !w.date) return;
+    const dt = new Date(w.date + "T00:00:00");
+    if (dt.getFullYear() === year && dt.getMonth() === month) add(w.date, w.employeeId, "WFH", w.status);
+  });
+
+  const dates = Object.keys(days).sort();
+  const rows = dates.map(d =>
+    `<div class="tc-day"><div class="tc-date font-mono">${d}</div><div class="tc-entries">` +
+    days[d].map(e => `<span class="tc-chip ${e.status === "Approved" ? "tc-approved" : "tc-pending"}">${e.name} \u00b7 ${e.label} <em>${e.status}</em></span>`).join("") +
+    `</div></div>`
+  ).join("");
+
+  el.innerHTML = `<div class="tc-head"><strong>${monthLabel}</strong><span class="tc-team">${reports.length} report${reports.length > 1 ? "s" : ""}</span></div>` +
+    (rows || `<p class="text-muted">No one on your team has requested time off this month.</p>`);
 }
 
 // ----------------------------------------------------------------------------

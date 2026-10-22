@@ -20,7 +20,9 @@ const STORAGE_KEYS = {
   NOTIFICATIONS: "vkon_notifications_v6",
   ADMIN_DECISION_SNAP: "vkon_admin_decision_snap_v6",
   // --- Loss of Pay ---
-  LOP_ENTRIES: "vkon_lop_entries_v1"
+  LOP_ENTRIES: "vkon_lop_entries_v1",
+  // --- Manager + Admin approval workflow ---
+  APPROVAL_FLOW: "vkon_approval_flow_v1"
 };
 
 // Default Company Geofence Coordinates
@@ -438,6 +440,314 @@ function estimateLopDeduction(empId, lopDays) {
   const raw = perDayRateRaw(salary);
   return { perDaySalary: round2(raw), amount: round2(raw * (Number(lopDays) || 0)) };
 }
+
+// ============================================================================
+// MANAGER + ADMIN APPROVAL WORKFLOW — configurable per request type.
+// ============================================================================
+// The four request types that flow through the approval engine. A Leave whose
+// category is Loss of Pay is routed with its own "lop" rule, so LOP can default
+// to Manager-then-Admin while ordinary Leave is Manager-only.
+const APPROVAL_TYPES = ["leave", "wfh", "regularisation", "lop"];
+const APPROVAL_ROUTES = ["manager_only", "manager_then_admin"];
+const APPROVAL_STATUSES = ["Pending Manager", "Pending Admin", "Approved", "Rejected", "Cancelled", "Cancellation Requested"];
+const DEFAULT_APPROVAL_FLOW = {
+  leave: "manager_only",
+  wfh: "manager_only",
+  regularisation: "manager_only",
+  lop: "manager_then_admin"
+};
+
+function getApprovalFlow() {
+  const saved = getStore(STORAGE_KEYS.APPROVAL_FLOW, {}) || {};
+  const flow = Object.assign({}, DEFAULT_APPROVAL_FLOW);
+  APPROVAL_TYPES.forEach(t => { if (APPROVAL_ROUTES.indexOf(saved[t]) !== -1) flow[t] = saved[t]; });
+  return flow;
+}
+
+function setApprovalFlow(next) {
+  const merged = getApprovalFlow();
+  Object.keys(next || {}).forEach(t => {
+    if (APPROVAL_TYPES.indexOf(t) !== -1 && APPROVAL_ROUTES.indexOf(next[t]) !== -1) merged[t] = next[t];
+  });
+  setStore(STORAGE_KEYS.APPROVAL_FLOW, merged);
+  return merged;
+}
+
+// Map an approval type to the underlying request store key.
+function approvalTypeStoreKey(type) {
+  if (type === "wfh") return STORAGE_KEYS.WFH;
+  if (type === "regularisation") return STORAGE_KEYS.REGULARISATIONS;
+  return STORAGE_KEYS.LEAVES;
+}
+
+// A Leave record is a "lop" request when its category/type is Loss of Pay.
+function leaveApprovalType(leave) {
+  if (!leave) return "leave";
+  return (leave.category === "LossOfPay" || (leave.type || "").indexOf("Loss of Pay") !== -1) ? "lop" : "leave";
+}
+
+// --- Manager relationships -------------------------------------------------
+function getDirectReports(managerId) {
+  if (!managerId) return [];
+  return getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES).filter(e => e.managerId === managerId && e.id !== managerId);
+}
+function hasTeam(managerId) { return getDirectReports(managerId).length > 0; }
+function isManagerOf(managerId, empId) {
+  if (!managerId || !empId || managerId === empId) return false;
+  const emp = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES).find(e => e.id === empId);
+  return !!emp && emp.managerId === managerId;
+}
+function _employeeName(empId) {
+  const e = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES).find(x => x.id === empId);
+  return e ? e.name : (empId || "");
+}
+
+// --- Routing ---------------------------------------------------------------
+// Returns the ordered list of approval stages for a request. Req 4: when the
+// employee has no manager, or is their own manager, the manager stage is
+// skipped so the request goes straight to Admin.
+function resolveApprovalRoute(type, empId) {
+  const flow = getApprovalFlow();
+  const emp = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES).find(e => e.id === empId);
+  const mgrId = emp ? emp.managerId : "";
+  const hasMgr = !!mgrId && mgrId !== empId;
+  if (!hasMgr) return ["admin"];
+  return flow[type] === "manager_then_admin" ? ["manager", "admin"] : ["manager"];
+}
+function statusForStage(stage) { return stage === "manager" ? "Pending Manager" : "Pending Admin"; }
+function initialStatusForRoute(route) { return statusForStage((route && route[0]) || "admin"); }
+function stageFromStatus(status) {
+  if (status === "Pending Manager") return "manager";
+  if (status === "Pending Admin") return "admin";
+  return null;
+}
+
+// Convenience for submit handlers: the fields a brand-new request should carry.
+function routingForNewRequest(type, empId) {
+  const route = resolveApprovalRoute(type, empId);
+  return { approvalRoute: route, status: initialStatusForRoute(route), approvalTrail: [] };
+}
+
+// Append one step to a request's audit trail (approver, decision, comment, when).
+function recordApprovalTrail(req, stage, actor, decision, comment) {
+  if (!req.approvalTrail) req.approvalTrail = [];
+  const name = (actor && actor.name) || (actor && actor.id ? _employeeName(actor.id) : (stage === "admin" ? "Admin" : ""));
+  req.approvalTrail.push({
+    stage,
+    approverId: (actor && actor.id) || "",
+    approverName: name,
+    role: stage,
+    decision,
+    comment: comment || "",
+    at: new Date().toISOString()
+  });
+}
+
+// Attendance / balance / LOP side effects are applied ONLY when a request
+// reaches the final Approved state (Req 11). Reversal happens on cancellation.
+function applyApprovedEffect(type, req) {
+  if (!req) return;
+  const records = getStore(STORAGE_KEYS.RECORDS, {});
+  if (type === "leave") {
+    const isRh = req.category === "RH" || req.category === "Restricted";
+    const isLop = req.category === "LossOfPay";
+    const cur = new Date(req.startDate + "T00:00:00");
+    const end = new Date(req.endDate + "T00:00:00");
+    while (cur <= end) {
+      if (cur.getDay() !== 0 && cur.getDay() !== 6) {
+        const dStr = formatDateKey(cur);
+        records[`${req.employeeId}_${dStr}`] = {
+          employeeId: req.employeeId, date: dStr,
+          status: isLop ? "Loss of Pay" : "Leave",
+          checkInTime: "-", checkOutTime: "-",
+          duration: isLop ? "Loss of Pay (Unpaid)" : (isRh ? "Restricted Holiday (RH)" : "Personal Leave"),
+          hoursDecimal: 0, distance: 0,
+          locationType: `${isLop ? "Loss of Pay" : (isRh ? "RH" : "Personal Leave")} (Approved)`,
+          bioVerified: false, selfieUrl: null
+        };
+      }
+      cur.setDate(cur.getDate() + 1);
+    }
+    setStore(STORAGE_KEYS.RECORDS, records);
+    if (isLop) {
+      createLopEntriesForLeave(req);
+    } else if (!isRh) {
+      const emp = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES).find(x => x.id === req.employeeId);
+      if (emp) {
+        const quota = (getEmployeeLeaveQuota(emp.id).personalLeave) || 0;
+        const used = computeApprovedLeaveDaysUsed(emp.id);
+        const overflow = Math.max(0, used - quota);
+        if (overflow > 0) {
+          const dates = lopDatesForRange(req.startDate, req.endDate, {});
+          let booked = 0;
+          for (let i = dates.length - 1; i >= 0 && booked < overflow; i--) {
+            if (addLopEntry(emp.id, dates[i].date, dates[i].fraction, "excess", req.id)) booked++;
+          }
+        }
+      }
+    }
+  } else if (type === "wfh") {
+    const employees = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
+    const emp = employees.find(e => e.id === req.employeeId) || { avatar: null };
+    records[`${req.employeeId}_${req.date}`] = {
+      employeeId: req.employeeId, date: req.date, status: "WFH",
+      checkInTime: "09:00 AM", checkOutTime: "06:00 PM", duration: "Scheduled Shift",
+      hoursDecimal: 9.0, distance: 0, locationType: "Work From Home (Approved)",
+      bioVerified: true, selfieUrl: emp.avatar
+    };
+    setStore(STORAGE_KEYS.RECORDS, records);
+  } else if (type === "regularisation") {
+    const employees = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
+    const emp = employees.find(e => e.id === req.employeeId) || {};
+    records[`${req.employeeId}_${req.date}`] = {
+      employeeId: req.employeeId, date: req.date, status: "Present",
+      checkInTime: req.inTime || "09:15 AM", checkOutTime: req.outTime || "06:15 PM",
+      duration: "Regularised Shift (9h 00m)", hoursDecimal: 9.0, distance: 25,
+      locationType: "Office (Regularised)", bioVerified: true, regularised: true,
+      capturedTimestamp: Date.now(), selfieUrl: emp.avatar || null
+    };
+    setStore(STORAGE_KEYS.RECORDS, records);
+  }
+}
+
+function removeApprovedEffect(type, req) {
+  if (!req) return;
+  const records = getStore(STORAGE_KEYS.RECORDS, {});
+  if (type === "leave") {
+    const cur = new Date(req.startDate + "T00:00:00");
+    const end = new Date(req.endDate + "T00:00:00");
+    while (cur <= end) {
+      const dStr = formatDateKey(cur);
+      const rec = records[`${req.employeeId}_${dStr}`];
+      if (rec && (rec.status === "Leave" || rec.status === "Loss of Pay")) delete records[`${req.employeeId}_${dStr}`];
+      cur.setDate(cur.getDate() + 1);
+    }
+    setStore(STORAGE_KEYS.RECORDS, records);
+    cancelLopEntriesByRef(req.id);
+  } else if (type === "wfh") {
+    const rec = records[`${req.employeeId}_${req.date}`];
+    if (rec && rec.status === "WFH") { delete records[`${req.employeeId}_${req.date}`]; setStore(STORAGE_KEYS.RECORDS, records); }
+  } else if (type === "regularisation") {
+    const rec = records[`${req.employeeId}_${req.date}`];
+    if (rec && rec.regularised) { delete records[`${req.employeeId}_${req.date}`]; setStore(STORAGE_KEYS.RECORDS, records); }
+  }
+}
+
+function _approvalLabel(type) { return type === "wfh" ? "WFH" : type === "regularisation" ? "Regularisation" : "Leave"; }
+
+
+// The single source of truth for one approval step, used by BOTH the manager
+// console and the admin console. Req 5: a manager may only act on their own
+// reports' requests at the manager stage; an admin may act on any pending step
+// (including on behalf of an absent manager).
+function advanceApproval(type, id, actor, decision, comment) {
+  const key = approvalTypeStoreKey(type);
+  const list = getStore(key, []);
+  const req = list.find(r => r.id === id);
+  if (!req) return null;
+  const stage = stageFromStatus(req.status);
+  if (!stage) return null;
+
+  if (actor && actor.role === "manager") {
+    if (stage !== "manager") return null;
+    if (!isManagerOf(actor.id, req.employeeId)) return null;
+  }
+
+  const route = (req.approvalRoute && req.approvalRoute.length) ? req.approvalRoute : resolveApprovalRoute(type, req.employeeId);
+
+  if (decision === "reject") {
+    const reason = (comment || "").trim();
+    if (!reason) return { error: "reason_required" };
+    recordApprovalTrail(req, stage, actor, "rejected", reason);
+    req.status = "Rejected";
+    req.rejectionReason = reason;
+    // Employee notifications are raised by the portal's syncAdminUpdates (the
+    // single source), so the engine stays side-effect-only to avoid duplicates.
+    setStore(key, list);
+    return req;
+  }
+
+  if (decision === "approve") {
+    recordApprovalTrail(req, stage, actor, "approved", comment);
+    const nextIdx = route.indexOf(stage) + 1;
+    const finalApproved = nextIdx >= route.length;
+    req.status = finalApproved ? "Approved" : statusForStage(route[nextIdx]);
+    setStore(key, list);
+    if (finalApproved) applyApprovedEffect(type, req);
+    return req;
+  }
+
+  return null;
+}
+
+// Employee cancels a still-pending request (either pending stage). Req 9.
+function cancelPendingRequest(type, id, empId) {
+  const key = approvalTypeStoreKey(type);
+  const list = getStore(key, []);
+  const req = list.find(r => r.id === id);
+  if (!req) return null;
+  if (empId && req.employeeId !== empId) return null;
+  if (req.status !== "Pending Manager" && req.status !== "Pending Admin") return null;
+  req.status = "Cancelled";
+  setStore(key, list);
+  return req;
+}
+
+// After approval, an employee asks Admin to cancel; Admin then approves (reverts
+// effects) or declines (stays Approved).
+function requestAdminCancellation(type, id, empId) {
+  const key = approvalTypeStoreKey(type);
+  const list = getStore(key, []);
+  const req = list.find(r => r.id === id);
+  if (!req) return null;
+  if (empId && req.employeeId !== empId) return null;
+  if (req.status !== "Approved") return null;
+  req.status = "Cancellation Requested";
+  setStore(key, list);
+  return req;
+}
+
+function resolveAdminCancellation(type, id, approve) {
+  const key = approvalTypeStoreKey(type);
+  const list = getStore(key, []);
+  const req = list.find(r => r.id === id);
+  if (!req || req.status !== "Cancellation Requested") return null;
+  if (approve) { req.status = "Cancelled"; removeApprovedEffect(type, req); } else { req.status = "Approved"; }
+  setStore(key, list);
+  return req;
+}
+
+// Manager's pending queue (their direct reports' requests awaiting the manager
+// step). Returns [{ type, request }] across the three stores.
+function getTeamRequests(managerId, statuses) {
+  const reports = getDirectReports(managerId);
+  const ids = new Set(reports.map(r => r.id));
+  const want = statuses || ["Pending Manager"];
+  const out = [];
+  ["wfh", "leave", "regularisation"].forEach(t => {
+    getStore(approvalTypeStoreKey(t), []).forEach(r => {
+      if (ids.has(r.employeeId) && want.indexOf(r.status) !== -1) out.push({ type: t, request: r });
+    });
+  });
+  out.sort((a, b) => String((a.request.submittedAt || a.request.createdAt || "")).localeCompare(String((b.request.submittedAt || b.request.createdAt || ""))));
+  return out;
+}
+
+function pendingTeamRequestCount(managerId) { return getTeamRequests(managerId, ["Pending Manager"]).length; }
+
+// Compact view of where a request is and what approvers have said, for the
+// employee's own request cards.
+function approvalSummary(req) {
+  const trail = (req && req.approvalTrail) || [];
+  const lastRejection = trail.filter(t => t.decision === "rejected").pop();
+  return {
+    stage: req ? req.status : "",
+    trail,
+    last: trail.length ? trail[trail.length - 1] : null,
+    rejectionReason: (req && req.rejectionReason) || (lastRejection ? lastRejection.comment : "")
+  };
+}
+
 
 // WFH days used in a week = approved WFH requests + actual WFH punch records,
 // de-duplicated by date, so a worked WFH day always counts toward its week.
@@ -1152,6 +1462,26 @@ function initializeDatabase() {
       }
     });
     if (salChanged) setStore(STORAGE_KEYS.EMPLOYEES, emps);
+  } catch (e) { /* non-fatal */ }
+  // One-time migration: move legacy single-"Pending" requests onto the new
+  // staged model so they surface in the correct manager/admin queue.
+  try {
+    [["wfh", STORAGE_KEYS.WFH], ["leave", STORAGE_KEYS.LEAVES], ["regularisation", STORAGE_KEYS.REGULARISATIONS]].forEach(pair => {
+      const type = pair[0];
+      const list = getStore(pair[1], []);
+      let changed = false;
+      list.forEach(r => {
+        if (r.status === "Pending") {
+          const effType = type === "leave" ? leaveApprovalType(r) : type;
+          const route = resolveApprovalRoute(effType, r.employeeId);
+          r.approvalRoute = route;
+          r.status = initialStatusForRoute(route);
+          if (!r.approvalTrail) r.approvalTrail = [];
+          changed = true;
+        }
+      });
+      if (changed) setStore(pair[1], list);
+    });
   } catch (e) { /* non-fatal */ }
   if (!getStore(STORAGE_KEYS.ADMIN_CREDENTIALS, null)) {
     setStore(STORAGE_KEYS.ADMIN_CREDENTIALS, DEFAULT_ADMIN_CREDENTIALS);

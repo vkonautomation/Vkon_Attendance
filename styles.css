@@ -10645,6 +10645,110 @@ body:not(.light-theme) .mr-icon { background: rgba(99, 102, 241, 0.2); color: #a
   text-overflow: ellipsis;
 }
 
+/* ============================================================================
+   MANAGER + ADMIN APPROVAL WORKFLOW — LAYER v10.0 (2026)
+   Staged status badges, approval audit trail, Team Requests manager surface.
+   ========================================================================== */
+.badge-pending-manager {
+  background: rgba(99, 102, 241, 0.16);
+  color: #a5b4fc;
+  border: 1px solid rgba(99, 102, 241, 0.4);
+}
+.badge-pending-admin {
+  background: rgba(245, 158, 11, 0.16);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.36);
+}
+body.light-theme .badge-pending-manager { background: #eef2ff; color: #4338ca; border-color: #c7d2fe; }
+body.light-theme .badge-pending-admin { background: #fffbeb; color: #b45309; border-color: #fcd9a3; }
+
+/* My Requests: right-hand stack (status pill + action) and stage/comment feed */
+.mr-right { display: flex; flex-direction: column; align-items: flex-end; gap: 0.4rem; flex: 0 0 auto; }
+.mr-stage-note { font-size: 0.72rem; color: var(--text-muted, #64748b); margin-top: 0.22rem; font-style: italic; }
+.mr-trail { margin-top: 0.4rem; display: flex; flex-direction: column; gap: 0.2rem; }
+.mr-trail-step { font-size: 0.72rem; display: inline-flex; align-items: center; gap: 0.3rem; }
+.mr-trail-step.approved { color: #15803d; }
+.mr-trail-step.rejected { color: #b91c1c; }
+body:not(.light-theme) .mr-trail-step.approved { color: #4ade80; }
+body:not(.light-theme) .mr-trail-step.rejected { color: #f87171; }
+.mr-trail-step em { color: var(--text-muted, #64748b); }
+
+/* Admin Approvals audit trail block under a request row */
+.approval-trail { margin-top: 0.4rem; display: flex; flex-direction: column; gap: 0.15rem; }
+.approval-trail-line { font-size: 0.72rem; color: var(--text-muted, #64748b); }
+.approval-trail-stage {
+  font-size: 0.62rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0.05rem 0.32rem;
+  border-radius: 999px;
+  margin-right: 0.15rem;
+}
+.approval-trail-stage.manager-stage { background: rgba(99, 102, 241, 0.16); color: #6366f1; }
+.approval-trail-stage.admin-stage { background: rgba(16, 185, 129, 0.16); color: #10b981; }
+.approval-trail-decision.approved { color: #15803d; font-weight: 700; }
+.approval-trail-decision.rejected { color: #b91c1c; font-weight: 700; }
+body:not(.light-theme) .approval-trail-decision.approved { color: #4ade80; }
+body:not(.light-theme) .approval-trail-decision.rejected { color: #f87171; }
+.approval-trail-comment { color: var(--text-muted, #94a3b8); }
+
+/* Team Requests (manager surface) */
+.team-requests-list { display: flex; flex-direction: column; gap: 0.7rem; }
+.team-req-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 0.85rem 1rem;
+  background: #fff;
+}
+body:not(.light-theme) .team-req-card { background: rgba(148, 163, 184, 0.06); border-color: var(--border-glass, rgba(148, 163, 184, 0.18)); }
+.tr-head { display: flex; align-items: center; gap: 0.6rem; }
+.tr-icon {
+  flex: 0 0 auto; width: 2rem; height: 2rem; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; font-size: 0.85rem;
+  background: rgba(99, 102, 241, 0.12); color: #6366f1;
+}
+body:not(.light-theme) .tr-icon { background: rgba(99, 102, 241, 0.2); color: #a5b4fc; }
+.tr-title { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; }
+.tr-kind { font-size: 0.76rem; color: var(--text-muted, #64748b); }
+.tr-dates { font-size: 0.8rem; font-weight: 700; }
+.tr-reason { margin: 0.5rem 0 0; font-size: 0.8rem; color: var(--text-muted, #64748b); }
+.tr-actions { display: flex; gap: 0.5rem; margin-top: 0.7rem; }
+
+/* Team calendar */
+.team-calendar { margin-top: 1.4rem; }
+.tc-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 0.6rem; }
+.tc-team { font-size: 0.76rem; color: var(--text-muted, #64748b); }
+.tc-day { display: flex; gap: 0.75rem; align-items: flex-start; padding: 0.4rem 0; border-top: 1px dashed #e2e8f0; }
+body:not(.light-theme) .tc-day { border-top-color: rgba(148, 163, 184, 0.18); }
+.tc-date { flex: 0 0 6rem; font-size: 0.78rem; font-weight: 700; color: var(--text-muted, #64748b); }
+.tc-entries { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.tc-chip { font-size: 0.72rem; padding: 0.18rem 0.5rem; border-radius: 999px; border: 1px solid transparent; }
+.tc-chip em { opacity: 0.7; font-style: normal; }
+.tc-chip.tc-approved { background: #ecfdf3; color: #15803d; border-color: #bbf7d0; }
+.tc-chip.tc-pending { background: #fffbeb; color: #b45309; border-color: #fcd9a3; }
+body:not(.light-theme) .tc-chip.tc-approved { background: rgba(15, 157, 107, 0.16); color: #4ade80; border-color: rgba(74, 222, 128, 0.3); }
+body:not(.light-theme) .tc-chip.tc-pending { background: rgba(245, 158, 11, 0.16); color: #fbbf24; border-color: rgba(251, 191, 36, 0.35); }
+
+/* Sidebar pending-count badge for the Team Requests nav item */
+.nav-badge {
+  margin-left: auto;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-primary, #f97316);
+  color: #fff;
+}
+
+/* Settings approval-flow card */
+.approval-flow-card { margin-top: 1.25rem; }
+
 
 
 

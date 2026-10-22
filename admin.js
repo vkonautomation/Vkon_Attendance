@@ -1271,9 +1271,10 @@ function updatePendingBadges() {
   const leaves = getStore(STORAGE_KEYS.LEAVES, []);
   const regs = getStore(STORAGE_KEYS.REGULARISATIONS, []);
 
-  const pendingWfh = wfh.filter(w => w.status === "Pending" || w.status === "Cancellation Requested").length;
-  const pendingLeaves = leaves.filter(l => l.status === "Pending" || l.status === "Cancellation Requested").length;
-  const pendingRegs = regs.filter(r => r.status === "Pending").length;
+  const _isPending = s => s === "Pending Manager" || s === "Pending Admin" || s === "Pending";
+  const pendingWfh = wfh.filter(w => _isPending(w.status) || w.status === "Cancellation Requested").length;
+  const pendingLeaves = leaves.filter(l => _isPending(l.status) || l.status === "Cancellation Requested").length;
+  const pendingRegs = regs.filter(r => _isPending(r.status)).length;
 
   const total = pendingWfh + pendingLeaves + pendingRegs;
   
@@ -1364,21 +1365,10 @@ function renderWfhApprovals() {
       const emp = employees.find(e => e.id === w.employeeId) || { name: w.employeeName || w.employeeId };
       const tr = document.createElement("tr");
 
-      let statusBadge = "";
-      if (w.status === "Approved") {
-        statusBadge = `<span class="day-badge-pill badge-present"><i class="fa-solid fa-check"></i> Approved</span>`;
-      } else if (w.status === "Rejected") {
-        statusBadge = `<span class="day-badge-pill badge-absent-day"><i class="fa-solid fa-xmark"></i> Rejected</span>`;
-      } else if (w.status === "Cancellation Requested") {
-        statusBadge = `<span class="day-badge-pill status-badge-cancel-pending"><i class="fa-solid fa-triangle-exclamation"></i> Cancel Requested</span>`;
-      } else if (w.status === "Cancelled") {
-        statusBadge = `<span class="day-badge-pill badge-absent-day">Cancelled</span>`;
-      } else {
-        statusBadge = `<span class="day-badge-pill badge-leave-day"><i class="fa-solid fa-clock"></i> Pending Approval</span>`;
-      }
+      const statusBadge = approvalStatusBadge(w.status, "Approved");
 
       let actionsHtml = "";
-      if (w.status === "Pending") {
+      if (isAdminActionableStatus(w.status)) {
         actionsHtml = `
           <div class="action-btn-cluster">
             <button class="btn btn-xs btn-primary approve-wfh-btn" data-id="${w.id}">
@@ -1411,7 +1401,7 @@ function renderWfhApprovals() {
         </td>
         <td><strong class="font-mono text-primary">${w.date}</strong></td>
         <td><span class="font-mono">${w.weekKey || '-'}</span></td>
-        <td>${statusBadge}</td>
+        <td>${statusBadge}${renderApprovalTrail(w)}</td>
         <td>${actionsHtml}</td>
       `;
       tbody.appendChild(tr);
@@ -1433,54 +1423,7 @@ function renderWfhApprovals() {
 }
 
 function handleWfhDecision(id, decision) {
-  let wfhList = getStore(STORAGE_KEYS.WFH, []);
-  const req = wfhList.find(w => w.id === id);
-  if (!req) return;
-
-  const records = getStore(STORAGE_KEYS.RECORDS, {});
-  const employees = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
-  const emp = employees.find(e => e.id === req.employeeId) || { avatar: null };
-
-  if (decision === "Approved") {
-    req.status = "Approved";
-    records[`${req.employeeId}_${req.date}`] = {
-      employeeId: req.employeeId,
-      date: req.date,
-      status: "WFH",
-      checkInTime: "09:00 AM",
-      checkOutTime: "06:00 PM",
-      duration: "Scheduled Shift",
-      hoursDecimal: 9.0,
-      distance: 0,
-      locationType: "Work From Home (Approved)",
-      bioVerified: true,
-      selfieUrl: emp.avatar
-    };
-    setStore(STORAGE_KEYS.RECORDS, records);
-    showToast(`WFH request on ${req.date} approved and applied to calendar!`, "success");
-  } else if (decision === "Rejected") {
-    req.status = "Rejected";
-    showToast(`WFH request on ${req.date} rejected.`, "warning");
-  } else if (decision === "ApproveCancellation") {
-    req.status = "Cancelled";
-    if (records[`${req.employeeId}_${req.date}`] && records[`${req.employeeId}_${req.date}`].status === "WFH") {
-      delete records[`${req.employeeId}_${req.date}`];
-      setStore(STORAGE_KEYS.RECORDS, records);
-    }
-    showToast(`WFH on ${req.date} cancelled and removed from calendar.`, "info");
-  } else if (decision === "RejectCancellation") {
-    req.status = "Approved";
-    showToast(`Cancellation rejected; WFH on ${req.date} remains approved.`, "info");
-  }
-
-  setStore(STORAGE_KEYS.WFH, wfhList);
-  if (typeof pushNotification === "function") {
-    const WFH_MSG = { Approved: `Your WFH request for ${req.date} was approved.`, Rejected: `Your WFH request for ${req.date} was rejected.`, Cancelled: `Your WFH cancellation for ${req.date} was approved — the day is no longer marked WFH.`, ApprovedAgain: `Your WFH cancellation for ${req.date} was rejected; WFH remains approved.` };
-    const msgKey = decision === "ApproveCancellation" ? "Cancelled" : (decision === "RejectCancellation" ? "ApprovedAgain" : decision);
-    if (WFH_MSG[msgKey]) pushNotification(req.employeeId, msgKey === "Rejected" ? "rejected" : (msgKey === "Approved" ? "approved" : "info"), msgKey === "Approved" ? "WFH Approved" : (msgKey === "Rejected" ? "WFH Rejected" : "WFH Update"), WFH_MSG[msgKey], "requests");
-  }
-  renderApprovalsCenter();
-  renderMonthlyReport();
+  _adminApprovalDecision("wfh", id, decision);
 }
 
 // -------------------------------------------------------------
@@ -1507,7 +1450,7 @@ function renderLeaveApprovals() {
 
       // Estimated pay deduction shown to the admin before approving a LOP request.
       let lopEstimate = "";
-      if (isLop && l.status === "Pending") {
+      if (isLop && isAdminActionableStatus(l.status)) {
         try {
           const days = Number(l.daysCount) || 1;
           const est = (typeof estimateLopDeduction === "function") ? estimateLopDeduction(l.employeeId, days) : { perDaySalary: 0, amount: 0 };
@@ -1515,21 +1458,10 @@ function renderLeaveApprovals() {
         } catch (e) { /* non-fatal */ }
       }
 
-      let statusBadge = "";
-      if (l.status === "Approved") {
-        statusBadge = `<span class="day-badge-pill badge-present"><i class="fa-solid fa-check"></i> Approved</span>`;
-      } else if (l.status === "Rejected") {
-        statusBadge = `<span class="day-badge-pill badge-absent-day"><i class="fa-solid fa-xmark"></i> Rejected</span>`;
-      } else if (l.status === "Cancellation Requested") {
-        statusBadge = `<span class="day-badge-pill status-badge-cancel-pending"><i class="fa-solid fa-triangle-exclamation"></i> Cancel Requested</span>`;
-      } else if (l.status === "Cancelled") {
-        statusBadge = `<span class="day-badge-pill badge-absent-day">Cancelled</span>`;
-      } else {
-        statusBadge = `<span class="day-badge-pill badge-leave-day"><i class="fa-solid fa-clock"></i> Pending Approval</span>`;
-      }
+      const statusBadge = approvalStatusBadge(l.status, "Approved");
 
       let actionsHtml = "";
-      if (l.status === "Pending") {
+      if (isAdminActionableStatus(l.status)) {
         actionsHtml = `
           <div class="action-btn-cluster">
             <button class="btn btn-xs btn-primary approve-leave-btn" data-id="${l.id}">
@@ -1565,7 +1497,7 @@ function renderLeaveApprovals() {
         </td>
         <td><strong class="font-mono">${l.startDate}</strong>${l.startDate !== l.endDate ? ` to <strong class="font-mono">${l.endDate}</strong>` : ''}</td>
         <td><span class="font-bold text-warning">${l.daysCount} Day(s)</span>${lopEstimate}</td>
-        <td>${l.reason || '-'}</td>
+        <td>${l.reason || '-'}${renderApprovalTrail(l)}</td>
         <td>${statusBadge}</td>
         <td>${actionsHtml}</td>
       `;
@@ -1587,96 +1519,81 @@ function renderLeaveApprovals() {
   }
 }
 
+// Admin decision entry point for a Leave row. Delegates every step to the
+// shared approval engine (advanceApproval / resolveAdminCancellation) so the
+// admin and the manager use one source of truth, and effects apply only on
+// final approval.
 function handleLeaveDecision(id, decision) {
-  let leaves = getStore(STORAGE_KEYS.LEAVES, []);
-  const req = leaves.find(l => l.id === id);
-  if (!req) return;
+  _adminApprovalDecision("leave", id, decision);
+}
 
-  const records = getStore(STORAGE_KEYS.RECORDS, {});
-  const isRh = req.category === "RH" || req.category === "Restricted";
-  const isLop = req.category === "LossOfPay";
-
-  if (decision === "Approved") {
-    req.status = "Approved";
-    const cur = new Date(req.startDate + "T00:00:00");
-    const end = new Date(req.endDate + "T00:00:00");
-    while (cur <= end) {
-      if (cur.getDay() !== 0 && cur.getDay() !== 6) {
-        const dStr = formatDateKey(cur);
-        records[`${req.employeeId}_${dStr}`] = {
-          employeeId: req.employeeId,
-          date: dStr,
-          status: isLop ? "Loss of Pay" : "Leave",
-          checkInTime: "-",
-          checkOutTime: "-",
-          duration: isLop ? "Loss of Pay (Unpaid)" : (isRh ? "Restricted Holiday (RH)" : "Personal Leave"),
-          hoursDecimal: 0,
-          distance: 0,
-          locationType: `${isLop ? "Loss of Pay" : (isRh ? "RH" : "Personal Leave")} (Approved)`,
-          bioVerified: false,
-          selfieUrl: null
-        };
-      }
-      cur.setDate(cur.getDate() + 1);
-    }
-    setStore(STORAGE_KEYS.RECORDS, records);
-
-    // Persist the leaves list first so quota math sees this approved request.
-    setStore(STORAGE_KEYS.LEAVES, leaves);
-
-    if (isLop) {
-      // An approved LOP leave books one LOP day per working day.
-      if (typeof createLopEntriesForLeave === "function") createLopEntriesForLeave(req);
-    } else if (!isRh) {
-      // Paid balance exhausted \u2192 overflow days auto-convert to LOP.
-      const emp = (getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES).find(x => x.id === req.employeeId));
-      if (emp) {
-        const quota = (getEmployeeLeaveQuota(emp.id).personalLeave) || 0;
-        const used = (typeof computeApprovedLeaveDaysUsed === "function") ? computeApprovedLeaveDaysUsed(emp.id) : 0;
-        const overflow = Math.max(0, used - quota);
-        if (overflow > 0) {
-          const dates = (typeof lopDatesForRange === "function") ? lopDatesForRange(req.startDate, req.endDate, {}) : [];
-          let booked = 0;
-          for (let i = dates.length - 1; i >= 0 && booked < overflow; i--) {
-            if (addLopEntry(emp.id, dates[i].date, dates[i].fraction, "excess", req.id)) booked++;
-          }
-        }
-      }
-    }
-    showToast(`Leave request ${id} approved and marked on calendar!`, "success");
-  } else if (decision === "Rejected") {
-    req.status = "Rejected";
-    showToast(`Leave request ${id} rejected.`, "warning");
-  } else if (decision === "ApproveCancellation") {
-    req.status = "Cancelled";
-    const cur = new Date(req.startDate + "T00:00:00");
-    const end = new Date(req.endDate + "T00:00:00");
-    while (cur <= end) {
-      const dStr = formatDateKey(cur);
-      if (records[`${req.employeeId}_${dStr}`] && (records[`${req.employeeId}_${dStr}`].status === "Leave" || records[`${req.employeeId}_${dStr}`].status === "Loss of Pay")) {
-        delete records[`${req.employeeId}_${dStr}`];
-      }
-      cur.setDate(cur.getDate() + 1);
-    }
-    setStore(STORAGE_KEYS.RECORDS, records);
-    // Only approved requests count; a cancelled leave reverses its LOP days.
-    if (typeof cancelLopEntriesByRef === "function") cancelLopEntriesByRef(id);
-    showToast(`Leave request ${id} cancelled and calendar reverted.`, "info");
-  } else if (decision === "RejectCancellation") {
-    req.status = "Approved";
-    showToast(`Leave cancellation request rejected; leave remains approved.`, "info");
+// Shared admin decision flow for leave / wfh / regularisation. Reject always
+// requires a reason (Req 6); approve takes an optional comment. The admin may
+// act on any pending stage, including a manager's step (Req 5).
+function _adminApprovalDecision(type, id, decision) {
+  if (decision === "ApproveCancellation" || decision === "RejectCancellation") {
+    const approve = decision === "ApproveCancellation";
+    const key = approvalTypeStoreKey(type);
+    const list = getStore(key, []);
+    const req = list.find(r => r.id === id);
+    if (!req) return;
+    resolveAdminCancellation(type, id, approve);
+    // The employee's portal surfaces this via syncAdminUpdates (single source).
+    _afterAdminDecision();
+    return;
   }
 
-  setStore(STORAGE_KEYS.LEAVES, leaves);
-  if (typeof pushNotification === "function") {
-    const kind = decision === "Approved" ? "approved" : (decision === "Rejected" ? "rejected" : (decision === "ApproveCancellation" ? "cancelled" : "info"));
-    const dates = req.startDate === req.endDate ? req.startDate : `${req.startDate} → ${req.endDate}`;
-    const TITLE = { Approved: "Leave Approved", Rejected: "Leave Rejected", ApproveCancellation: "Leave Cancelled", RejectCancellation: "Cancellation Rejected" };
-    const TEXT = { Approved: `Your ${req.type || "leave"} request (${dates}) was approved.`, Rejected: `Your ${req.type || "leave"} request (${dates}) was rejected.`, ApproveCancellation: `Your cancellation for ${dates} was approved — the days are back on the floor.`, RejectCancellation: `Your cancellation for ${dates} was rejected; the leave remains approved.` };
-    if (TITLE[decision]) pushNotification(req.employeeId, kind, TITLE[decision], TEXT[decision], "requests");
+  const isReject = decision === "Rejected";
+  let comment = "";
+  if (isReject) {
+    comment = window.prompt("Rejection reason (required, shown to the employee):", "") || "";
+    if (!comment.trim()) { showToast("A rejection reason is required.", "error"); return; }
+  } else {
+    comment = window.prompt("Optional comment for the employee (leave blank for none):", "") || "";
   }
+
+  const res = advanceApproval(type, id, { role: "admin", name: "Admin" }, isReject ? "reject" : "approve", comment);
+  if (res && res.error === "reason_required") { showToast("A rejection reason is required.", "error"); return; }
+  if (!res) { showToast("This request is not awaiting a decision.", "warning"); return; }
+  showToast(isReject ? "Request rejected."
+    : (res.status === "Approved" ? "Approved and applied to attendance."
+       : (res.status === "Pending Admin" ? "Manager step approved; forwarded to Admin." : "Approved.")), isReject ? "warning" : "success");
+  _afterAdminDecision();
+}
+
+function _afterAdminDecision() {
   renderApprovalsCenter();
-  renderMonthlyReport();
+  if (typeof renderMonthlyReport === "function") renderMonthlyReport();
+}
+
+// Small block under a request row showing what each approver decided (Req 10).
+function renderApprovalTrail(req) {
+  const trail = (req && req.approvalTrail) || [];
+  if (!trail.length) return "";
+  const lines = trail.map(t =>
+    `<div class="approval-trail-line"><span class="approval-trail-stage ${t.stage}-stage">${t.stage === "manager" ? "Manager" : "Admin"}</span> `
+    + `<strong>${t.approverName || ""}</strong> `
+    + `<span class="approval-trail-decision ${t.decision}">${t.decision === "approved" ? "approved" : "rejected"}</span>`
+    + (t.comment ? ` <em class="approval-trail-comment">\u2014 ${t.comment}</em>` : "") + `</div>`
+  ).join("");
+  return `<div class="approval-trail">${lines}</div>`;
+}
+
+// Status badge shared by the three approval tables; maps the staged statuses.
+function approvalStatusBadge(status, approvedLabel, approvedClass) {
+  approvedLabel = approvedLabel || "Approved";
+  if (status === "Approved") return `<span class="day-badge-pill ${approvedClass || "badge-present"}"><i class="fa-solid fa-check"></i> ${approvedLabel}</span>`;
+  if (status === "Rejected") return `<span class="day-badge-pill badge-absent-day"><i class="fa-solid fa-xmark"></i> Rejected</span>`;
+  if (status === "Cancellation Requested") return `<span class="day-badge-pill status-badge-cancel-pending"><i class="fa-solid fa-triangle-exclamation"></i> Cancel Requested</span>`;
+  if (status === "Cancelled") return `<span class="day-badge-pill badge-absent-day">Cancelled</span>`;
+  if (status === "Pending Manager") return `<span class="day-badge-pill badge-pending-manager"><i class="fa-solid fa-user-tie"></i> Pending Manager</span>`;
+  if (status === "Pending Admin") return `<span class="day-badge-pill badge-pending-admin"><i class="fa-solid fa-clock"></i> Pending Admin</span>`;
+  return `<span class="day-badge-pill badge-leave-day"><i class="fa-solid fa-clock"></i> Pending Approval</span>`;
+}
+
+// The admin may act on any still-pending step, including a manager's (Req 5).
+function isAdminActionableStatus(status) {
+  return status === "Pending Manager" || status === "Pending Admin" || status === "Pending";
 }
 
 // -------------------------------------------------------------
@@ -1699,19 +1616,10 @@ function renderRegularisationApprovals() {
       const emp = employees.find(e => e.id === r.employeeId) || { name: r.employeeName || r.employeeId };
       const tr = document.createElement("tr");
 
-      let statusBadge = "";
-      if (r.status === "Approved") {
-        statusBadge = `<span class="day-badge-pill badge-present"><i class="fa-solid fa-check"></i> Regularised</span>`;
-      } else if (r.status === "Rejected") {
-        statusBadge = `<span class="day-badge-pill badge-absent-day"><i class="fa-solid fa-xmark"></i> Rejected</span>`;
-      } else if (r.status === "Cancelled") {
-        statusBadge = `<span class="day-badge-pill badge-absent-day">Cancelled</span>`;
-      } else {
-        statusBadge = `<span class="day-badge-pill badge-leave-day"><i class="fa-solid fa-clock"></i> Pending Approval</span>`;
-      }
+      const statusBadge = approvalStatusBadge(r.status, "Regularised");
 
       let actionsHtml = "";
-      if (r.status === "Pending") {
+      if (isAdminActionableStatus(r.status)) {
         actionsHtml = `
           <div class="action-btn-cluster">
             <button class="btn btn-xs btn-primary approve-reg-btn" data-id="${r.id}">
@@ -1734,7 +1642,7 @@ function renderRegularisationApprovals() {
         <td><strong class="font-mono text-primary">${r.date}</strong></td>
         <td><span class="badge-mini">${r.type || 'Missed Punch'}</span></td>
         <td><span class="font-mono">${r.inTime || '09:00 AM'} &bull; ${r.outTime || '06:00 PM'}</span></td>
-        <td>${r.reason || '-'}</td>
+        <td>${r.reason || '-'}${renderApprovalTrail(r)}</td>
         <td>${statusBadge}</td>
         <td>${actionsHtml}</td>
       `;
@@ -1751,47 +1659,7 @@ function renderRegularisationApprovals() {
 }
 
 function handleRegularisationDecision(id, decision) {
-  let regs = getStore(STORAGE_KEYS.REGULARISATIONS, []);
-  const req = regs.find(r => r.id === id);
-  if (!req) return;
-
-  req.status = decision;
-  setStore(STORAGE_KEYS.REGULARISATIONS, regs);
-
-  if (decision === "Approved") {
-    const records = getStore(STORAGE_KEYS.RECORDS, {});
-    const employees = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
-    const emp = employees.find(e => e.id === req.employeeId) || {};
-
-    records[`${req.employeeId}_${req.date}`] = {
-      employeeId: req.employeeId,
-      date: req.date,
-      status: "Present",
-      checkInTime: req.inTime || "09:15 AM",
-      checkOutTime: req.outTime || "06:15 PM",
-      duration: "Regularised Shift (9h 00m)",
-      hoursDecimal: 9.0,
-      distance: 25,
-      locationType: "Office (Regularised by Admin)",
-      bioVerified: true,
-      regularised: true,
-      capturedTimestamp: Date.now(),
-      selfieUrl: emp.avatar || null
-    };
-    setStore(STORAGE_KEYS.RECORDS, records);
-    showToast(`Attendance regularised! ${req.employeeName || req.employeeId} marked Present on ${req.date}.`, "success");
-  } else {
-    showToast(`Regularisation request for ${req.date} rejected.`, "warning");
-  }
-
-  if (typeof pushNotification === "function") {
-    pushNotification(req.employeeId, decision === "Approved" ? "approved" : "rejected",
-      decision === "Approved" ? "Regularisation Approved" : "Regularisation Rejected",
-      decision === "Approved" ? `Your regularisation for ${req.date} was approved — you're marked Present.` : `Your regularisation for ${req.date} was rejected.`,
-      "requests");
-  }
-  renderApprovalsCenter();
-  renderMonthlyReport();
+  _adminApprovalDecision("regularisation", id, decision);
 }
 
 // ============================================================================
@@ -3125,8 +2993,38 @@ function renderTicketList() {
   if (empty) empty.style.display = tickets.length ? "none" : "";
 }
 
+// Settings > Approval Workflow: one route per request type (Req 2).
+function renderApprovalFlowSettings() {
+  const flow = getApprovalFlow();
+  const map = { approvalFlowLeave: flow.leave, approvalFlowWfh: flow.wfh, approvalFlowRegularisation: flow.regularisation, approvalFlowLop: flow.lop };
+  Object.keys(map).forEach(id => {
+    const sel = document.getElementById(id);
+    if (sel) sel.value = map[id];
+  });
+}
+
+function initApprovalFlowSettings() {
+  renderApprovalFlowSettings();
+  const form = document.getElementById("approvalFlowForm");
+  if (form) {
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const val = id => { const el = document.getElementById(id); return el ? el.value : undefined; };
+      setApprovalFlow({
+        leave: val("approvalFlowLeave"),
+        wfh: val("approvalFlowWfh"),
+        regularisation: val("approvalFlowRegularisation"),
+        lop: val("approvalFlowLop")
+      });
+      renderApprovalFlowSettings();
+      showToast("Approval workflow saved.", "success");
+    });
+  }
+}
+
 function initExtraModules() {
   renderDeptNav();
+  if (typeof initApprovalFlowSettings === "function") initApprovalFlowSettings();
 
   const deptList = document.getElementById("deptNavList");
   if (deptList) {

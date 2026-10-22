@@ -57,7 +57,10 @@ def verify_all():
     print("\n[Req 4] LOP day sources (approved leave / paid-balance excess):")
     need("function createLopEntriesForLeave" in shared, "LOP leave entry creator missing")
     need('req.status !== "Approved"' in shared, "approved-only gate missing on entry creation")
-    need('"excess"' in admin and "getEmployeeLeaveQuota" in admin, "paid-balance overflow -> LOP not wired in admin.js")
+    # The paid-balance overflow -> LOP wiring now lives in the shared.js approval
+    # engine (applyApprovedEffect), applied only on final approval.
+    need("'excess'" in shared or '"excess"' in shared, "paid-balance overflow -> LOP not wired in shared.js")
+    need("getEmployeeLeaveQuota" in shared and "applyApprovedEffect" in shared, "paid-balance overflow not applied at final approval")
     print("  PASS")
 
     # Req 5: employee form shows estimated deduction before submitting.
@@ -90,7 +93,7 @@ def verify_all():
     # Req 9: only approved requests count (rejected/cancelled reversed).
     print("\n[Req 9] Only approved count:")
     need("cancelLopEntriesByRef" in shared, "LOP reversal on cancellation missing")
-    need("cancelLopEntriesByRef(id)" in admin, "cancellation not wired to reverse LOP in admin.js")
+    need("cancelLopEntriesByRef(req.id)" in shared, "cancellation not wired to reverse LOP in shared.js engine")
     need('e.status === "active"' in shared, "active-only day filter missing in shared.js")
     print("  PASS")
 

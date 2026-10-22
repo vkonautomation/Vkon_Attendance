@@ -24,7 +24,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="styles.css?v=20261022_lop2">
+  <link rel="stylesheet" href="styles.css?v=20261022_apr1">
 </head>
 <body class="light-theme admin-page">
 
@@ -1163,6 +1163,54 @@
           </div>
 
         </div>
+
+        <div class="glass-panel admin-card approval-flow-card">
+          <div class="card-header">
+            <div class="header-icon icon-bg-purple">
+              <i class="fa-solid fa-diagram-project"></i>
+            </div>
+            <div class="header-title">
+              <h3>Approval Workflow</h3>
+              <p>Choose who approves each request type. Employees with no manager (or who are their own manager) always go straight to Admin.</p>
+            </div>
+          </div>
+
+          <form id="approvalFlowForm" class="box-form padding-form">
+            <div class="form-row-2">
+              <div class="form-group">
+                <label for="approvalFlowLeave">Leave requests</label>
+                <select id="approvalFlowLeave" class="form-control">
+                  <option value="manager_only">Manager only</option>
+                  <option value="manager_then_admin">Manager then Admin</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="approvalFlowWfh">WFH requests</label>
+                <select id="approvalFlowWfh" class="form-control">
+                  <option value="manager_only">Manager only</option>
+                  <option value="manager_then_admin">Manager then Admin</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="approvalFlowRegularisation">Attendance Regularisation</label>
+                <select id="approvalFlowRegularisation" class="form-control">
+                  <option value="manager_only">Manager only</option>
+                  <option value="manager_then_admin">Manager then Admin</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="approvalFlowLop">Loss of Pay (LOP) leave</label>
+                <select id="approvalFlowLop" class="form-control">
+                  <option value="manager_only">Manager only</option>
+                  <option value="manager_then_admin">Manager then Admin</option>
+                </select>
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">
+              <i class="fa-solid fa-floppy-disk"></i> Save Approval Workflow
+            </button>
+          </form>
+        </div>
       </section>
 
       <!-- ================= TAB 7: ADMIN ACCOUNT & SECURITY CREDENTIALS ================= -->
@@ -1525,8 +1573,8 @@
 
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <script src="shared.js?v=20261013_ist_lop2"></script>
-  <script src="admin.js?v=20261022_lop4"></script>
+  <script src="shared.js?v=20261013_ist_apr1"></script>
+  <script src="admin.js?v=20261022_apr1"></script>
   <script src="js/password-toggle.js?v=20261019_ui1"></script>
 </body>
 </html>

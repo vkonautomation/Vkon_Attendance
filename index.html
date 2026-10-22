@@ -21,7 +21,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="styles.css?v=20261022_lop2">
+  <link rel="stylesheet" href="styles.css?v=20261022_apr1">
 </head>
 <body class="light-theme">
   
@@ -122,6 +122,10 @@
         </a>
         <a href="#" class="portal-nav-link" data-view="requests" role="button">
           <i class="fa-solid fa-inbox"></i> My Requests
+        </a>
+        <a href="#" class="portal-nav-link" data-view="team-requests" role="button" style="display: none;">
+          <i class="fa-solid fa-users"></i> Team Requests
+          <span class="nav-badge team-requests-badge" id="teamRequestsBadge" style="display: none;"></span>
         </a>
         <a href="#" class="portal-nav-link" data-view="tasks" role="button">
           <i class="fa-solid fa-list-check"></i> My Tasks
@@ -703,6 +707,26 @@
         </div>
       </section>
 
+      <!-- ================= SECTION: TEAM REQUESTS (MANAGER APPROVALS) ================= -->
+      <section class="portal-view glass-panel" id="sectionTeamRequests" data-portal-view="team-requests">
+        <div class="box-header">
+          <div class="box-icon icon-leave">
+            <i class="fa-solid fa-users"></i>
+          </div>
+          <div class="box-title">
+            <h3>Team Requests</h3>
+            <span class="box-policy-tag" id="teamRequestsTeamSize"></span>
+          </div>
+        </div>
+        <p class="subtitle" style="margin-bottom: 1.25rem;">Requests from your direct reports awaiting your decision. A manager never sees or acts on their own requests.</p>
+        <div class="team-requests-list" id="teamRequestsList"></div>
+        <div class="empty-state-card" id="emptyTeamRequestsMsg" style="display: none;">
+          <i class="fa-regular fa-circle-check"></i>
+          <p>No requests are waiting on you right now.</p>
+        </div>
+        <div class="team-calendar" id="teamCalendarWrap"></div>
+      </section>
+
       <!-- ================= SECTION: MY TASKS (ASSIGNED BY ADMIN) ================= -->
       <section class="portal-view glass-panel" id="sectionMyTasks" data-portal-view="tasks">
         <div class="box-header">
@@ -1019,8 +1043,8 @@
   <div class="toast-container" id="toastContainer"></div>
 
   <!-- Shared Engine & App Controller -->
-  <script src="shared.js?v=20261013_ist_lop2"></script>
-  <script src="app.js?v=20261022_lop2"></script>
+  <script src="shared.js?v=20261013_ist_apr1"></script>
+  <script src="app.js?v=20261022_apr1"></script>
   <script src="js/password-toggle.js?v=20261019_ui1"></script>
 
   <!-- Present Day & Migration Guarantee -->
