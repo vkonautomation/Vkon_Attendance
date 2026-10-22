@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Office Check-In Code &mdash; VKON</title>
+  <link rel="stylesheet" href="styles.css?v=20261022_code1">
+</head>
+<body class="office-code-page">
+
+  <main class="oc-wrap" aria-live="polite">
+    <header class="oc-head">
+      <h1 id="ocOfficeName"><i class="fa-solid fa-building"></i> VKON Automation Tech Park</h1>
+      <p class="oc-sub">Live check-in code &mdash; employees type this in the attendance portal. Stays valid for 60 seconds.</p>
+    </header>
+
+    <section class="oc-card">
+      <p class="oc-label">Today's rotating code</p>
+      <p class="oc-code-big" id="ocCodeText">&bull;&bull;&bull;&bull;&bull;&bull;</p>
+      <div class="oc-timer-row">
+        <div class="oc-timer-bar"><span id="ocTimerFill"></span></div>
+        <strong id="ocCountdown">60s</strong>
+      </div>
+    </section>
+
+    <footer class="oc-foot">
+      <span id="ocClock">&mdash;</span>
+      <span class="oc-err" id="ocError" style="display: none;"><i class="fa-solid fa-triangle-exclamation"></i> Needs a secure (HTTPS) page to generate codes.</span>
+    </footer>
+  </main>
+
+  <script src="shared.js?v=20261013_ist_code1"></script>
+  <script>
+    (async function () {
+      const codeText = document.getElementById("ocCodeText");
+      const fill = document.getElementById("ocTimerFill");
+      const cd = document.getElementById("ocCountdown");
+      const clock = document.getElementById("ocClock");
+      const errEl = document.getElementById("ocError");
+
+      try {
+        const s = getStore(STORAGE_KEYS.SETTINGS, DEFAULT_OFFICE);
+        document.getElementById("ocOfficeName").innerHTML = `<i class="fa-solid fa-building"></i> ${s.name || "Office"}`;
+        document.title = `Office Check-In Code — ${s.name || "VKON"}`;
+      } catch (e) { /* keep default heading */ }
+
+      // Keep the monitor awake while this page is displayed.
+      try { if (navigator.wakeLock) await navigator.wakeLock.request("screen"); } catch (e) { /* optional */ }
+
+      async function refreshCode() {
+        try {
+          codeText.textContent = await generateOfficeCode(officeCodeSlot());
+          errEl.style.display = "none";
+        } catch (e) {
+          errEl.style.display = "inline"; // crypto.subtle needs a secure context
+        }
+      }
+
+      function tick() {
+        const msInto = Date.now() % (OFFICE_CODE_SLOT_SECONDS * 1000);
+        const left = Math.ceil((OFFICE_CODE_SLOT_SECONDS * 1000 - msInto) / 1000);
+        cd.textContent = left + "s";
+        fill.style.width = ((OFFICE_CODE_SLOT_SECONDS * 1000 - msInto) / (OFFICE_CODE_SLOT_SECONDS * 10)) + "%";
+        clock.textContent = new Date().toLocaleTimeString();
+      }
+
+      let lastSlot = officeCodeSlot();
+      await refreshCode();
+      setInterval(async () => {
+        tick();
+        const slot = officeCodeSlot();
+        if (slot !== lastSlot) { lastSlot = slot; await refreshCode(); }
+      }, 250);
+      tick();
+      document.addEventListener("visibilitychange", async () => { if (!document.hidden) await refreshCode(); });
+    })();
+  </script>
+</body>
+</html>
