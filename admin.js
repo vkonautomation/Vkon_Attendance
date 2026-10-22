@@ -906,7 +906,10 @@ function renderRosterTable() {
   employees.forEach(emp => {
     const tr = document.createElement("tr");
     const isExempt = emp.geofenceEnforcement === "exempt";
-    const quota = emp.annualLeaveQuota || DEFAULT_ANNUAL_LEAVE_ALLOWANCE;
+    const _q = (typeof getEmployeeLeaveQuota === "function") ? getEmployeeLeaveQuota(emp.id) : { personalLeave: emp.annualLeaveQuota || DEFAULT_ANNUAL_LEAVE_ALLOWANCE, restrictedLeave: DEFAULT_GLOBAL_LEAVE_QUOTAS.restrictedLeave };
+    const plQuota = _q.personalLeave;
+    const rlQuota = _q.restrictedLeave;
+    const quota = plQuota + rlQuota;
     const joinedStr = emp.enrolledAt ? new Date(emp.enrolledAt + "T00:00:00").toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "&mdash;";
 
     // Requirement 6: number of leave taken / restricted holiday taken / total number of leave
@@ -917,7 +920,8 @@ function renderRosterTable() {
     const rhTaken = empApprovedLeaves
       .filter(l => l.category === "Restricted" || l.type === "Restricted Holiday")
       .reduce((sum, l) => sum + (parseInt(l.daysCount, 10) || 1), 0);
-    const plLeft = Math.max(0, quota - leavesTaken);
+    const plLeft = Math.max(0, plQuota - leavesTaken);
+    const rlLeft = Math.max(0, rlQuota - rhTaken);
 
     tr.innerHTML = `
       <td>
@@ -937,9 +941,9 @@ function renderRosterTable() {
           <i class="fa-solid ${isExempt ? 'fa-shield-halved' : 'fa-location-dot'}"></i> ${isExempt ? 'Geofence OFF (Exempt)' : 'Geofence Applicable (500m)'}
         </span>
       </td>
-      <td><span class="day-badge-pill badge-leave-day font-mono font-bold" title="Personal Leave taken: ${leavesTaken} of ${quota} (${plLeft} left)">${leavesTaken}</span></td>
-      <td><span class="day-badge-pill badge-rh-day font-mono font-bold" title="Restricted Holiday (RH) taken this year: ${rhTaken}">${rhTaken}</span></td>
-      <td><span class="day-badge-pill badge-neutral font-mono font-bold" title="Total annual leave quota">${quota}</span></td>
+      <td><span class="day-badge-pill badge-leave-day font-mono font-bold" title="Personal Leave taken: ${leavesTaken} of ${plQuota} (${plLeft} left)">${leavesTaken}</span></td>
+      <td><span class="day-badge-pill badge-rh-day font-mono font-bold" title="Restricted Holiday (RH) taken: ${rhTaken} of ${rlQuota} (${rlLeft} left)">${rhTaken}</span></td>
+      <td><span class="day-badge-pill badge-neutral font-mono font-bold" title="Total leave quota (Personal ${plQuota} + Restricted ${rlQuota})">${quota}</span></td>
       <td><span class="font-mono roster-joined" title="Date of joining"><i class="fa-regular fa-calendar-days text-muted"></i> ${joinedStr}</span></td>
       <td>
         <div class="action-btn-cluster">
