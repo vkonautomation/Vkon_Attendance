@@ -230,10 +230,11 @@ function effectiveHoursDecimal(rec) {
 
 // Annual leave days actually used = APPROVED leaves only. A pending request is
 // not yet "used" leave (this is the one source both the portal and admin use).
+// Loss of Pay days are unpaid by choice and never touch the paid-leave quota.
 function computeApprovedLeaveDaysUsed(empId) {
   const allLeaves = getStore(STORAGE_KEYS.LEAVES, []);
   return allLeaves
-    .filter(l => l.employeeId === empId && l.status === "Approved")
+    .filter(l => l.employeeId === empId && l.status === "Approved" && l.category !== "LossOfPay")
     .reduce((sum, l) => sum + (parseInt(l.daysCount, 10) || 1), 0);
 }
 

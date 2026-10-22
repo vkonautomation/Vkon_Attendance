@@ -275,6 +275,7 @@ function renderMonthlyReport() {
     let wfhCount = 0;
     let halfCount = 0;
     let leaveCount = 0;
+    let lopCount = 0;       // approved Loss of Pay days (unpaid, quota-safe)
     let empTotalHours = 0;
     let expectedDays = 0;     // closed working days, net of holidays & approved leave
     let closedAttended = 0;   // attendance credit on closed days only (today excluded)
@@ -312,6 +313,8 @@ function renderMonthlyReport() {
           empTotalHours += effectiveHoursDecimal(rec);
         } else if (rec.status === "Holiday" || rec.status === "Leave") {
           leaveCount++;
+        } else if (rec.status === "Loss of Pay") {
+          lopCount++;
         } else if (rec.status === "Absent") {
           absentCount++;
         }
@@ -376,6 +379,11 @@ function renderMonthlyReport() {
       pillClass = todayRec.status === "Leave" ? "pill-leave" : "pill-remote";
       pillLabel = todayRec.status === "Leave" ? "On Leave" : "Holiday";
       typeLabel = todayRec.status;
+    } else if (todayRec && todayRec.status === "Loss of Pay") {
+      todayStatus = "leave";
+      pillClass = "pill-lop";
+      pillLabel = "Loss of Pay";
+      typeLabel = "Unpaid";
     } else if (todayRec && todayRec.status === "Absent") {
       pillClass = "pill-late";
       pillLabel = "Absent";
@@ -420,7 +428,7 @@ function renderMonthlyReport() {
       <td><span class="text-danger font-bold">${absentCount} Days</span></td>
       <td><span class="unmarked-cell${unmarkedCount > 0 ? " has-unmarked" : ""}" title="${unmarkedCount} past working day(s) with no punch or request \u2014 needs regularisation, NOT counted as Absent">${unmarkedCount} Days</span></td>
       <td><span class="text-primary font-bold">${wfhCount} Days</span></td>
-      <td><span class="day-badge-pill badge-neutral font-mono font-bold" title="Annual Leaves Taken / Total Leave Quota">${leaveCellFormatted}</span></td>
+      <td><span class="day-badge-pill badge-neutral font-mono font-bold" title="Annual Leaves Taken / Total Leave Quota">${leaveCellFormatted}</span>${lopCount ? ` <span class="lop-mini-pill" title="Approved Loss of Pay days (unpaid)">LoP ${lopCount}</span>` : ""}</td>
       <td class="font-mono">${empTotalHours.toFixed(1)} hrs</td>
     `;
     tr.addEventListener("click", () => openEmpCalendar(emp.id));
@@ -805,12 +813,13 @@ function exportMonthlyExcel() {
 
   const allLeaves = getStore(STORAGE_KEYS.LEAVES, []);
 
-  csv += "Employee ID,Full Name,Role,Department,Geofence Rule,Present Days,Absent Days,WFH Days,Leave Taken (Annual/Quota),Total Work Hours,Biometric Verified\n";
+  csv += "Employee ID,Full Name,Role,Department,Geofence Rule,Present Days,Absent Days,WFH Days,Loss of Pay Days,Leave Taken (Annual/Quota),Total Work Hours,Biometric Verified\n";
 
   employees.forEach(emp => {
     let presentCount = 0;
     let absentCount = 0;
     let wfhCount = 0;
+    let lopCount = 0;
     let empTotalHours = 0;
 
     const empEnrolledDate = emp.enrolledAt ? new Date(emp.enrolledAt + "T00:00:00") : null;
@@ -832,19 +841,21 @@ function exportMonthlyExcel() {
           empTotalHours += (rec.hoursDecimal || 8.8);
         } else if (rec.status === "Absent") {
           absentCount++;
+        } else if (rec.status === "Loss of Pay") {
+          lopCount++;
         }
       } else {
         absentCount++;
       }
     }
 
-    const empApprovedLeaves = allLeaves.filter(l => l.employeeId === emp.id && l.status === "Approved");
+    const empApprovedLeaves = allLeaves.filter(l => l.employeeId === emp.id && l.status === "Approved" && l.category !== "LossOfPay");
     const annualLeavesTaken = empApprovedLeaves.reduce((sum, l) => sum + (parseInt(l.daysCount, 10) || 1), 0);
     const totalLeaveQuota = emp.annualLeaveQuota || DEFAULT_ANNUAL_LEAVE_ALLOWANCE;
 
     const geofenceRule = emp.geofenceEnforcement === "exempt" ? "Exempt (Any Location)" : "Enforced (<= 500m)";
 
-    csv += `"${emp.id}","${emp.name}","${emp.role}","${emp.department}","${geofenceRule}","${presentCount}","${absentCount}","${wfhCount}","${annualLeavesTaken} / ${totalLeaveQuota}","${empTotalHours.toFixed(1)} hrs","Verified Snapshot"\n`;
+    csv += `"${emp.id}","${emp.name}","${emp.role}","${emp.department}","${geofenceRule}","${presentCount}","${absentCount}","${wfhCount}","${lopCount}","${annualLeavesTaken} / ${totalLeaveQuota}","${empTotalHours.toFixed(1)} hrs","Verified Snapshot"\n`;
   });
 
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -1454,6 +1465,7 @@ function renderLeaveApprovals() {
       const emp = employees.find(e => e.id === l.employeeId) || { name: l.employeeName || l.employeeId };
       const tr = document.createElement("tr");
       const isRh = l.category === "RH" || l.category === "Restricted";
+      const isLop = l.category === "LossOfPay" || (l.type || "").indexOf("Loss of Pay") !== -1;
 
       let statusBadge = "";
       if (l.status === "Approved") {
@@ -1501,9 +1513,7 @@ function renderLeaveApprovals() {
           <span class="table-sub font-mono">${l.employeeId}</span>
         </td>
         <td>
-          <span class="day-badge-pill ${isRh ? 'badge-rh-day' : 'badge-leave-day'}">
-            ${isRh ? 'Restricted Holiday (RH)' : 'Personal Leave'}
-          </span>
+          ${isLop ? '<span class="day-badge-pill badge-lop-day">Loss of Pay</span>' : `<span class="day-badge-pill ${isRh ? 'badge-rh-day' : 'badge-leave-day'}">${isRh ? 'Restricted Holiday (RH)' : 'Personal Leave'}</span>`}
         </td>
         <td><strong class="font-mono">${l.startDate}</strong>${l.startDate !== l.endDate ? ` to <strong class="font-mono">${l.endDate}</strong>` : ''}</td>
         <td><span class="font-bold text-warning">${l.daysCount} Day(s)</span></td>
@@ -1536,6 +1546,7 @@ function handleLeaveDecision(id, decision) {
 
   const records = getStore(STORAGE_KEYS.RECORDS, {});
   const isRh = req.category === "RH" || req.category === "Restricted";
+  const isLop = req.category === "LossOfPay";
 
   if (decision === "Approved") {
     req.status = "Approved";
@@ -1547,13 +1558,13 @@ function handleLeaveDecision(id, decision) {
         records[`${req.employeeId}_${dStr}`] = {
           employeeId: req.employeeId,
           date: dStr,
-          status: "Leave",
+          status: isLop ? "Loss of Pay" : "Leave",
           checkInTime: "-",
           checkOutTime: "-",
-          duration: isRh ? "Restricted Holiday (RH)" : "Personal Leave",
+          duration: isLop ? "Loss of Pay (Unpaid)" : (isRh ? "Restricted Holiday (RH)" : "Personal Leave"),
           hoursDecimal: 0,
           distance: 0,
-          locationType: `${isRh ? "RH" : "Personal Leave"} (Approved)`,
+          locationType: `${isLop ? "Loss of Pay" : (isRh ? "RH" : "Personal Leave")} (Approved)`,
           bioVerified: false,
           selfieUrl: null
         };
@@ -1571,7 +1582,7 @@ function handleLeaveDecision(id, decision) {
     const end = new Date(req.endDate + "T00:00:00");
     while (cur <= end) {
       const dStr = formatDateKey(cur);
-      if (records[`${req.employeeId}_${dStr}`] && records[`${req.employeeId}_${dStr}`].status === "Leave") {
+      if (records[`${req.employeeId}_${dStr}`] && (records[`${req.employeeId}_${dStr}`].status === "Leave" || records[`${req.employeeId}_${dStr}`].status === "Loss of Pay")) {
         delete records[`${req.employeeId}_${dStr}`];
       }
       cur.setDate(cur.getDate() + 1);
@@ -2239,7 +2250,7 @@ function renderEmpCalendar() {
     grid.appendChild(cell);
   }
 
-  let s = { present: 0, wfh: 0, leave: 0, absent: 0, notmarked: 0 };
+  let s = { present: 0, wfh: 0, leave: 0, lop: 0, absent: 0, notmarked: 0 };
   for (let d = 1; d <= totalDays; d++) {
     const dateObj = new Date(year, month, d);
     const dateStr = formatDateKey(dateObj);
@@ -2267,6 +2278,9 @@ function renderEmpCalendar() {
         s.leave++;
         const isRh = rec.locationType && rec.locationType.includes("RH");
         badge = `<span class="day-badge-pill ${isRh ? 'badge-rh-day' : 'badge-leave-day'}"><i class="fa-solid ${isRh ? 'fa-calendar-check' : 'fa-umbrella-beach'}"></i> ${isRh ? 'RH' : 'Leave'}</span>`;
+      } else if (rec.status === "Loss of Pay") {
+        s.lop++;
+        badge = `<span class="day-badge-pill badge-lop-day" title="Loss of Pay (Approved) — unpaid"><i class="fa-solid fa-hand-holding-dollar"></i> LoP</span>`;
       } else if (rec.status === "Absent") {
         s.absent++;
         badge = `<span class="day-badge-pill badge-absent-day"><i class="fa-solid fa-circle-xmark"></i> Absent</span>`;
@@ -2301,6 +2315,7 @@ function renderEmpCalendar() {
       <span class="emp-cal-chip chip-p"><i class="fa-solid fa-circle-check"></i> Present ${s.present}</span>
       <span class="emp-cal-chip chip-w"><i class="fa-solid fa-house-laptop"></i> WFH ${s.wfh}</span>
       <span class="emp-cal-chip chip-l"><i class="fa-solid fa-umbrella-beach"></i> Leave ${s.leave}</span>
+      <span class="emp-cal-chip chip-lop"><i class="fa-solid fa-hand-holding-dollar"></i> LoP ${s.lop}</span>
       <span class="emp-cal-chip chip-n"><i class="fa-solid fa-circle-question"></i> Not marked ${s.notmarked}</span>
       <span class="emp-cal-chip chip-a"><i class="fa-solid fa-circle-xmark"></i> Absent ${s.absent}</span>
     `;

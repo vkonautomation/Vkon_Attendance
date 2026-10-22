@@ -284,6 +284,7 @@ function loadEmployeeSession(emp) {
   try { renderLeaveBox(); } catch (e) { console.error("renderLeaveBox err:", e); }
   try { renderWfhBox(); } catch (e) { console.error("renderWfhBox err:", e); }
   try { renderMyRegularisationsList(); } catch (e) { console.error("renderMyRegularisationsList err:", e); }
+  try { renderMyRequests(); } catch (e) { console.error("renderMyRequests err:", e); }
 }
 
 // ============================================================================
@@ -396,6 +397,7 @@ function renderMonthlyCalendar() {
   let countPresent = 0;
   let countWfh = 0;
   let countLeave = 0;
+  let countLop = 0;
   let countAbsent = 0;
   let countNotMarked = 0;
 
@@ -451,6 +453,12 @@ function renderMonthlyCalendar() {
           badgeHtml = `
             <span class="day-badge-pill badge-wfh-day" title="Work from Home"><i class="fa-solid fa-house-laptop"></i> WFH</span>
             ${workedMeta(record)}
+          `;
+        } else if (record.status === "Loss of Pay") {
+          countLop++;
+          badgeHtml = `
+            <span class="day-badge-pill badge-lop-day" title="Loss of Pay (Approved)"><i class="fa-solid fa-hand-holding-dollar"></i> LoP</span>
+            <span class="day-meta-text">Unpaid</span>
           `;
         } else if (record.status === "Holiday" || record.status === "Leave") {
           countLeave++;
@@ -541,6 +549,8 @@ function renderMonthlyCalendar() {
   if (statW) statW.textContent = countWfh;
   const statL = document.getElementById("statsLeaveCount");
   if (statL) statL.textContent = countLeave;
+  const statLop = document.getElementById("statsLopCount");
+  if (statLop) statLop.textContent = countLop;
   const statA = document.getElementById("statsAbsentCount");
   if (statA) statA.textContent = countAbsent;
   const statNM = document.getElementById("statsNotMarkedCount");
@@ -1065,6 +1075,11 @@ function initLeaveBox() {
 
       warningBox.style.display = "none";
       submitBtn.disabled = false;
+    } else if (category === "LossOfPay") {
+      // Loss of Pay: unpaid by choice — the paid-leave quota never blocks it
+      daysNoticeText.textContent = `Loss of Pay: ${workingDays} working day(s) requested (unpaid \u2014 paid-leave quota untouched)`;
+      warningBox.style.display = "none";
+      submitBtn.disabled = false;
     } else {
       // Personal Leave Rule
       const personalUsed = calculatePersonalLeavesUsed(empId);
@@ -1098,6 +1113,7 @@ function initLeaveBox() {
     e.preventDefault();
     const category = categorySelect.value;
     const isRh = category === "Restricted" || category === "RH";
+    const isLop = category === "LossOfPay";
     const startVal = startInput.value;
     const endVal = isRh ? startVal : endInput.value;
     const reasonVal = document.getElementById("leaveReasonInput").value.trim();
@@ -1127,7 +1143,7 @@ function initLeaveBox() {
         showToast("Exceeds monthly Restricted Leave allowance.", "error");
         return;
       }
-    } else {
+    } else if (!isLop) {
       const personalUsed = calculatePersonalLeavesUsed(empId);
       if (workingDays > (quota.personalLeave - personalUsed)) {
         showToast("Exceeds annual personal leave allowance.", "error");
@@ -1142,8 +1158,8 @@ function initLeaveBox() {
       startDate: startVal,
       endDate: endVal,
       daysCount: workingDays,
-      category: isRh ? "Restricted" : "Personal",
-      type: isRh ? "Restricted Holiday" : "Personal Leave",
+      category: isRh ? "Restricted" : (isLop ? "LossOfPay" : "Personal"),
+      type: isRh ? "Restricted Holiday" : (isLop ? "Loss of Pay (Unpaid)" : "Personal Leave"),
       reason: reasonVal,
       status: "Pending", // Awaiting Admin Review
       createdAt: formatDateKey(new Date())
@@ -1162,7 +1178,8 @@ function initLeaveBox() {
       endInput.value = "2026-10-16";
     }
     renderLeaveBox();
-    showToast(`${isRh ? "Restricted Holiday" : "Personal Leave"} request for ${startVal} submitted for Admin approval!`, "success");
+    try { renderMyRequests(); } catch (e) { console.error(e); }
+    showToast(`${isRh ? "Restricted Holiday" : (isLop ? "Loss of Pay" : "Personal Leave")} request for ${startVal} submitted for Admin approval!`, "success");
     closeActionCard("modalCardApplyLeave");
   });
 }
@@ -2341,6 +2358,7 @@ function initWfhBox() {
 
     form.reset();
     renderWfhBox();
+    try { renderMyRequests(); } catch (e) { console.error(e); }
     showToast(`Work From Home request submitted for Admin approval! (Status: Pending)`, "success");
     closeActionCard("modalCardWfh");
   });
@@ -2858,9 +2876,108 @@ function initAttendanceRegularisation() {
 
     if (reasonInput) reasonInput.value = "";
     renderMyRegularisationsList();
+    try { renderMyRequests(); } catch (e) { console.error(e); }
     try { renderMonthlyCalendar(); } catch (e) { console.error(e); }
     showToast(`Attendance Regularisation request for ${dateVal} submitted to Admin!`, "success");
   });
+}
+
+// ============================================================================
+// 8b. MY REQUESTS (EMPLOYEE PORTAL) — one live tracker for every request the
+// employee raised: Leave / Loss of Pay / WFH / Regularisation.
+// ============================================================================
+function renderMyRequests() {
+  if (!employeeState.currentEmployee) return;
+  const empId = employeeState.currentEmployee.id;
+
+  const items = [];
+
+  // Leaves (Personal / Restricted / Loss of Pay)
+  getStore(STORAGE_KEYS.LEAVES, []).forEach(l => {
+    if (l.employeeId !== empId) return;
+    const isLop = l.category === "LossOfPay" || (l.type || "").indexOf("Loss of Pay") !== -1;
+    items.push({
+      kind: isLop ? "Loss of Pay" : (l.type || "Personal Leave"),
+      icon: isLop ? "fa-hand-holding-dollar" : "fa-umbrella-beach",
+      dates: l.startDate === l.endDate ? l.startDate : `${l.startDate} \u2192 ${l.endDate}`,
+      days: l.daysCount || 1,
+      reason: l.reason || "",
+      status: l.status || "Pending",
+      createdAt: l.createdAt || l.startDate || ""
+    });
+  });
+
+  // Work From Home requests (one date each)
+  getStore(STORAGE_KEYS.WFH, []).forEach(w => {
+    if (w.employeeId !== empId) return;
+    items.push({
+      kind: "Work From Home",
+      icon: "fa-house-laptop",
+      dates: w.date || "",
+      days: 1,
+      reason: w.reason || "",
+      status: w.status || "Pending",
+      createdAt: w.createdAt || w.date || ""
+    });
+  });
+
+  // Regularisation requests
+  getStore(STORAGE_KEYS.REGULARISATIONS, []).forEach(r => {
+    if (r.employeeId !== empId) return;
+    items.push({
+      kind: "Regularisation",
+      icon: "fa-clock-rotate-left",
+      dates: r.date || "",
+      days: 1,
+      reason: r.reason || "",
+      status: r.status || "Pending",
+      createdAt: r.createdAt || r.date || ""
+    });
+  });
+
+  // Newest first (createdAt is a YYYY-MM-DD key, stable string sort).
+  items.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+
+  const listEl = document.getElementById("myRequestsList");
+  const summaryEl = document.getElementById("myRequestsSummary");
+  const emptyEl = document.getElementById("emptyMyRequestsMsg");
+  if (!listEl) return;
+
+  if (emptyEl) emptyEl.style.display = items.length ? "none" : "block";
+  if (!items.length) { listEl.innerHTML = ""; if (summaryEl) summaryEl.innerHTML = ""; return; }
+
+  const count = st => items.filter(i => i.status === st).length;
+  const pendingN = count("Pending") + count("Cancellation Requested");
+  const approvedN = count("Approved");
+  const rejectedN = count("Rejected") + count("Cancelled");
+  if (summaryEl) {
+    summaryEl.innerHTML = `
+      <span class="mr-chip mr-pending"><i class="fa-solid fa-hourglass-half"></i> Pending ${pendingN}</span>
+      <span class="mr-chip mr-approved"><i class="fa-solid fa-circle-check"></i> Approved ${approvedN}</span>
+      <span class="mr-chip mr-rejected"><i class="fa-solid fa-circle-xmark"></i> Rejected ${rejectedN}</span>`;
+  }
+
+  const STATUS_CLASS = {
+    "Pending": "badge-leave-day",
+    "Approved": "badge-present",
+    "Rejected": "badge-absent-day",
+    "Cancelled": "badge-absent-day",
+    "Cancellation Requested": "status-badge-cancel-pending"
+  };
+
+  listEl.innerHTML = items.map(it => {
+    const pillCls = STATUS_CLASS[it.status] || "badge-leave-day";
+    const reasonHtml = it.reason ? `<div class="mr-reason" title="${it.reason}">${it.reason}</div>` : "";
+    return `
+      <div class="my-req-item">
+        <div class="mr-icon"><i class="fa-solid ${it.icon}"></i></div>
+        <div class="mr-main">
+          <div class="mr-kind">${it.kind} <span class="mr-dates">\u00b7 ${it.dates} (${it.days} day${it.days > 1 ? "s" : ""})</span></div>
+          ${reasonHtml}
+        </div>
+        <span class="day-badge-pill ${pillCls}">${it.status}</span>
+      </div>`;
+  }).join("");
 }
 
 // ============================================================================
@@ -2874,6 +2991,7 @@ function initPortalSideNav() {
   const VIEW_META = {
     dashboard: ["Dashboard", "Your day at a glance \u2022 punch in, leave & WFH"],
     attendance: ["My Attendance & Leaves", "Full calendar history, leave applications & WFH"],
+    requests: ["My Requests", "Track every leave, Loss of Pay, WFH & regularisation you raised"],
     regularisation: ["Regularisation Requests", "Raise & track missed-punch fixes"]
   };
 
@@ -2910,6 +3028,9 @@ function initPortalSideNav() {
   function switchView(viewId) {
     links.forEach(l => l.classList.toggle("active", l.dataset.view === viewId));
     views.forEach(v => v.classList.toggle("portal-view-active", v.dataset.portalView === viewId));
+    if (viewId === "requests") {
+      try { renderMyRequests(); } catch (e) { console.error(e); }
+    }
     document.body.classList.toggle("policy-collapsed", viewId !== "dashboard");
     closePolicyPopover();
     const meta = VIEW_META[viewId];

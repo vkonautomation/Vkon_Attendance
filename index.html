@@ -21,7 +21,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="styles.css?v=20261022_gps1">
+  <link rel="stylesheet" href="styles.css?v=20261022_lop1">
 </head>
 <body class="light-theme">
   
@@ -119,6 +119,9 @@
         </a>
         <a href="#" class="portal-nav-link" data-view="attendance" role="button">
           <i class="fa-solid fa-calendar-days"></i> My Attendance &amp; Leaves
+        </a>
+        <a href="#" class="portal-nav-link" data-view="requests" role="button">
+          <i class="fa-solid fa-inbox"></i> My Requests
         </a>
         <a href="#" class="portal-nav-link" data-view="regularisation" role="button">
           <i class="fa-solid fa-clipboard-check"></i> Regularisation Requests
@@ -226,7 +229,7 @@
               <i class="fa-solid fa-umbrella-beach"></i>
               <div class="sub-btn-texts">
                 <span class="sub-title">Apply for Leave</span>
-                <span class="sub-meta" id="leaveBtnSubMeta">Personal Leave &bull; Restricted Leave</span>
+                <span class="sub-meta" id="leaveBtnSubMeta">Personal &bull; Restricted &bull; Loss of Pay</span>
               </div>
             </div>
             <i class="fa-solid fa-arrow-up-right-from-square open-card-icon" id="arrowLeave"></i>
@@ -386,7 +389,7 @@
               <div class="box-icon icon-leave"><i class="fa-solid fa-umbrella-beach"></i></div>
               <div>
                 <h3>Apply for Leave</h3>
-                <span class="box-policy-tag tag-leave">Personal Leave &bull; Restricted Leave</span>
+                <span class="box-policy-tag tag-leave">Personal &bull; Restricted &bull; Loss of Pay</span>
               </div>
             </div>
             <button type="button" class="modal-close-btn" id="closeCardApplyLeaveBtn" aria-label="Close card">&times;</button>
@@ -417,6 +420,7 @@
                 <select id="leaveCategorySelect" class="form-control">
                   <option value="Personal">Personal Leave</option>
                   <option value="Restricted">Restricted Leave</option>
+                  <option value="LossOfPay">Loss of Pay (Unpaid)</option>
                 </select>
               </div>
 
@@ -604,6 +608,10 @@
               <span class="q-num" id="statsLeaveCount">0</span>
               <span class="q-label">Leaves & RH</span>
             </div>
+            <div class="quick-stat-badge stat-rose">
+              <span class="q-num" id="statsLopCount">0</span>
+              <span class="q-label">Loss of Pay</span>
+            </div>
             <div class="quick-stat-badge stat-red">
               <span class="q-num" id="statsAbsentCount">0</span>
               <span class="q-label">Absent</span>
@@ -620,6 +628,7 @@
             <span class="legend-item"><span class="legend-dot dot-wfh"></span> WFH</span>
             <span class="legend-item"><span class="legend-dot dot-leave"></span> Personal Leave</span>
             <span class="legend-item"><span class="legend-dot dot-rh"></span> Restricted Leave</span>
+            <span class="legend-item"><span class="legend-dot dot-lop"></span> Loss of Pay</span>
             <span class="legend-item"><span class="legend-dot dot-holiday"></span> Official Holiday</span>
             <span class="legend-item"><span class="legend-dot dot-absent"></span> Absent</span>
             <span class="legend-item"><span class="legend-dot dot-notmarked"></span> Not Marked</span>
@@ -643,6 +652,26 @@
           </div>
         </div>
 
+      </section>
+
+      <!-- ================= SECTION: MY REQUESTS (ALL TYPES, LIVE STATUS) ================= -->
+      <section class="portal-view glass-panel" id="sectionMyRequests" data-portal-view="requests">
+        <div class="box-header">
+          <div class="box-icon icon-leave">
+            <i class="fa-solid fa-inbox"></i>
+          </div>
+          <div class="box-title">
+            <h3>My Requests</h3>
+            <span class="box-policy-tag">Leave &bull; Loss of Pay &bull; WFH &bull; Regularisation</span>
+          </div>
+        </div>
+        <p class="subtitle" style="margin-bottom: 1.25rem;">Every request you raise lands here &mdash; track its live approval status from the Executive Admin.</p>
+        <div class="my-requests-summary" id="myRequestsSummary"></div>
+        <div class="my-requests-list" id="myRequestsList"></div>
+        <div class="empty-state-card" id="emptyMyRequestsMsg" style="display: none;">
+          <i class="fa-regular fa-paper-plane"></i>
+          <p>No requests yet. Apply for leave, WFH or regularisation from the Dashboard actions.</p>
+        </div>
       </section>
 
       <!-- ================= SECTION 2: ATTENDANCE REGULARISATION (AFTER CALENDAR) ================= -->
@@ -760,7 +789,7 @@
     <footer class="app-footer">
       <div class="footer-content">
         <p>VKON Smart Attendance Portal &bull; Geofence (&le; 500m) & Live Selfie Photo Verification</p>
-        <span class="footer-meta">Policies: Personal Leave &bull; Restricted Leave &bull; WFH with Admin Approval &bull; Attendance Regularisation</span>
+        <span class="footer-meta">Policies: Personal Leave &bull; Restricted Leave &bull; Loss of Pay &bull; WFH with Admin Approval &bull; Attendance Regularisation</span>
       </div>
     </footer>
     </div><!-- /.admin-main-col -->
@@ -941,8 +970,8 @@
   <div class="toast-container" id="toastContainer"></div>
 
   <!-- Shared Engine & App Controller -->
-  <script src="shared.js?v=20261013_ist_gps1"></script>
-  <script src="app.js?v=20261022_gps1"></script>
+  <script src="shared.js?v=20261013_ist_lop1"></script>
+  <script src="app.js?v=20261022_lop1"></script>
   <script src="js/password-toggle.js?v=20261019_ui1"></script>
 
   <!-- Present Day & Migration Guarantee -->
