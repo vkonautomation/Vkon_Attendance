@@ -639,6 +639,12 @@
                 <span class="form-hint">Optional. Shown to the employee in their console.</span>
               </div>
 
+              <div class="form-group">
+                <label for="newEmpJoinDate"><i class="fa-regular fa-calendar-days text-primary"></i> Date of Joining</label>
+                <input type="date" id="newEmpJoinDate" class="form-control">
+                <span class="form-hint">When the employee joined. Defaults to today if left blank.</span>
+              </div>
+
               <!-- Master Reference Photo Enrollment (Webcam or Laptop Upload) -->
               <div class="master-photo-box">
                 <label class="font-bold"><i class="fa-solid fa-camera"></i> Profile Identification Photo <span class="req">*</span></label>
@@ -698,6 +704,7 @@
                     <th>Username</th>
                     <th>Geofence</th>
                     <th>Leave</th>
+                    <th title="Date the employee joined">Joined</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
@@ -1373,6 +1380,14 @@
             <span class="form-hint">The selected manager is shown to this employee in their console. Leave blank for none.</span>
           </div>
 
+          <div class="form-group">
+            <label for="editEmpJoinDate" class="font-bold">
+              <i class="fa-regular fa-calendar-days text-primary"></i> Date of Joining
+            </label>
+            <input type="date" id="editEmpJoinDate" class="form-control">
+            <span class="form-hint">When this employee joined the company.</span>
+          </div>
+
           <!-- Master Photo Update -->
           <div class="master-photo-box">
             <label class="font-bold"><i class="fa-solid fa-camera"></i> Profile Reference Photo</label>
@@ -1511,7 +1526,7 @@
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="shared.js?v=20261013_ist_lop2"></script>
-  <script src="admin.js?v=20261022_lop3"></script>
+  <script src="admin.js?v=20261022_lop4"></script>
   <script src="js/password-toggle.js?v=20261019_ui1"></script>
 </body>
 </html>

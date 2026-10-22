@@ -900,6 +900,7 @@ function renderRosterTable() {
     const tr = document.createElement("tr");
     const isExempt = emp.geofenceEnforcement === "exempt";
     const quota = emp.annualLeaveQuota || DEFAULT_ANNUAL_LEAVE_ALLOWANCE;
+    const joinedStr = emp.enrolledAt ? new Date(emp.enrolledAt + "T00:00:00").toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "&mdash;";
 
     // Requirement 6: number of leave taken / restricted holiday taken / total number of leave
     const empApprovedLeaves = allLeaves.filter(l => l.employeeId === emp.id && l.status === "Approved");
@@ -934,6 +935,7 @@ function renderRosterTable() {
           ${leaveCellFormatted}
         </span>
       </td>
+      <td><span class="font-mono roster-joined" title="Date of joining"><i class="fa-regular fa-calendar-days text-muted"></i> ${joinedStr}</span></td>
       <td>
         <div class="action-btn-cluster">
           <button class="btn btn-secondary btn-xs edit-emp-btn" data-id="${emp.id}" title="Edit Profile Details">
@@ -987,6 +989,8 @@ function openEditEmployeeModal(empId) {
   document.getElementById("editEmpUsername").value = emp.username;
   document.getElementById("editEmpPassword").value = emp.password;
   document.getElementById("editEmpGeofenceRule").value = emp.geofenceEnforcement || "required";
+  const joinInput = document.getElementById("editEmpJoinDate");
+  if (joinInput) joinInput.value = emp.enrolledAt || "";
   const mgrSel = document.getElementById("editEmpManager");
   if (mgrSel) mgrSel.innerHTML = managerOptionsHtml(emp.id, emp.managerId || "");
   document.getElementById("editEmpPhotoPreview").src = emp.avatar;
@@ -1086,6 +1090,8 @@ function initEditEmployeeModal() {
     const username = document.getElementById("editEmpUsername").value.trim().toLowerCase();
     const password = document.getElementById("editEmpPassword").value.trim();
     const geofenceRule = document.getElementById("editEmpGeofenceRule").value;
+    const joinInput = document.getElementById("editEmpJoinDate");
+    const joinDate = joinInput ? joinInput.value : "";
     const mgrSel = document.getElementById("editEmpManager");
     const managerId = mgrSel ? mgrSel.value : "";
 
@@ -1098,6 +1104,7 @@ function initEditEmployeeModal() {
       emp.username = username;
       emp.password = password;
       emp.geofenceEnforcement = geofenceRule;
+      if (joinDate) emp.enrolledAt = joinDate;
       // Never allow an employee to manage themselves.
       emp.managerId = (managerId && managerId !== empId) ? managerId : "";
       if (editCapturedMasterPhoto) {
@@ -1188,6 +1195,7 @@ function initEnrollmentForm() {
     const username = document.getElementById("newEmpUsername").value.trim().toLowerCase();
     const password = document.getElementById("newEmpPassword").value.trim();
     const geofenceRule = document.getElementById("newEmpGeofenceRule").value;
+    const joinDateInput = document.getElementById("newEmpJoinDate");
     const newMgrSel = document.getElementById("newEmpManager");
 
     if (!name || !role || !username || !password) return;
@@ -1209,7 +1217,7 @@ function initEnrollmentForm() {
       geofenceEnforcement: geofenceRule,
       managerId: newMgrSel ? newMgrSel.value : "",
       avatar: adminCapturedMasterPhoto || previewImg.src,
-      enrolledAt: formatDateKey(new Date())
+      enrolledAt: (joinDateInput && joinDateInput.value) ? joinDateInput.value : formatDateKey(new Date())
     };
 
     // Ensure newly enrolled member has completely clean slate (no previous present, leave, or absent history)
