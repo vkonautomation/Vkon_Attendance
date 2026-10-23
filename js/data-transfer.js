@@ -20,6 +20,22 @@
   // The login session is device-specific; carrying it across devices would
   // silently sign the other device in as this user, so we skip it on export.
   var SESSION_KEY = "vkon_session_v6";
+  // Safety ceiling on how many sections a single backup may carry.
+  var MAX_SECTIONS = 64;
+
+  // Explicit allow-list of app-owned storage keys, derived from the shared
+  // STORAGE_KEYS map so it can never drift. On import, anything outside this set
+  // (and the login session) is treated as untrusted and dropped, so a crafted
+  // backup cannot inject arbitrary keys or hijack the session/role state.
+  function _allowedKeys() {
+    var set = {};
+    try {
+      if (typeof STORAGE_KEYS === "object" && STORAGE_KEYS) {
+        Object.keys(STORAGE_KEYS).forEach(function (k) { set[STORAGE_KEYS[k]] = true; });
+      }
+    } catch (e) { /* STORAGE_KEYS unavailable */ }
+    return set;
+  }
 
   function _toast(msg, type) {
     try {
@@ -92,24 +108,35 @@
         _toast("Unrecognised backup format.", "error");
         return;
       }
-      var names = Object.keys(data.keys);
-      if (!names.length) { _toast("That backup is empty.", "error"); return; }
+      var allow = _allowedKeys();
+      if (!Object.keys(allow).length) {
+        _toast("Validation unavailable (app config not loaded). Import cancelled.", "error");
+        return;
+      }
+      var all = Object.keys(data.keys);
+      if (!all.length) { _toast("That backup is empty.", "error"); return; }
+      if (all.length > MAX_SECTIONS) { _toast("Backup has too many sections; refusing.", "error"); return; }
+      // Keep only recognised, non-session keys; everything else is ignored.
+      var safe = all.filter(function (k) { return allow[k] && k !== SESSION_KEY; });
+      var skipped = all.length - safe.length;
+      if (!safe.length) { _toast("No restorable sections in that backup.", "error"); return; }
       var when = data._meta && data._meta.exportedAt
         ? " (exported " + new Date(data._meta.exportedAt).toLocaleString() + ")" : "";
       var ok = window.confirm(
-        "Restore " + names.length + " sections from this backup" + when + "?\n\n" +
+        "Restore " + safe.length + " sections" +
+        (skipped ? " (" + skipped + " unrecognised entries ignored)" : "") + when + "?\n\n" +
         "This REPLACES all VKON data on THIS device and cannot be undone."
       );
       if (!ok) return;
       // Wipe existing app keys first (keep the current session so we stay logged in),
-      // then write the imported snapshot.
+      // then write only the validated snapshot entries.
       var toRemove = [];
       for (var i = 0; i < localStorage.length; i++) {
         var k = localStorage.key(i);
         if (k && k.indexOf(APP_KEY_PREFIX) === 0 && k !== SESSION_KEY) toRemove.push(k);
       }
       toRemove.forEach(function (k) { localStorage.removeItem(k); });
-      names.forEach(function (k) {
+      safe.forEach(function (k) {
         var v = data.keys[k];
         try { localStorage.setItem(k, typeof v === "string" ? v : JSON.stringify(v)); }
         catch (e) { console.error("import key failed:", k, e); }
