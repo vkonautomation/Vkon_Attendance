@@ -1236,7 +1236,6 @@ function initLeaveBox() {
 
 function getElapsedShiftMinutes(record) {
   if (!record || !record.checkInTime || record.checkInTime === "-") return 0;
-  if (record.simulatedFullShift) return 9999;
   if (record.capturedTimestamp) {
     return Math.max(0, Math.floor((Date.now() - record.capturedTimestamp) / 60000));
   }
@@ -1275,7 +1274,6 @@ function updatePunchStatus() {
   const lockNotice = document.getElementById("punchOutLockNotice");
   const lockIcon = document.getElementById("shiftLockIcon");
   const lockText = document.getElementById("punchOutLockText");
-  const simWrap = document.getElementById("simulateShiftActionWrap");
   const punchOutSubText = document.getElementById("punchOutSubText");
 
   if (!todayRecord) {
@@ -1318,7 +1316,7 @@ function updatePunchStatus() {
       const minPolicy = getMinWorkDurationPolicy();
       const elapsedMinutes = getElapsedShiftMinutes(todayRecord);
       const reqMinutes = minPolicy.totalMinutes || (minPolicy.hours * 60 + minPolicy.minutes);
-      const isDurationMet = Boolean(todayRecord.simulatedFullShift) || (elapsedMinutes >= reqMinutes);
+      const isDurationMet = elapsedMinutes >= reqMinutes;
 
       const workedH = Math.floor(elapsedMinutes / 60);
       const workedM = elapsedMinutes % 60;
@@ -1334,7 +1332,6 @@ function updatePunchStatus() {
         if (lockText) {
           lockText.innerHTML = `<strong>Punch-Out Restricted:</strong> Policy requires at least <strong>${reqH}h ${reqM > 0 ? reqM + 'm' : '00m'}</strong> on duty before punch-out. Worked so far: <strong>${workedH}h ${String(workedM).padStart(2, '0')}m</strong>.`;
         }
-        if (simWrap) simWrap.style.display = "block";
         if (punchOutSubText) {
           punchOutSubText.textContent = `Restricted: requires ${reqH}h ${reqM > 0 ? reqM + 'm' : '00m'} duty (${workedH}h ${workedM}m done)`;
         }
@@ -1354,7 +1351,6 @@ function updatePunchStatus() {
         if (lockText) {
           lockText.innerHTML = `<strong>Minimum Shift Completed:</strong> Required <strong>${reqH}h ${reqM > 0 ? reqM + 'm' : '00m'}</strong> fulfilled. You are eligible to Punch Out.`;
         }
-        if (simWrap) simWrap.style.display = "none";
         if (punchOutSubText) {
           punchOutSubText.textContent = "Click to capture photo and complete today's shift";
         }
@@ -1412,7 +1408,7 @@ function openVerificationModal(mode = "in") {
     const elapsedMinutes = getElapsedShiftMinutes(todayRecord);
     const reqMinutes = minPolicy.totalMinutes || (minPolicy.hours * 60 + minPolicy.minutes);
 
-    if (!todayRecord?.simulatedFullShift && elapsedMinutes < reqMinutes) {
+    if (elapsedMinutes < reqMinutes) {
       const workedH = Math.floor(elapsedMinutes / 60);
       const workedM = elapsedMinutes % 60;
       const reqH = minPolicy.hours;
@@ -2002,10 +1998,9 @@ async function handleConfirmVerification() {
     const existing = records[`${employeeState.currentEmployee.id}_${todayKey}`];
     if (existing) {
       existing.checkOutTime = timeStr;
-      const minPolicy = getMinWorkDurationPolicy();
       const elapsedM = getElapsedShiftMinutes(existing);
-      const hLogged = Math.max(minPolicy.hours, Math.floor(elapsedM / 60));
-      const mLogged = Math.max(minPolicy.minutes, elapsedM % 60);
+      const hLogged = Math.floor(elapsedM / 60);
+      const mLogged = elapsedM % 60;
       existing.duration = `${hLogged}h ${String(mLogged).padStart(2, '0')}m`;
       existing.hoursDecimal = Number((hLogged + (mLogged / 60)).toFixed(2));
       existing.outCapturedTimestamp = Date.now();
@@ -2058,24 +2053,10 @@ function initVerificationModal() {
     confirmBtn.addEventListener("click", handleConfirmVerification);
   }
 
-  // Simulation button for Testing Required Shift Duration fulfillment
-  const simShiftBtn = document.getElementById("btnSimulateCompleteShift");
-  if (simShiftBtn) {
-    simShiftBtn.addEventListener("click", () => {
-      if (!employeeState.currentEmployee) return;
-      const todayKey = getTodayKey();
-      const records = getStore(STORAGE_KEYS.RECORDS, {});
-      const key = `${employeeState.currentEmployee.id}_${todayKey}`;
-      const rec = records[key];
-      if (rec) {
-        rec.simulatedFullShift = true;
-        records[key] = rec;
-        setStore(STORAGE_KEYS.RECORDS, records);
-        showToast("Minimum shift requirement satisfied via simulation! You can now Punch Out.", "success");
-        updatePunchStatus();
-      }
-    });
-  }
+  // (Removed) The old "Mark Required Shift Completed" simulation bypass let an
+  // employee self-certify a full shift and fake the logged hours. Punch-out is
+  // now a strict lock: the minimum shift must actually be met, or the day must
+  // be corrected afterwards through a Regularisation request.
 
   // Manual re-fetch of the device location (real GPS only — fake preset
   // buttons were removed because they never set `located` and confused UX)

@@ -50,9 +50,9 @@ def test_requirements():
     assert "closeCardApplyLeaveBtn" in index_html, "Fail: closeCardApplyLeaveBtn missing in index.html"
     assert "closeCardWfhBtn" in index_html, "Fail: closeCardWfhBtn missing in index.html"
     
-    # Requirement 3: Punch-out lock banner and simulation in employee card
+    # Requirement 3: Punch-out lock banner (strict lock; self-service bypass removed)
     assert "punchOutLockNotice" in index_html, "Fail: punchOutLockNotice missing in index.html"
-    assert "btnSimulateCompleteShift" in index_html, "Fail: btnSimulateCompleteShift missing in index.html"
+    assert "btnSimulateCompleteShift" not in index_html, "Fail: 'Mark Required Shift Completed' bypass should be removed from index.html"
 
     # Requirement 1: Restricted holiday in leave card
     assert "restrictedHolidayGroup" in index_html, "Fail: restrictedHolidayGroup missing in index.html"
@@ -69,7 +69,8 @@ def test_requirements():
     assert "getElapsedShiftMinutes" in app_js, "Fail: getElapsedShiftMinutes missing in app.js"
     assert "getMinWorkDurationPolicy" in app_js, "Fail: getMinWorkDurationPolicy call missing in app.js"
     assert "punchOutLockNotice" in app_js, "Fail: punchOutLockNotice logic missing in app.js"
-    assert "btnSimulateCompleteShift" in app_js, "Fail: btnSimulateCompleteShift missing in app.js"
+    assert "btnSimulateCompleteShift" not in app_js, "Fail: bypass handler should be removed from app.js"
+    assert "simulatedFullShift" not in app_js, "Fail: simulatedFullShift bypass should be removed from app.js"
     assert "Restricted Holiday" in app_js, "Fail: Restricted Holiday logic missing in app.js"
     print("PASS: Requirement 1, 3, 4 (App JS) - Modal card open/close, restricted holiday workflow, punch-out restrictions")
 
