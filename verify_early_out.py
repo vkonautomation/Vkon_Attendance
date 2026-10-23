@@ -130,7 +130,7 @@ def verify_all():
     need("shared.js?v=20261013_ist_apr9" in index_html and "shared.js?v=20261013_ist_apr9" in admin_html,
          "shared.js cache token not bumped")
     need("app.js?v=20261023_apr8" in index_html, "app.js cache token not bumped")
-    need("admin.js?v=20261023_apr14" in admin_html, "admin.js cache token not bumped")
+    need("admin.js?v=20261023_apr15" in admin_html, "admin.js cache token not bumped")
     need("styles.css?v=20261023_apr9" in index_html and "styles.css?v=20261023_apr9" in admin_html,
          "styles.css cache token not bumped")
     for cls in ["badge-shortleave", "badge-halfday", "badge-shorthours", "badge-override",

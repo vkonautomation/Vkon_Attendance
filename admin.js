@@ -443,7 +443,6 @@ function renderMonthlyReport() {
       <td><span class="${shortHoursCount ? 'day-badge-pill badge-shorthours' : 'text-muted'}" title="${shortHoursCount} day(s) worked below the Present minimum and awaiting review">${shortHoursCount}</span></td>
       <td>${_leaveBalPill(plRemaining, plTotal, "Personal Leave (yearly)")}</td>
       <td>${_leaveBalPill(rlRemaining, rlTotal, "Restricted Leave (this month)")}</td>
-      <td>${_leaveBalPill(leaveTotalRemaining, leaveTotalQuota, "Total Leave (Personal + Restricted)")}</td>
       <td class="font-mono">${empTotalHours.toFixed(1)} hrs</td>
     `;
     tr.addEventListener("click", () => openEmpCalendar(emp.id));
@@ -978,7 +977,6 @@ function renderRosterTable() {
       <td>${_leaveBalPill(plLeft, plQuota, "Personal Leave (yearly)")}</td>
       <td>${_leaveBalPill(rlLeft, rlQuota, "Restricted Leave (this month)")}</td>
       <td>${_lopMonthPill(emp.id, _curMonthStr)}</td>
-      <td>${_leaveBalPill(totalLeft, quota, "Total Leave (Personal + Restricted)")}</td>
       <td><span class="font-mono roster-joined" title="Date of joining"><i class="fa-regular fa-calendar-days text-muted"></i> ${joinedStr}</span></td>
       <td>
         <div class="action-btn-cluster">

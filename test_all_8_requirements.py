@@ -56,10 +56,10 @@ def run_tests():
     print("  PASS: Req 5 verified.")
 
     # Requirement 6:
-    print("\n[Req 6] Staff Roster Leave columns: Personal / Restricted (month) / LOP (month) / Total:")
-    assert 'Personal Leave' in admin_html and 'Restricted Leave (this month)' in admin_html and 'LOP (this month)' in admin_html and 'Total Leaves' in admin_html, "Failed roster Leave sub-headers (PL/RL/LOP/Total) in admin.html"
+    print("\n[Req 6] Staff Roster Leave columns: Personal / Restricted (month) / LOP (month):")
+    assert 'Personal Leave' in admin_html and 'Restricted Leave (this month)' in admin_html and 'LOP (this month)' in admin_html, "Failed roster Leave sub-headers (PL/RL/LOP) in admin.html"
     assert 'leavesTaken' in admin_js and 'rhTaken' in admin_js, "Failed leave counting logic in admin.js"
-    assert '_leaveBalPill(plLeft, plQuota' in admin_js and '_lopMonthPill(emp.id' in admin_js and '_leaveBalPill(totalLeft, quota' in admin_js, "Failed balance/LOP/total pill cells in admin.js roster"
+    assert '_leaveBalPill(plLeft, plQuota' in admin_js and '_lopMonthPill(emp.id' in admin_js, "Failed balance/LOP pill cells in admin.js roster"
     assert 'left of' in admin_js, "Failed explicit 'X left of Y' balance labelling in admin.js"
     print("  PASS: Req 6 verified.")
 
@@ -99,14 +99,13 @@ def run_tests():
     assert 'color: var(--color-primary, #ea580c) !important' in styles_css, "Failed visible color for active pill in styles.css"
     print("  PASS: Sidebar active text bold and visible verified.")
 
-    # New Request 4: Master Sheet Leave columns shown as "X left of Y" (PL / RL / Total)
-    print("\n[New Req 4] Master Sheet PL (yr) / RL (mo) / Total left-of-total columns:")
-    assert 'leave-group-header' in admin_html and 'PL (yr)' in admin_html and 'RL (mo)' in admin_html and '>Total<' in admin_html, "Failed grouped Leave header (PL/RL/Total) in admin.html"
+    # New Request 4: Master Sheet Leave columns shown as "X left of Y" (PL / RL)
+    print("\n[New Req 4] Master Sheet PL (yr) / RL (mo) left-of-total columns:")
+    assert 'leave-group-header' in admin_html and 'PL (yr)' in admin_html and 'RL (mo)' in admin_html, "Failed grouped Leave header (PL/RL) in admin.html"
     assert '_leaveBalPill(plRemaining, plTotal' in admin_js, "Failed Personal Leave left-of-total pill in admin.js master sheet"
     assert '_leaveBalPill(rlRemaining, rlTotal' in admin_js, "Failed Restricted Leave left-of-total pill in admin.js master sheet"
-    assert '_leaveBalPill(leaveTotalRemaining, leaveTotalQuota' in admin_js, "Failed Total Leave left-of-total pill in admin.js master sheet"
     assert 'left of' in admin_js, "Explicit 'X left of Y' labelling present"
-    print("  PASS: Master Sheet PL/RL/Total left-of-total columns verified.")
+    print("  PASS: Master Sheet PL/RL left-of-total columns verified.")
 
     print("\n" + "="*50)
     print(">>> ALL REQUIREMENTS AND ENHANCEMENTS HAVE PASSED VERIFICATION! <<<")
