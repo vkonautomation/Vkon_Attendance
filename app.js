@@ -2999,11 +2999,12 @@ function renderMyRequests() {
   if (!listEl) return;
 
   if (emptyEl) emptyEl.style.display = items.length ? "none" : "block";
-  if (!items.length) { listEl.innerHTML = ""; if (summaryEl) summaryEl.innerHTML = ""; return; }
+  if (!items.length) { listEl.innerHTML = ""; if (summaryEl) summaryEl.innerHTML = ""; updateMyRequestsBadge(0); return; }
 
   const isPending = st => st === "Pending Manager" || st === "Pending Admin" || st === "Pending";
   const count = st => items.filter(i => i.status === st).length;
   const pendingN = items.filter(i => isPending(i.status) || i.status === "Cancellation Requested").length;
+  updateMyRequestsBadge(pendingN);
   const approvedN = count("Approved");
   const rejectedN = count("Rejected") + count("Cancelled");
   if (summaryEl) {
@@ -3437,6 +3438,15 @@ function initTeamRequestsNav(emp) {
   const isMgr = !!emp && typeof hasTeam === "function" && hasTeam(emp.id);
   if (link) link.style.display = isMgr ? "" : "none";
   updateTeamBadge();
+}
+
+// Sidebar pending-count badge for the "My Requests" nav item. Kept in sync with
+// the "Pending" summary chip rendered inside the My Requests page.
+function updateMyRequestsBadge(n) {
+  const badge = document.getElementById("myRequestsBadge");
+  if (!badge) return;
+  if (n > 0) { badge.textContent = n; badge.style.display = "inline-flex"; }
+  else { badge.textContent = ""; badge.style.display = "none"; }
 }
 
 function updateTeamBadge() {
