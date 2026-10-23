@@ -1618,6 +1618,23 @@ function startGpsFetch() {
 }
 
 // Apply the most accurate device sample and evaluate the geofence against it.
+// B+ laptop-aware GPS accuracy gate. Phones/tablets carry a real GNSS chip and
+// routinely reach <100m; laptops/desktops have no GPS radio and can only resolve
+// a Wi-Fi/IP fix (~100-1000m). Keep phones strict, give network-only devices the
+// fairer threshold. Detection is a heuristic (the Geolocation API exposes no
+// fix-source), so the office geofence distance check always still applies.
+function _isLikelyMobileDevice() {
+  if (typeof navigator === "undefined") return true; // unknown host -> stay strict
+  const uaData = navigator.userAgentData;
+  if (uaData && typeof uaData.mobile === "boolean") return uaData.mobile;
+  const ua = navigator.userAgent || "";
+  const ipados = navigator.platform === "MacIntel" && (navigator.maxTouchPoints || 0) > 1;
+  return /Android|iPhone|iPad|iPod|IEMobile|Opera Mini|Mobile|webOS|BlackBerry|Windows Phone/i.test(ua) || ipados;
+}
+function gpsAccuracyLimitM() {
+  return _isLikelyMobileDevice() ? GPS_ACCURACY_MAX_M : GPS_ACCURACY_MAX_NETWORK_M;
+}
+
 function applyDeviceFix(pos) {
   employeeState.userLocation.lat = pos.coords.latitude;
   employeeState.userLocation.lng = pos.coords.longitude;
@@ -1730,7 +1747,7 @@ function evaluateModalLocation() {
 
   if (gpsPill) {
     const accNow = employeeState.userLocation.accuracy;
-    const accCoarse = !isExempt && employeeState.userLocation.located && accNow != null && accNow > GPS_ACCURACY_MAX_M;
+    const accCoarse = !isExempt && employeeState.userLocation.located && accNow != null && accNow > gpsAccuracyLimitM();
     if (isExempt) {
       gpsPill.className = "verification-status-pill pill-success";
       gpsPill.innerHTML = `<i class="fa-solid fa-shield-halved"></i> Exempt (${distance}m)`;
@@ -1754,8 +1771,12 @@ function evaluateModalLocation() {
     } else {
       const acc = employeeState.userLocation.accuracy;
       let fixHtml = `<i class="fa-solid fa-satellite-dish"></i> Device reported <strong>${Number(employeeState.userLocation.lat).toFixed(5)}, ${Number(employeeState.userLocation.lng).toFixed(5)}</strong>${acc ? ` &plusmn;${acc}m accuracy` : ""} &middot; ${formatTimeString(new Date())}`;
-      if (acc && acc > GPS_ACCURACY_MAX_M) {
-        fixHtml += ` &middot; <span class="gps-acc-warn"><i class="fa-solid fa-triangle-exclamation"></i> Coarse fix \u2014 punches need \u2264 ${GPS_ACCURACY_MAX_M}m accuracy. Allow <strong>Precise location</strong> for this site, turn off VPN, then Retry.</span>`;
+      const _accLim = gpsAccuracyLimitM();
+      if (acc && acc > _accLim) {
+        const _accTip = _isLikelyMobileDevice()
+          ? "Allow <strong>Precise location</strong> for this site, turn off VPN, move near a window, then Retry."
+          : "This laptop has no GPS (Wi-Fi/IP fix only) \u2014 move near a window or turn off VPN and Retry, or punch from your phone for a tighter fix.";
+        fixHtml += ` &middot; <span class="gps-acc-warn"><i class="fa-solid fa-triangle-exclamation"></i> Coarse fix \u2014 needs \u2264 ${_accLim}m accuracy. ${_accTip}</span>`;
       }
       fixInfo.innerHTML = fixHtml;
       fixInfo.style.display = "block";
@@ -1789,7 +1810,7 @@ async function handleCaptureLivePhoto() {
 
   // Strict accuracy: a coarse fix can't prove presence, in either direction.
   const accNow = employeeState.userLocation.accuracy;
-  if (!isExempt && located && accNow != null && accNow > GPS_ACCURACY_MAX_M) {
+  if (!isExempt && located && accNow != null && accNow > gpsAccuracyLimitM()) {
     if (guidance) {
       guidance.innerHTML = `<span class="text-danger"><i class="fa-solid fa-circle-xmark"></i> GPS fix too coarse (\u00b1${accNow}m) to be trusted. Allow <strong>Precise location</strong>, move near a window, then tap <strong>Retry location</strong> above.</span>`;
     }
@@ -1941,7 +1962,7 @@ async function handleConfirmVerification() {
   const isExempt = employeeState.currentEmployee && employeeState.currentEmployee.geofenceEnforcement === "exempt";
   const located = Boolean(employeeState.userLocation.located);
   const accConfirm = employeeState.userLocation.accuracy;
-  const accCoarseConfirm = !isExempt && accConfirm != null && accConfirm > GPS_ACCURACY_MAX_M;
+  const accCoarseConfirm = !isExempt && accConfirm != null && accConfirm > gpsAccuracyLimitM();
   const withinGeofence = isExempt ? true : (located && !accCoarseConfirm && distance <= settings.radius);
 
   if (!withinGeofence) {

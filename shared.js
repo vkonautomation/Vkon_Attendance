@@ -1822,5 +1822,10 @@ function initializeDatabase() {
 // geofence decision (network/IP fixes can be off by hundreds of meters).
 // ============================================================================
 const GPS_ACCURACY_MAX_M = 100;
+// Laptops/desktops have no GNSS chip and can only resolve a Wi-Fi/IP fix, which
+// is rarely under ~100m even when the user is genuinely at the desk. We keep
+// phones/tablets (real GPS) at the strict limit above and give network-only
+// devices this fairer threshold; the office geofence distance check still applies.
+const GPS_ACCURACY_MAX_NETWORK_M = 300;
 
 initializeDatabase();
