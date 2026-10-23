@@ -3501,21 +3501,30 @@ function renderTeamRequests() {
 function managerDecide(type, id, decision) {
   const emp = employeeState.currentEmployee;
   if (!emp) return;
-  let comment = "";
-  if (decision === "reject") {
-    comment = window.prompt("Rejection reason (required, shown to the employee):", "") || "";
-    if (!comment.trim()) { showToast("A rejection reason is required.", "error"); return; }
-  } else {
-    comment = window.prompt("Optional comment (shown to the employee; leave blank for none):", "") || "";
-  }
-  const res = advanceApproval(type, id, { role: "manager", id: emp.id, name: emp.name }, decision, comment);
-  if (res && res.error === "reason_required") { showToast("A rejection reason is required.", "error"); return; }
-  if (!res) { showToast("This request is no longer awaiting your action.", "warning"); return; }
-  showToast(decision === "reject" ? "Request rejected."
-    : (res.status === "Approved" ? "Approved and applied." : "Approved; forwarded to Admin."),
-    decision === "reject" ? "warning" : "success");
-  renderTeamRequests();
-  try { renderMyRequests(); } catch (e) { /* non-fatal */ }
+  const list = getStore(approvalTypeStoreKey(type), []);
+  const req = list.find(r => r.id === id);
+  if (!req) { showToast("This request is no longer awaiting your action.", "warning"); return; }
+  const isReject = decision === "reject";
+  ConfirmDecisionModal.open({
+    title: isReject ? "Reject request" : "Approve request",
+    summary: `${req.employeeName || req.employeeId} \u00b7 ${_teamReqLabel(type, req)} \u00b7 ${_teamReqDates(req)}`,
+    actionLabel: isReject ? "Confirm rejection" : "Confirm approval",
+    actionStyle: isReject ? "danger" : "primary",
+    reasonRequired: isReject,
+    reasonLabel: isReject ? "Reason" : "Comment",
+    placeholder: isReject ? "Required \u2014 shown to the employee" : "Optional note for the employee",
+    run: function (comment) {
+      const res = advanceApproval(type, id, { role: "manager", id: emp.id, name: emp.name }, decision, comment);
+      if (res && res.error === "reason_required") return { ok: false, error: "A rejection reason is required." };
+      if (!res) return { ok: false, error: "This request is no longer awaiting your action." };
+      showToast(isReject ? "Request rejected."
+        : (res.status === "Approved" ? "Approved and applied." : "Approved; forwarded to Admin."),
+        isReject ? "warning" : "success");
+      renderTeamRequests();
+      try { renderMyRequests(); } catch (e) { /* non-fatal */ }
+      return { ok: true };
+    }
+  });
 }
 
 // Who on the team is off this month (pending + approved leave/WFH), by date.

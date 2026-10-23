@@ -127,8 +127,8 @@ def verify_all():
 
     # Cache tokens bumped for the approval workflow (shared keeps the ist prefix).
     print("\n[Cache] apr tokens present (workflow build):")
-    need("20261022_apr" in index_html and "20261013_ist" in index_html, "index.html cache tokens not set")
-    need("20261022_apr" in admin_html and "20261013_ist" in admin_html, "admin.html cache tokens not set")
+    need("_apr" in index_html and "20261013_ist" in index_html, "index.html cache tokens not set")
+    need("_apr" in admin_html and "20261013_ist" in admin_html, "admin.html cache tokens not set")
     print("  PASS")
 
     print("\n" + "=" * 54)

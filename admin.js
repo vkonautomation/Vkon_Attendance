@@ -1291,6 +1291,18 @@ function updatePendingBadges() {
   const pendingLeaves = leaves.filter(l => _isPending(l.status) || l.status === "Cancellation Requested").length;
   const pendingRegs = regs.filter(r => _isPending(r.status)).length;
 
+  // Per-tab pending counts (Manager / Admin / History) for each category.
+  const _cnt = (list, st) => list.filter(x => st.indexOf(x.status) !== -1).length;
+  _setTabCount("wfhTabManagerCount", _cnt(wfh, ["Pending Manager"]));
+  _setTabCount("wfhTabAdminCount", _cnt(wfh, ["Pending Admin", "Cancellation Requested"]));
+  _setTabCount("wfhTabHistoryCount", _cnt(wfh, ["Approved", "Rejected", "Cancelled"]));
+  _setTabCount("leaveTabManagerCount", _cnt(leaves, ["Pending Manager"]));
+  _setTabCount("leaveTabAdminCount", _cnt(leaves, ["Pending Admin", "Cancellation Requested"]));
+  _setTabCount("leaveTabHistoryCount", _cnt(leaves, ["Approved", "Rejected", "Cancelled"]));
+  _setTabCount("regTabManagerCount", _cnt(regs, ["Pending Manager"]));
+  _setTabCount("regTabAdminCount", _cnt(regs, ["Pending Admin", "Cancellation Requested"]));
+  _setTabCount("regTabHistoryCount", _cnt(regs, ["Approved", "Rejected", "Cancelled"]));
+
   const total = pendingWfh + pendingLeaves + pendingRegs;
   
   // Main header tab bubble (only shows number if > 0, hidden if 0)
@@ -1363,78 +1375,148 @@ function initApprovalsSideDrawer() {
 // -------------------------------------------------------------
 // ROW 1: WORK FROM HOME APPROVALS
 // -------------------------------------------------------------
-function renderWfhApprovals() {
-  const wfhList = getStore(STORAGE_KEYS.WFH, []);
-  const employees = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
-  const tbody = document.getElementById("adminWfhTableBody");
-  const emptyMsg = document.getElementById("emptyWfhMsg");
+// ---- Approvals: shared rendering + interaction helpers --------------------
+const APPROVAL_TAB_STATE = { wfh: "manager", leave: "manager", reg: "manager" };
+const APPROVAL_TAB_STATUSES = {
+  manager: ["Pending Manager"],
+  admin: ["Pending Admin", "Cancellation Requested"],
+  history: ["Approved", "Rejected", "Cancelled"]
+};
 
-  if (!tbody) return;
-  tbody.innerHTML = "";
-
-  if (wfhList.length === 0) {
-    if (emptyMsg) emptyMsg.style.display = "flex";
-  } else {
-    if (emptyMsg) emptyMsg.style.display = "none";
-    wfhList.slice().reverse().forEach(w => {
-      const emp = employees.find(e => e.id === w.employeeId) || { name: w.employeeName || w.employeeId };
-      const tr = document.createElement("tr");
-
-      const statusBadge = approvalStatusBadge(w.status, "Approved");
-
-      let actionsHtml = "";
-      if (isAdminActionableStatus(w.status)) {
-        actionsHtml = `
-          <div class="action-btn-cluster">
-            <button class="btn btn-xs btn-primary approve-wfh-btn" data-id="${w.id}">
-              <i class="fa-solid fa-check"></i> Approve
-            </button>
-            <button class="btn btn-xs btn-ghost text-danger reject-wfh-btn" data-id="${w.id}">
-              <i class="fa-solid fa-xmark"></i> Reject
-            </button>
-          </div>
-        `;
-      } else if (w.status === "Cancellation Requested") {
-        actionsHtml = `
-          <div class="action-btn-cluster">
-            <button class="btn btn-xs btn-danger approve-wfh-cancel-btn" data-id="${w.id}">
-              <i class="fa-solid fa-ban"></i> Approve Cancel
-            </button>
-            <button class="btn btn-xs btn-ghost reject-wfh-cancel-btn" data-id="${w.id}">
-              Keep WFH
-            </button>
-          </div>
-        `;
-      } else {
-        actionsHtml = `<span class="text-muted font-mono">${w.status}</span>`;
-      }
-
-      tr.innerHTML = `
-        <td>
-          <strong class="font-bold">${emp.name}</strong>
-          <span class="table-sub font-mono">${w.employeeId}</span>
-        </td>
-        <td><strong class="font-mono text-primary">${w.date}</strong></td>
-        <td><span class="font-mono">${w.weekKey || '-'}</span></td>
-        <td>${statusBadge}${renderApprovalTrail(w)}</td>
-        <td>${actionsHtml}</td>
-      `;
-      tbody.appendChild(tr);
-    });
-
-    tbody.querySelectorAll(".approve-wfh-btn").forEach(btn => {
-      btn.addEventListener("click", () => handleWfhDecision(btn.dataset.id, "Approved"));
-    });
-    tbody.querySelectorAll(".reject-wfh-btn").forEach(btn => {
-      btn.addEventListener("click", () => handleWfhDecision(btn.dataset.id, "Rejected"));
-    });
-    tbody.querySelectorAll(".approve-wfh-cancel-btn").forEach(btn => {
-      btn.addEventListener("click", () => handleWfhDecision(btn.dataset.id, "ApproveCancellation"));
-    });
-    tbody.querySelectorAll(".reject-wfh-cancel-btn").forEach(btn => {
-      btn.addEventListener("click", () => handleWfhDecision(btn.dataset.id, "RejectCancellation"));
-    });
+function _esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c])); }
+function _fmtAt(iso) {
+  if (!iso) return "";
+  try { return new Date(iso).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }); }
+  catch (e) { return String(iso); }
+}
+function _approvalDates(r) { return r.date || (r.startDate ? (r.startDate === r.endDate ? r.startDate : `${r.startDate} \u2192 ${r.endDate}`) : ""); }
+function _isLopLeave(l) { return l.category === "LossOfPay" || (l.type || "").indexOf("Loss of Pay") !== -1; }
+function _routeFor(req, type) { return (req.approvalRoute && req.approvalRoute.length) ? req.approvalRoute : resolveApprovalRoute(type, req.employeeId); }
+function _stagePill(cls, icon, text) { return `<span class="stage-pill ${cls}"><i class="fa-solid ${icon}"></i> ${text}</span>`; }
+function _trailMeta(step, whoHtml) {
+  return `<div class="stage-meta">${whoHtml}<br><span class="stage-when">${_fmtAt(step.at)}</span>`
+    + (step.comment ? `<br><span class="stage-comment">\u2014 ${_esc(step.comment)}</span>` : "") + "</div>";
+}
+function _managerStageCell(req, type) {
+  const route = _routeFor(req, type);
+  if (route.indexOf("manager") === -1) {
+    return `<div class="stage-cell">${_stagePill("stage-nomgr", "fa-user-slash", "No manager assigned, routed to Admin")}</div>`;
   }
+  const step = trailStepFor(req, "manager");
+  if (!step) return `<div class="stage-cell">${_stagePill("stage-pending", "fa-hourglass-half", "Pending")}</div>`;
+  const approved = step.decision === "approved";
+  const pill = approved ? _stagePill("stage-approved", "fa-check", "Approved") : _stagePill("stage-rejected", "fa-xmark", "Rejected");
+  const mgrName = step.managerName || resolveManagerName(req.employeeId) || "Manager";
+  const onBehalf = step.onBehalf || step.actorRole === "admin";
+  const who = onBehalf
+    ? `<span class="stage-who">${_esc(mgrName)}</span> <span class="stage-onbehalf">(${approved ? "approved" : "rejected"} by Admin on their behalf)</span>`
+    : `<span class="stage-who">${_esc(step.approverName || mgrName)}</span>`;
+  return `<div class="stage-cell">${pill}${_trailMeta(step, who)}</div>`;
+}
+function _adminStageCell(req, type) {
+  const route = _routeFor(req, type);
+  if (route.indexOf("admin") === -1) {
+    return `<div class="stage-cell">${_stagePill("stage-waiting", "fa-minus", "Not required (manager-only)")}</div>`;
+  }
+  const step = trailStepFor(req, "admin");
+  if (step) {
+    const approved = step.decision === "approved";
+    const pill = approved ? _stagePill("stage-approved", "fa-check", "Approved") : _stagePill("stage-rejected", "fa-xmark", "Rejected");
+    const who = `<span class="stage-who">${_esc(step.approverName && step.approverName !== "Admin" ? step.approverName : "Admin")}</span>`;
+    return `<div class="stage-cell">${pill}${_trailMeta(step, who)}</div>`;
+  }
+  if (req.status === "Pending Admin") return `<div class="stage-cell">${_stagePill("stage-pending", "fa-hourglass-half", "Pending")}</div>`;
+  if (req.status === "Cancellation Requested") return `<div class="stage-cell">${_stagePill("stage-pending", "fa-ban", "Cancellation Requested")}</div>`;
+  return `<div class="stage-cell">${_stagePill("stage-waiting", "fa-hourglass", "Waiting")}</div>`;
+}
+function _actionCell(cat, type, r, tab) {
+  const btn = (action, style, icon, label) =>
+    `<button type="button" class="btn btn-xs ${style} appr-action-btn" data-cat="${cat}" data-type="${type}" data-id="${r.id}" data-action="${action}"><i class="fa-solid ${icon}"></i> ${label}</button>`;
+  let btns = "";
+  if (tab === "manager") {
+    if (r.status === "Pending Manager") {
+      btns = btn("onbehalf-approve", "btn-primary", "fa-check", "Approve on behalf of manager")
+        + btn("onbehalf-reject", "btn-ghost text-danger", "fa-xmark", "Reject on behalf of manager");
+    }
+  } else if (tab === "admin") {
+    if (r.status === "Pending Admin") {
+      btns = btn("approve", "btn-primary", "fa-check", "Approve")
+        + btn("reject", "btn-ghost text-danger", "fa-xmark", "Reject");
+    } else if (r.status === "Cancellation Requested") {
+      btns = btn("approve-cancel", "btn-danger", "fa-ban", "Approve cancellation")
+        + btn("decline-cancel", "btn-ghost", "fa-xmark", "Decline");
+    }
+  }
+  if (!btns) return `<span class="text-muted font-mono">${_esc(r.status)}</span>`;
+  return `<div class="action-btn-cluster">${btns}</div>`;
+}
+function _wfhWarn(r) {
+  if (!(r.status === "Pending Manager" || r.status === "Pending Admin" || r.status === "Pending")) return "";
+  try {
+    const all = getStore(STORAGE_KEYS.WFH, []);
+    const cnt = all.filter(w => w.employeeId === r.employeeId && w.weekKey === r.weekKey && (w.status === "Approved" || w.status === "Pending Manager" || w.status === "Pending Admin" || w.status === "Pending")).length;
+    if (cnt > WEEKLY_WFH_ALLOWANCE) return `<div class="wfh-limit-warn"><i class="fa-solid fa-triangle-exclamation"></i> Would exceed ${WEEKLY_WFH_ALLOWANCE} WFH/week (${cnt} this week)</div>`;
+  } catch (e) { /* non-fatal */ }
+  return "";
+}
+function _emptyApprovalText(cat, tab) {
+  const kind = cat === "wfh" ? "Work From Home" : cat === "leave" ? "Leave" : "Regularisation";
+  if (tab === "manager") return `No ${kind} requests awaiting manager approval.`;
+  if (tab === "admin") return `No ${kind} requests awaiting admin approval.`;
+  return `No ${kind} history yet.`;
+}
+function _setTabCount(id, n) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = n;
+  el.setAttribute("data-zero", n === 0 ? "true" : "false");
+}
+function _renderApprovalRows(cat, type, key, tbodyId, emptyId, rowHtmlFn) {
+  const list = getStore(key, []);
+  const employees = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
+  const tbody = document.getElementById(tbodyId);
+  const emptyMsg = document.getElementById(emptyId);
+  if (!tbody) return;
+  const tab = APPROVAL_TAB_STATE[cat];
+  const want = APPROVAL_TAB_STATUSES[tab];
+  const rows = list.slice().reverse().filter(r => want.indexOf(r.status) !== -1);
+  tbody.innerHTML = "";
+  if (!rows.length) {
+    if (emptyMsg) { emptyMsg.style.display = "flex"; const p = emptyMsg.querySelector("p"); if (p) p.textContent = _emptyApprovalText(cat, tab); }
+    return;
+  }
+  if (emptyMsg) emptyMsg.style.display = "none";
+  rows.forEach(r => {
+    const emp = employees.find(e => e.id === r.employeeId) || { name: r.employeeName || r.employeeId };
+    const tr = document.createElement("tr");
+    tr.innerHTML = rowHtmlFn(cat, type, r, emp, tab);
+    tbody.appendChild(tr);
+  });
+  tbody.querySelectorAll(".appr-action-btn").forEach(btn => btn.addEventListener("click", () => _handleAction(btn)));
+}
+
+// Tab switcher within each approval category (Manager / Admin / History).
+function initApprovalTabs() {
+  document.querySelectorAll(".approval-tab").forEach(tab => {
+    tab.addEventListener("click", () => {
+      const cat = tab.dataset.cat, t = tab.dataset.tab;
+      APPROVAL_TAB_STATE[cat] = t;
+      document.querySelectorAll(`.approval-tabs[data-cat="${cat}"] .approval-tab`).forEach(x => x.classList.toggle("active", x === tab));
+      if (cat === "wfh") renderWfhApprovals();
+      else if (cat === "leave") renderLeaveApprovals();
+      else renderRegularisationApprovals();
+    });
+  });
+}
+
+function renderWfhApprovals() {
+  _renderApprovalRows("wfh", "wfh", STORAGE_KEYS.WFH, "adminWfhTableBody", "emptyWfhMsg", (cat, type, w, emp, tab) => `
+    <td><strong class="font-bold">${_esc(emp.name)}</strong><span class="table-sub font-mono">${_esc(w.employeeId)}</span></td>
+    <td><strong class="font-mono text-primary">${_esc(w.date)}</strong></td>
+    <td><span class="font-mono">${_esc(w.weekKey || '-')}</span>${_wfhWarn(w)}</td>
+    <td>${_managerStageCell(w, type)}</td>
+    <td>${_adminStageCell(w, type)}</td>
+    <td>${_actionCell(cat, type, w, tab)}</td>`);
 }
 
 function handleWfhDecision(id, decision) {
@@ -1445,135 +1527,114 @@ function handleWfhDecision(id, decision) {
 // ROW 2: LEAVE APPROVALS
 // -------------------------------------------------------------
 function renderLeaveApprovals() {
-  const leaves = getStore(STORAGE_KEYS.LEAVES, []);
-  const employees = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
-  const leavesTbody = document.getElementById("adminLeavesTableBody");
-  const emptyLeaves = document.getElementById("emptyLeavesMsg");
-
-  if (!leavesTbody) return;
-  leavesTbody.innerHTML = "";
-
-  if (leaves.length === 0) {
-    if (emptyLeaves) emptyLeaves.style.display = "flex";
-  } else {
-    if (emptyLeaves) emptyLeaves.style.display = "none";
-    leaves.slice().reverse().forEach(l => {
-      const emp = employees.find(e => e.id === l.employeeId) || { name: l.employeeName || l.employeeId };
-      const tr = document.createElement("tr");
-      const isRh = l.category === "RH" || l.category === "Restricted";
-      const isLop = l.category === "LossOfPay" || (l.type || "").indexOf("Loss of Pay") !== -1;
-
-      // Estimated pay deduction shown to the admin before approving a LOP request.
-      let lopEstimate = "";
-      if (isLop && isAdminActionableStatus(l.status)) {
-        try {
-          const days = Number(l.daysCount) || 1;
-          const est = (typeof estimateLopDeduction === "function") ? estimateLopDeduction(l.employeeId, days) : { perDaySalary: 0, amount: 0 };
-          lopEstimate = `<span class="lop-est-note"><i class="fa-solid fa-hand-holding-dollar"></i> Est. deduction \u20b9 ${money2(est.amount)} (\u20b9 ${money2(est.perDaySalary)}/day \u00d7 ${days})</span>`;
-        } catch (e) { /* non-fatal */ }
-      }
-
-      const statusBadge = approvalStatusBadge(l.status, "Approved");
-
-      let actionsHtml = "";
-      if (isAdminActionableStatus(l.status)) {
-        actionsHtml = `
-          <div class="action-btn-cluster">
-            <button class="btn btn-xs btn-primary approve-leave-btn" data-id="${l.id}">
-              <i class="fa-solid fa-check"></i> Approve
-            </button>
-            <button class="btn btn-xs btn-ghost text-danger reject-leave-btn" data-id="${l.id}">
-              <i class="fa-solid fa-xmark"></i> Reject
-            </button>
-          </div>
-        `;
-      } else if (l.status === "Cancellation Requested") {
-        actionsHtml = `
-          <div class="action-btn-cluster">
-            <button class="btn btn-xs btn-danger approve-leave-cancel-btn" data-id="${l.id}">
-              <i class="fa-solid fa-ban"></i> Approve Cancel
-            </button>
-            <button class="btn btn-xs btn-ghost reject-leave-cancel-btn" data-id="${l.id}">
-              Keep Leave
-            </button>
-          </div>
-        `;
-      } else {
-        actionsHtml = `<span class="text-muted font-mono">${l.status}</span>`;
-      }
-
-      tr.innerHTML = `
-        <td>
-          <strong class="font-bold">${emp.name}</strong>
-          <span class="table-sub font-mono">${l.employeeId}</span>
-        </td>
-        <td>
-          ${isLop ? '<span class="day-badge-pill badge-lop-day">Loss of Pay</span>' : `<span class="day-badge-pill ${isRh ? 'badge-rh-day' : 'badge-leave-day'}">${isRh ? 'Restricted Holiday (RH)' : 'Personal Leave'}</span>`}
-        </td>
-        <td><strong class="font-mono">${l.startDate}</strong>${l.startDate !== l.endDate ? ` to <strong class="font-mono">${l.endDate}</strong>` : ''}</td>
-        <td><span class="font-bold text-warning">${l.daysCount} Day(s)</span>${lopEstimate}</td>
-        <td>${l.reason || '-'}${renderApprovalTrail(l)}</td>
-        <td>${statusBadge}</td>
-        <td>${actionsHtml}</td>
-      `;
-      leavesTbody.appendChild(tr);
-    });
-
-    leavesTbody.querySelectorAll(".approve-leave-btn").forEach(btn => {
-      btn.addEventListener("click", () => handleLeaveDecision(btn.dataset.id, "Approved"));
-    });
-    leavesTbody.querySelectorAll(".reject-leave-btn").forEach(btn => {
-      btn.addEventListener("click", () => handleLeaveDecision(btn.dataset.id, "Rejected"));
-    });
-    leavesTbody.querySelectorAll(".approve-leave-cancel-btn").forEach(btn => {
-      btn.addEventListener("click", () => handleLeaveDecision(btn.dataset.id, "ApproveCancellation"));
-    });
-    leavesTbody.querySelectorAll(".reject-leave-cancel-btn").forEach(btn => {
-      btn.addEventListener("click", () => handleLeaveDecision(btn.dataset.id, "RejectCancellation"));
-    });
-  }
+  _renderApprovalRows("leave", "leave", STORAGE_KEYS.LEAVES, "adminLeavesTableBody", "emptyLeavesMsg", (cat, type, l, emp, tab) => {
+    const isRh = l.category === "RH" || l.category === "Restricted";
+    const isLop = _isLopLeave(l);
+    const pill = isLop ? '<span class="day-badge-pill badge-lop-day">Loss of Pay</span>'
+      : (isRh ? '<span class="day-badge-pill badge-rh-day">Restricted</span>' : '<span class="day-badge-pill badge-leave-day">Personal</span>');
+    const days = `<span class="font-bold text-warning">${_esc(l.daysCount)} Day(s)</span>`;
+    const est = isLop ? _lopDetailHtml(l) : "";
+    const reason = l.reason ? `<div class="stage-meta"><span class="stage-comment">${_esc(l.reason)}</span></div>` : "";
+    return `
+    <td><strong class="font-bold">${_esc(emp.name)}</strong><span class="table-sub font-mono">${_esc(l.employeeId)}</span></td>
+    <td><strong class="font-mono">${_esc(l.startDate)}</strong>${l.startDate !== l.endDate ? ` to <strong class="font-mono">${_esc(l.endDate)}</strong>` : ''}</td>
+    <td>${pill} ${days}${est}${reason}</td>
+    <td>${_managerStageCell(l, type)}</td>
+    <td>${_adminStageCell(l, type)}</td>
+    <td>${_actionCell(cat, type, l, tab)}</td>`;
+  });
 }
 
-// Admin decision entry point for a Leave row. Delegates every step to the
-// shared approval engine (advanceApproval / resolveAdminCancellation) so the
-// admin and the manager use one source of truth, and effects apply only on
-// final approval.
+function _lopDetailHtml(l) {
+  try {
+    const days = Number(l.daysCount) || 1;
+    const est = (typeof estimateLopDeduction === "function") ? estimateLopDeduction(l.employeeId, days) : { perDaySalary: 0, amount: 0 };
+    return `<div class="lop-est-note"><i class="fa-solid fa-hand-holding-dollar"></i> Est. deduction \u20b9 ${money2(est.amount)} (\u20b9 ${money2(est.perDaySalary)}/day \u00d7 ${days})</div>`;
+  } catch (e) { return ""; }
+}
+
+// Admin decision entry point for a Leave row (kept for compatibility).
 function handleLeaveDecision(id, decision) {
   _adminApprovalDecision("leave", id, decision);
 }
 
-// Shared admin decision flow for leave / wfh / regularisation. Reject always
-// requires a reason (Req 6); approve takes an optional comment. The admin may
-// act on any pending stage, including a manager's step (Req 5).
-function _adminApprovalDecision(type, id, decision) {
-  if (decision === "ApproveCancellation" || decision === "RejectCancellation") {
-    const approve = decision === "ApproveCancellation";
-    const key = approvalTypeStoreKey(type);
-    const list = getStore(key, []);
-    const req = list.find(r => r.id === id);
-    if (!req) return;
-    resolveAdminCancellation(type, id, approve);
-    // The employee's portal surfaces this via syncAdminUpdates (single source).
-    _afterAdminDecision();
-    return;
-  }
+// Shared admin decision flow for leave / wfh / regularisation. Opens the
+// reusable ConfirmDecisionModal (no more window.prompt) and, on confirm,
+// delegates the step to the shared engine (advanceApproval /
+// resolveAdminCancellation). Reject and on-behalf actions require a reason.
+function _adminApprovalDecision(type, id, decision, opts) {
+  opts = opts || {};
+  const list = getStore(approvalTypeStoreKey(type), []);
+  const req = list.find(r => r.id === id);
+  if (!req) return;
+  const employees = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
+  const emp = employees.find(e => e.id === req.employeeId) || { name: req.employeeName || req.employeeId };
+  const summary = `${emp.name} \u00b7 ${_approvalLabel(type)} \u00b7 ${_approvalDates(req)}`;
+  const detail = (type === "leave" && _isLopLeave(req)) ? _lopDetailHtml(req) : "";
+  const onBehalfNotice = "You are acting on behalf of the manager. This will be recorded in the audit log.";
 
-  const isReject = decision === "Rejected";
-  let comment = "";
-  if (isReject) {
-    comment = window.prompt("Rejection reason (required, shown to the employee):", "") || "";
-    if (!comment.trim()) { showToast("A rejection reason is required.", "error"); return; }
+  let cfg;
+  if (decision === "ApproveCancellation" || decision === "approve-cancel") {
+    cfg = { title: "Approve cancellation", actionLabel: "Approve cancellation", actionStyle: "danger", reasonRequired: false, reasonLabel: "Comment",
+      notice: "This reverses the approved request and removes its attendance / leave-balance / LOP effects.",
+      run: () => _runResolveCancel(type, id, true) };
+  } else if (decision === "RejectCancellation" || decision === "decline-cancel") {
+    cfg = { title: "Decline cancellation request", actionLabel: "Keep request", actionStyle: "primary", reasonRequired: false, reasonLabel: "Comment",
+      run: () => _runResolveCancel(type, id, false) };
+  } else if (decision === "Rejected" || decision === "reject") {
+    cfg = { title: opts.onBehalf ? "Reject on behalf of manager" : "Reject request", actionLabel: "Confirm rejection", actionStyle: "danger", reasonRequired: true, reasonLabel: "Reason",
+      placeholder: "Required \u2014 shown to the employee",
+      notice: opts.onBehalf ? onBehalfNotice : "",
+      run: comment => _runAdvance(type, id, "reject", comment) };
   } else {
-    comment = window.prompt("Optional comment for the employee (leave blank for none):", "") || "";
+    cfg = { title: opts.onBehalf ? "Approve on behalf of manager" : "Approve request", actionLabel: "Confirm approval", actionStyle: "primary", reasonRequired: !!opts.onBehalf, reasonLabel: "Reason",
+      placeholder: opts.onBehalf ? "Why are you approving as the manager? (shown to the employee)" : "Optional note for the employee",
+      notice: opts.onBehalf ? onBehalfNotice : "",
+      run: comment => _runAdvance(type, id, "approve", comment) };
   }
+  cfg.summary = summary;
+  cfg.detail = detail;
+  cfg.onCancel = opts.onCancel;
+  ConfirmDecisionModal.open(cfg);
+}
 
-  const res = advanceApproval(type, id, { role: "admin", name: "Admin" }, isReject ? "reject" : "approve", comment);
-  if (res && res.error === "reason_required") { showToast("A rejection reason is required.", "error"); return; }
-  if (!res) { showToast("This request is not awaiting a decision.", "warning"); return; }
-  showToast(isReject ? "Request rejected."
-    : (res.status === "Approved" ? "Approved and applied to attendance."
-       : (res.status === "Pending Admin" ? "Manager step approved; forwarded to Admin." : "Approved.")), isReject ? "warning" : "success");
+function _runAdvance(type, id, decision, comment) {
+  const res = advanceApproval(type, id, { role: "admin", name: "Admin" }, decision, comment);
+  if (res && res.error === "reason_required") return { ok: false, error: "A reason is required." };
+  if (!res) return { ok: false, error: "This request is no longer awaiting a decision." };
+  if (decision === "reject") { showToast("Request rejected.", "warning"); }
+  else { showToast(res.status === "Approved" ? "Approved and applied to attendance." : (res.status === "Pending Admin" ? "Approved; forwarded to Admin." : "Approved."), "success"); }
   _afterAdminDecision();
+  return { ok: true };
+}
+
+function _runResolveCancel(type, id, approve) {
+  const res = resolveAdminCancellation(type, id, approve);
+  if (!res) return { ok: false, error: "Unable to process the cancellation request." };
+  showToast(approve ? "Cancellation approved \u2014 request reverted." : "Cancellation declined.", approve ? "success" : "warning");
+  _afterAdminDecision();
+  return { ok: true };
+}
+
+// Maps an action button to a decision, disables the row's buttons to prevent
+// double submission, and hands off to the confirmation modal.
+function _handleAction(btn) {
+  const cat = btn.dataset.cat, type = btn.dataset.type, id = btn.dataset.id, action = btn.dataset.action;
+  const cluster = btn.closest(".action-btn-cluster");
+  const reenable = () => { if (cluster) cluster.querySelectorAll("button").forEach(b => { b.disabled = false; }); };
+  if (cluster) cluster.querySelectorAll("button").forEach(b => { b.disabled = true; });
+  const map = {
+    "approve": ["Approved", {}],
+    "reject": ["Rejected", {}],
+    "onbehalf-approve": ["Approved", { onBehalf: true }],
+    "onbehalf-reject": ["Rejected", { onBehalf: true }],
+    "approve-cancel": ["ApproveCancellation", {}],
+    "decline-cancel": ["RejectCancellation", {}]
+  };
+  const m = map[action];
+  if (!m) { reenable(); return; }
+  const opts = Object.assign({}, m[1], { onCancel: reenable });
+  _adminApprovalDecision(type, id, m[0], opts);
 }
 
 function _afterAdminDecision() {
@@ -1623,62 +1684,18 @@ function isAdminActionableStatus(status) {
 // ROW 3: ATTENDANCE REGULARISATION APPROVALS
 // -------------------------------------------------------------
 function renderRegularisationApprovals() {
-  const regs = getStore(STORAGE_KEYS.REGULARISATIONS, []);
-  const employees = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
-  const tbody = document.getElementById("adminRegularisationTableBody");
-  const emptyMsg = document.getElementById("emptyRegularisationMsg");
-
-  if (!tbody) return;
-  tbody.innerHTML = "";
-
-  if (regs.length === 0) {
-    if (emptyMsg) emptyMsg.style.display = "flex";
-  } else {
-    if (emptyMsg) emptyMsg.style.display = "none";
-    regs.slice().reverse().forEach(r => {
-      const emp = employees.find(e => e.id === r.employeeId) || { name: r.employeeName || r.employeeId };
-      const tr = document.createElement("tr");
-
-      const statusBadge = approvalStatusBadge(r.status, "Regularised");
-
-      let actionsHtml = "";
-      if (isAdminActionableStatus(r.status)) {
-        actionsHtml = `
-          <div class="action-btn-cluster">
-            <button class="btn btn-xs btn-primary approve-reg-btn" data-id="${r.id}">
-              <i class="fa-solid fa-check"></i> Approve Regularisation
-            </button>
-            <button class="btn btn-xs btn-ghost text-danger reject-reg-btn" data-id="${r.id}">
-              <i class="fa-solid fa-xmark"></i> Reject
-            </button>
-          </div>
-        `;
-      } else {
-        actionsHtml = `<span class="text-muted font-mono">${r.status}</span>`;
-      }
-
-      tr.innerHTML = `
-        <td>
-          <strong class="font-bold">${emp.name}</strong>
-          <span class="table-sub font-mono">${r.employeeId}</span>
-        </td>
-        <td><strong class="font-mono text-primary">${r.date}</strong></td>
-        <td><span class="badge-mini">${r.type || 'Missed Punch'}</span></td>
-        <td><span class="font-mono">${r.inTime || '09:00 AM'} &bull; ${r.outTime || '06:00 PM'}</span></td>
-        <td>${r.reason || '-'}${renderApprovalTrail(r)}</td>
-        <td>${statusBadge}</td>
-        <td>${actionsHtml}</td>
-      `;
-      tbody.appendChild(tr);
-    });
-
-    tbody.querySelectorAll(".approve-reg-btn").forEach(btn => {
-      btn.addEventListener("click", () => handleRegularisationDecision(btn.dataset.id, "Approved"));
-    });
-    tbody.querySelectorAll(".reject-reg-btn").forEach(btn => {
-      btn.addEventListener("click", () => handleRegularisationDecision(btn.dataset.id, "Rejected"));
-    });
-  }
+  _renderApprovalRows("reg", "regularisation", STORAGE_KEYS.REGULARISATIONS, "adminRegularisationTableBody", "emptyRegularisationMsg", (cat, type, r, emp, tab) => {
+    const times = `<span class="font-mono">${_esc(r.inTime || '09:00 AM')} &bull; ${_esc(r.outTime || '06:15 PM')}</span>`;
+    const etype = `<span class="badge-mini">${_esc(r.type || r.missedType || 'Missed Punch')}</span>`;
+    const reason = r.reason ? `<div class="stage-meta"><span class="stage-comment">${_esc(r.reason)}</span></div>` : "";
+    return `
+    <td><strong class="font-bold">${_esc(emp.name)}</strong><span class="table-sub font-mono">${_esc(r.employeeId)}</span></td>
+    <td><strong class="font-mono text-primary">${_esc(r.date)}</strong></td>
+    <td>${times}<div class="stage-meta">${etype}</div>${reason}</td>
+    <td>${_managerStageCell(r, type)}</td>
+    <td>${_adminStageCell(r, type)}</td>
+    <td>${_actionCell(cat, type, r, tab)}</td>`;
+  });
 }
 
 function handleRegularisationDecision(id, decision) {
@@ -3239,6 +3256,7 @@ function startAdminConsole() {
   initEditEmployeeModal();
   renderApprovalsCenter();
   initApprovalsSideDrawer();
+  initApprovalTabs();
   renderHolidaysTable();
   initHolidayForm();
   initGlobalLeaveQuotasForm();

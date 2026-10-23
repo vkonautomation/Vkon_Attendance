@@ -562,6 +562,8 @@ function routingForNewRequest(type, empId) {
 function recordApprovalTrail(req, stage, actor, decision, comment) {
   if (!req.approvalTrail) req.approvalTrail = [];
   const name = (actor && actor.name) || (actor && actor.id ? _employeeName(actor.id) : (stage === "admin" ? "Admin" : ""));
+  // An admin acting at the manager stage is doing so on the manager's behalf.
+  const onBehalf = stage === "manager" && !!actor && actor.role === "admin";
   req.approvalTrail.push({
     stage,
     approverId: (actor && actor.id) || "",
@@ -569,10 +571,24 @@ function recordApprovalTrail(req, stage, actor, decision, comment) {
     role: stage,
     actorRole: (actor && actor.role) || "",
     managerName: (stage === "manager" ? resolveManagerName(req.employeeId) : ""),
+    onBehalf,
     decision,
     comment: comment || "",
     at: new Date().toISOString()
   });
+}
+
+// --- Read-only helpers for rendering the manager/admin stage split ---------
+function _reqRoute(req, type) {
+  return (req && req.approvalRoute && req.approvalRoute.length) ? req.approvalRoute : resolveApprovalRoute(type, req.employeeId);
+}
+function routeHasStage(req, type, stage) { return _reqRoute(req, type).indexOf(stage) !== -1; }
+// The most recent trail entry for a given stage, or null if that stage has not
+// been actioned yet.
+function trailStepFor(req, stage) {
+  const trail = (req && req.approvalTrail) || [];
+  for (let i = trail.length - 1; i >= 0; i--) { if (trail[i].stage === stage) return trail[i]; }
+  return null;
 }
 
 // Attendance / balance / LOP side effects are applied ONLY when a request

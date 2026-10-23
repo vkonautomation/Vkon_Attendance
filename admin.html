@@ -24,7 +24,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="styles.css?v=20261022_apr6">
+  <link rel="stylesheet" href="styles.css?v=20261023_apr7">
 </head>
 <body class="light-theme admin-page">
 
@@ -777,15 +777,22 @@
                 </div>
               </div>
 
+              <div class="approval-tabs" data-cat="wfh">
+                <button type="button" class="approval-tab active" data-cat="wfh" data-tab="manager"><i class="fa-solid fa-user-tie"></i> Manager Approval <span class="tab-count" id="wfhTabManagerCount">0</span></button>
+                <button type="button" class="approval-tab" data-cat="wfh" data-tab="admin"><i class="fa-solid fa-shield-halved"></i> Admin Approval <span class="tab-count" id="wfhTabAdminCount">0</span></button>
+                <button type="button" class="approval-tab" data-cat="wfh" data-tab="history"><i class="fa-solid fa-clock-rotate-left"></i> History <span class="tab-count" id="wfhTabHistoryCount" data-zero="true">0</span></button>
+              </div>
+
               <div class="table-responsive">
                 <table class="data-table">
                   <thead>
                     <tr>
                       <th>Employee</th>
-                      <th>Requested WFH Date</th>
+                      <th>Date(s)</th>
                       <th>Work Week</th>
-                      <th>Status</th>
-                      <th>Approval Action</th>
+                      <th>Manager Stage</th>
+                      <th>Admin Stage</th>
+                      <th>Action</th>
                     </tr>
                   </thead>
                   <tbody id="adminWfhTableBody">
@@ -811,17 +818,22 @@
                 </div>
               </div>
 
+              <div class="approval-tabs" data-cat="leave">
+                <button type="button" class="approval-tab active" data-cat="leave" data-tab="manager"><i class="fa-solid fa-user-tie"></i> Manager Approval <span class="tab-count" id="leaveTabManagerCount">0</span></button>
+                <button type="button" class="approval-tab" data-cat="leave" data-tab="admin"><i class="fa-solid fa-shield-halved"></i> Admin Approval <span class="tab-count" id="leaveTabAdminCount">0</span></button>
+                <button type="button" class="approval-tab" data-cat="leave" data-tab="history"><i class="fa-solid fa-clock-rotate-left"></i> History <span class="tab-count" id="leaveTabHistoryCount" data-zero="true">0</span></button>
+              </div>
+
               <div class="table-responsive">
                 <table class="data-table">
                   <thead>
                     <tr>
                       <th>Employee</th>
-                      <th>Category</th>
-                      <th>Dates Requested</th>
-                      <th>Working Days</th>
-                      <th>Reason</th>
-                      <th>Status</th>
-                      <th>Approval Action</th>
+                      <th>Date(s)</th>
+                      <th>Type / Days</th>
+                      <th>Manager Stage</th>
+                      <th>Admin Stage</th>
+                      <th>Action</th>
                     </tr>
                   </thead>
                   <tbody id="adminLeavesTableBody">
@@ -847,16 +859,21 @@
                 </div>
               </div>
 
+              <div class="approval-tabs" data-cat="reg">
+                <button type="button" class="approval-tab active" data-cat="reg" data-tab="manager"><i class="fa-solid fa-user-tie"></i> Manager Approval <span class="tab-count" id="regTabManagerCount">0</span></button>
+                <button type="button" class="approval-tab" data-cat="reg" data-tab="admin"><i class="fa-solid fa-shield-halved"></i> Admin Approval <span class="tab-count" id="regTabAdminCount">0</span></button>
+                <button type="button" class="approval-tab" data-cat="reg" data-tab="history"><i class="fa-solid fa-clock-rotate-left"></i> History <span class="tab-count" id="regTabHistoryCount" data-zero="true">0</span></button>
+              </div>
+
               <div class="table-responsive">
                 <table class="data-table">
                   <thead>
                     <tr>
                       <th>Employee</th>
-                      <th>Missed Date</th>
-                      <th>Event Type</th>
-                      <th>Declared Hours</th>
-                      <th>Reason / Remarks</th>
-                      <th>Status</th>
+                      <th>Date(s)</th>
+                      <th>Declared Times / Reason</th>
+                      <th>Manager Stage</th>
+                      <th>Admin Stage</th>
                       <th>Action</th>
                     </tr>
                   </thead>
@@ -1583,8 +1600,9 @@
 
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <script src="shared.js?v=20261013_ist_apr5"></script>
-  <script src="admin.js?v=20261022_apr9"></script>
+  <script src="shared.js?v=20261013_ist_apr6"></script>
+  <script src="js/confirm-decision-modal.js?v=20261023_apr1"></script>
+  <script src="admin.js?v=20261023_apr10"></script>
   <script src="js/password-toggle.js?v=20261019_ui1"></script>
 </body>
 </html>
