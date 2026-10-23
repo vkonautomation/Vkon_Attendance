@@ -437,7 +437,7 @@ function renderMonthlyReport() {
       <td><span class="${lopCount ? 'day-badge-pill badge-lop-day' : 'text-muted'}">${lopCount} Days</span></td>
       <td>${_leaveBalPill(plRemaining, plTotal, "Personal Leave (yearly)")}</td>
       <td>${_leaveBalPill(rlRemaining, rlTotal, "Restricted Leave (this month)")}</td>
-      <td>${_pendingLeavePill(emp.id)}</td>
+      <td>${_leaveBalPill(leaveTotalRemaining, leaveTotalQuota, "Total Leave (Personal + Restricted)")}</td>
       <td class="font-mono">${empTotalHours.toFixed(1)} hrs</td>
     `;
     tr.addEventListener("click", () => openEmpCalendar(emp.id));
@@ -822,7 +822,7 @@ function exportMonthlyExcel() {
 
   const allLeaves = getStore(STORAGE_KEYS.LEAVES, []);
 
-  csv += "Employee ID,Full Name,Role,Department,Geofence Rule,Present Days,Absent Days,WFH Days,Loss of Pay Days,Personal Leave (Left of Total),Restricted Leave (Left of Total),Pending Leave Days,Total Work Hours,Biometric Verified\n";
+  csv += "Employee ID,Full Name,Role,Department,Geofence Rule,Present Days,Absent Days,WFH Days,Loss of Pay Days,Personal Leave (Left of Total),Restricted Leave (Left of Total),Total Leave (Left of Total),Total Work Hours,Biometric Verified\n";
 
   employees.forEach(emp => {
     let presentCount = 0;
@@ -868,7 +868,7 @@ function exportMonthlyExcel() {
 
     const geofenceRule = emp.geofenceEnforcement === "exempt" ? "Exempt (Any Location)" : "Enforced (<= 500m)";
 
-    csv += `"${emp.id}","${emp.name}","${emp.role}","${emp.department}","${geofenceRule}","${presentCount}","${absentCount}","${wfhCount}","${lopCount}","${plRemainingCsv} left of ${plTotalCsv}","${rlRemainingCsv} left of ${rlTotalCsv}","${_pendingLeaveDays(emp.id)}","${empTotalHours.toFixed(1)} hrs","Verified Snapshot"\n`;
+    csv += `"${emp.id}","${emp.name}","${emp.role}","${emp.department}","${geofenceRule}","${presentCount}","${absentCount}","${wfhCount}","${lopCount}","${plRemainingCsv} left of ${plTotalCsv}","${rlRemainingCsv} left of ${rlTotalCsv}","${leaveTotalRemainingCsv} left of ${leaveTotalQuotaCsv}","${empTotalHours.toFixed(1)} hrs","Verified Snapshot"\n`;
   });
 
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -908,18 +908,6 @@ function _leaveBalPill(remaining, total, ctx) {
   else if (remaining <= 3) { cls = "bal-low"; icon = "fa-triangle-exclamation"; }
   else { cls = "bal-healthy"; icon = "fa-circle-check"; }
   return `<span class="day-badge-pill ${cls} font-mono font-bold" title="${ctx}: ${remaining} remaining of ${total} allowance"><i class="fa-solid ${icon}"></i> ${remaining} left of ${total}</span>`;
-}
-// Leave days requested but NOT yet approved (pending at either stage).
-function _pendingLeaveDays(empId) {
-  return getStore(STORAGE_KEYS.LEAVES, [])
-    .filter(l => l.employeeId === empId && (l.status === "Pending" || l.status === "Pending Manager" || l.status === "Pending Admin"))
-    .reduce((s, l) => s + (parseFloat(l.daysCount) || 1), 0);
-}
-function _pendingLeavePill(empId) {
-  const n = _pendingLeaveDays(empId);
-  const cls = n > 0 ? "badge-leave-day" : "bal-healthy";
-  const icon = n > 0 ? "fa-hourglass-half" : "fa-circle-check";
-  return `<span class="day-badge-pill ${cls} font-mono font-bold" title="Leave days requested but not yet approved"><i class="fa-solid ${icon}"></i> ${n} pending</span>`;
 }
 // Approved Loss of Pay days in a 'YYYY-MM' month (unpaid; does not use quota).
 function _lopMonthPill(empId, monthStr) {
@@ -982,7 +970,7 @@ function renderRosterTable() {
       <td>${_leaveBalPill(plLeft, plQuota, "Personal Leave (yearly)")}</td>
       <td>${_leaveBalPill(rlLeft, rlQuota, "Restricted Leave (this month)")}</td>
       <td>${_lopMonthPill(emp.id, _curMonthStr)}</td>
-      <td>${_pendingLeavePill(emp.id)}</td>
+      <td>${_leaveBalPill(totalLeft, quota, "Total Leave (Personal + Restricted)")}</td>
       <td><span class="font-mono roster-joined" title="Date of joining"><i class="fa-regular fa-calendar-days text-muted"></i> ${joinedStr}</span></td>
       <td>
         <div class="action-btn-cluster">
