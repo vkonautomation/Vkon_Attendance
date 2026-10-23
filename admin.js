@@ -1426,7 +1426,16 @@ function _managerStageCell(req, type) {
     return `<div class="stage-cell">${_stagePill("stage-nomgr", "fa-user-slash", "No manager assigned, routed to Admin")}</div>`;
   }
   const step = trailStepFor(req, "manager");
-  if (!step) return `<div class="stage-cell">${_stagePill("stage-pending", "fa-hourglass-half", "Pending")}</div>`;
+  if (!step) {
+    // No explicit manager audit entry. This happens for requests decided before
+    // stage-level tracking existed. Reflect the request's real outcome instead of
+    // a misleading "Pending" (which should only show while it is genuinely awaiting
+    // the manager).
+    if (req.status === "Approved") return `<div class="stage-cell">${_stagePill("stage-approved", "fa-check", "Approved")}</div>`;
+    if (req.status === "Rejected") return `<div class="stage-cell">${_stagePill("stage-rejected", "fa-xmark", "Rejected")}</div>`;
+    if (req.status === "Cancelled") return `<div class="stage-cell">${_stagePill("stage-waiting", "fa-ban", "Cancelled")}</div>`;
+    return `<div class="stage-cell">${_stagePill("stage-pending", "fa-hourglass-half", "Pending")}</div>`;
+  }
   const approved = step.decision === "approved";
   const pill = approved ? _stagePill("stage-approved", "fa-check", "Approved") : _stagePill("stage-rejected", "fa-xmark", "Rejected");
   const mgrName = step.managerName || resolveManagerName(req.employeeId) || "Manager";
@@ -1450,6 +1459,10 @@ function _adminStageCell(req, type) {
   }
   if (req.status === "Pending Admin") return `<div class="stage-cell">${_stagePill("stage-pending", "fa-hourglass-half", "Pending")}</div>`;
   if (req.status === "Cancellation Requested") return `<div class="stage-cell">${_stagePill("stage-pending", "fa-ban", "Cancellation Requested")}</div>`;
+  // Closed request with no admin audit entry (legacy): show the real outcome, not "Waiting".
+  if (req.status === "Approved") return `<div class="stage-cell">${_stagePill("stage-approved", "fa-check", "Approved")}</div>`;
+  if (req.status === "Rejected") return `<div class="stage-cell">${_stagePill("stage-rejected", "fa-xmark", "Rejected")}</div>`;
+  if (req.status === "Cancelled") return `<div class="stage-cell">${_stagePill("stage-waiting", "fa-ban", "Cancelled")}</div>`;
   return `<div class="stage-cell">${_stagePill("stage-waiting", "fa-hourglass", "Waiting")}</div>`;
 }
 function _actionCell(cat, type, r, tab) {
