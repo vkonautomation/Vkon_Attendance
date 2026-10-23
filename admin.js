@@ -435,9 +435,9 @@ function renderMonthlyReport() {
       <td><span class="unmarked-cell${unmarkedCount > 0 ? " has-unmarked" : ""}" title="${unmarkedCount} past working day(s) with no punch or request \u2014 needs regularisation, NOT counted as Absent">${unmarkedCount} Days</span></td>
       <td><span class="text-primary font-bold">${wfhCount} Days</span></td>
       <td><span class="${lopCount ? 'day-badge-pill badge-lop-day' : 'text-muted'}">${lopCount} Days</span></td>
-      <td><span class="day-badge-pill badge-leave-day font-mono font-bold" title="Personal Leave remaining / annual quota">${plRemaining} / ${plTotal}</span></td>
-      <td><span class="day-badge-pill badge-leave-day font-mono font-bold" title="Restricted Leave remaining / monthly quota (this month)">${rlRemaining} / ${rlTotal}</span></td>
-      <td><span class="day-badge-pill badge-neutral font-mono font-bold" title="Total Leave remaining / total quota (Personal + Restricted)">${leaveTotalRemaining} / ${leaveTotalQuota}</span></td>
+      <td>${_leaveBalPill(plRemaining, plTotal, "Personal Leave (yearly)")}</td>
+      <td>${_leaveBalPill(rlRemaining, rlTotal, "Restricted Leave (this month)")}</td>
+      <td>${_pendingLeavePill(emp.id)}</td>
       <td class="font-mono">${empTotalHours.toFixed(1)} hrs</td>
     `;
     tr.addEventListener("click", () => openEmpCalendar(emp.id));
@@ -822,7 +822,7 @@ function exportMonthlyExcel() {
 
   const allLeaves = getStore(STORAGE_KEYS.LEAVES, []);
 
-  csv += "Employee ID,Full Name,Role,Department,Geofence Rule,Present Days,Absent Days,WFH Days,Loss of Pay Days,Personal Leave (Remaining/Total),Restricted Leave (Remaining/Total),Total Leave (Remaining/Total),Total Work Hours,Biometric Verified\n";
+  csv += "Employee ID,Full Name,Role,Department,Geofence Rule,Present Days,Absent Days,WFH Days,Loss of Pay Days,Personal Leave (Left of Total),Restricted Leave (Left of Total),Pending Leave Days,Total Work Hours,Biometric Verified\n";
 
   employees.forEach(emp => {
     let presentCount = 0;
@@ -868,7 +868,7 @@ function exportMonthlyExcel() {
 
     const geofenceRule = emp.geofenceEnforcement === "exempt" ? "Exempt (Any Location)" : "Enforced (<= 500m)";
 
-    csv += `"${emp.id}","${emp.name}","${emp.role}","${emp.department}","${geofenceRule}","${presentCount}","${absentCount}","${wfhCount}","${lopCount}","${plRemainingCsv} / ${plTotalCsv}","${rlRemainingCsv} / ${rlTotalCsv}","${leaveTotalRemainingCsv} / ${leaveTotalQuotaCsv}","${empTotalHours.toFixed(1)} hrs","Verified Snapshot"\n`;
+    csv += `"${emp.id}","${emp.name}","${emp.role}","${emp.department}","${geofenceRule}","${presentCount}","${absentCount}","${wfhCount}","${lopCount}","${plRemainingCsv} left of ${plTotalCsv}","${rlRemainingCsv} left of ${rlTotalCsv}","${_pendingLeaveDays(emp.id)}","${empTotalHours.toFixed(1)} hrs","Verified Snapshot"\n`;
   });
 
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -898,10 +898,42 @@ function managerOptionsHtml(excludeId, selectedId) {
   return html;
 }
 
+// ---- Leave-balance display helpers (shared by Staff Roster & Master Sheet) --
+// Explicit "X left of Y" labelling so it can never be read as used/total, and
+// colour that is NOT the only signal: neutral when healthy, amber when low
+// (<= 3 days left), red at 0 — each with a matching icon and a tooltip.
+function _leaveBalPill(remaining, total, ctx) {
+  let cls, icon;
+  if (remaining <= 0) { cls = "bal-zero"; icon = "fa-circle-xmark"; }
+  else if (remaining <= 3) { cls = "bal-low"; icon = "fa-triangle-exclamation"; }
+  else { cls = "bal-healthy"; icon = "fa-circle-check"; }
+  return `<span class="day-badge-pill ${cls} font-mono font-bold" title="${ctx}: ${remaining} remaining of ${total} allowance"><i class="fa-solid ${icon}"></i> ${remaining} left of ${total}</span>`;
+}
+// Leave days requested but NOT yet approved (pending at either stage).
+function _pendingLeaveDays(empId) {
+  return getStore(STORAGE_KEYS.LEAVES, [])
+    .filter(l => l.employeeId === empId && (l.status === "Pending" || l.status === "Pending Manager" || l.status === "Pending Admin"))
+    .reduce((s, l) => s + (parseFloat(l.daysCount) || 1), 0);
+}
+function _pendingLeavePill(empId) {
+  const n = _pendingLeaveDays(empId);
+  const cls = n > 0 ? "badge-leave-day" : "bal-healthy";
+  const icon = n > 0 ? "fa-hourglass-half" : "fa-circle-check";
+  return `<span class="day-badge-pill ${cls} font-mono font-bold" title="Leave days requested but not yet approved"><i class="fa-solid ${icon}"></i> ${n} pending</span>`;
+}
+// Approved Loss of Pay days in a 'YYYY-MM' month (unpaid; does not use quota).
+function _lopMonthPill(empId, monthStr) {
+  const n = (typeof computeLopDaysForMonth === "function") ? computeLopDaysForMonth(empId, monthStr) : 0;
+  const cls = n > 0 ? "badge-lop-day" : "bal-healthy";
+  return `<span class="day-badge-pill ${cls} font-mono font-bold" title="Approved Loss of Pay days this month (unpaid)"><i class="fa-solid fa-hand-holding-dollar"></i> ${n} ${n === 1 ? "day" : "days"}</span>`;
+}
+
 function renderRosterTable() {
   const employees = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
   const allLeaves = getStore(STORAGE_KEYS.LEAVES, []);
   const tbody = document.getElementById("adminRosterTableBody");
+  const _now = new Date();
+  const _curMonthStr = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, "0")}`;
   tbody.innerHTML = "";
 
   // Keep the add-employee manager picker fresh.
@@ -947,9 +979,10 @@ function renderRosterTable() {
           <i class="fa-solid ${isExempt ? 'fa-shield-halved' : 'fa-location-dot'}"></i> ${isExempt ? 'Geofence OFF (Exempt)' : 'Geofence Applicable (500m)'}
         </span>
       </td>
-      <td><span class="day-badge-pill badge-leave-day font-mono font-bold" title="Personal Leave remaining / annual quota">${plLeft} / ${plQuota}</span></td>
-      <td><span class="day-badge-pill badge-leave-day font-mono font-bold" title="Restricted Leave remaining / total">${rlLeft} / ${rlQuota}</span></td>
-      <td><span class="day-badge-pill badge-neutral font-mono font-bold" title="Total Leave remaining / total quota (Personal + Restricted)">${totalLeft} / ${quota}</span></td>
+      <td>${_leaveBalPill(plLeft, plQuota, "Personal Leave (yearly)")}</td>
+      <td>${_leaveBalPill(rlLeft, rlQuota, "Restricted Leave (this month)")}</td>
+      <td>${_lopMonthPill(emp.id, _curMonthStr)}</td>
+      <td>${_pendingLeavePill(emp.id)}</td>
       <td><span class="font-mono roster-joined" title="Date of joining"><i class="fa-regular fa-calendar-days text-muted"></i> ${joinedStr}</span></td>
       <td>
         <div class="action-btn-cluster">
@@ -979,7 +1012,9 @@ function renderRosterTable() {
   tbody.querySelectorAll(".delete-emp-btn").forEach(btn => {
     btn.addEventListener("click", () => {
       const id = btn.dataset.id;
-      if (confirm(`Are you sure you want to remove employee ${id}?`)) {
+      const _delEmp = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES).find(e => e.id === id);
+      const _delLabel = _delEmp ? `${_delEmp.name} (${id})` : id;
+      if (confirm(`Remove employee ${_delLabel}?\n\nThis permanently deletes their roster entry and cannot be undone.`)) {
         let emps = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
         emps = emps.filter(e => e.id !== id);
         setStore(STORAGE_KEYS.EMPLOYEES, emps);

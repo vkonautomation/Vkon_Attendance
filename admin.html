@@ -24,7 +24,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="styles.css?v=20261023_apr7">
+  <link rel="stylesheet" href="styles.css?v=20261023_apr8">
 </head>
 <body class="light-theme admin-page">
 
@@ -544,13 +544,13 @@
                   <th rowspan="2" title="Past working days with no punch or request &mdash; needs regularisation, not a confirmed absence">Not Marked</th>
                   <th rowspan="2">WFH Days</th>
                   <th rowspan="2" title="Approved Loss of Pay days (unpaid, does not use the paid-leave quota)">Loss of Pay Days</th>
-                  <th colspan="3" class="leave-group-header" title="Leave balances (remaining / total)">Leave</th>
+                  <th colspan="2" class="leave-group-header" title="Leave balances &mdash; shown as &quot;X left of Y&quot;">Leave</th>
+                  <th rowspan="2" title="Leave days requested but not yet approved">Pending</th>
                   <th rowspan="2">Total Work Time</th>
                 </tr>
                 <tr>
-                  <th class="leave-sub-header" title="Personal Leave: remaining / annual quota">PL</th>
-                  <th class="leave-sub-header" title="Restricted Leave: remaining / monthly quota">RL</th>
-                  <th class="leave-sub-header" title="Total Leave: remaining / total quota (Personal + Restricted)">Total</th>
+                  <th class="leave-sub-header" title="Personal Leave: days left of the yearly allowance">PL (yr)</th>
+                  <th class="leave-sub-header" title="Restricted Leave: days left of the monthly allowance (this month)">RL (mo)</th>
                 </tr>
               </thead>
               <tbody id="masterReportTableBody">
@@ -708,14 +708,15 @@
                     <th rowspan="2">Name & Role</th>
                     <th rowspan="2">Username</th>
                     <th rowspan="2">Geofence</th>
-                    <th colspan="3" class="leave-group-header" title="Leave balances">Leave</th>
+                    <th colspan="4" class="leave-group-header" title="Leave balances &mdash; shown as &quot;X left of Y&quot;">Leave</th>
                     <th rowspan="2" title="Date the employee joined">Joined</th>
                     <th rowspan="2">Actions</th>
                   </tr>
                   <tr>
-                    <th class="leave-sub-header" title="Personal Leave days taken (approved, this year)">Personal Leave</th>
-                    <th class="leave-sub-header" title="Restricted Holiday days taken (approved, this year)">Restricted Leave</th>
-                    <th class="leave-sub-header" title="Total annual leave quota">Total Leaves</th>
+                    <th class="leave-sub-header" title="Personal Leave: days left of the yearly allowance">Personal Leave</th>
+                    <th class="leave-sub-header" title="Restricted Leave: days left of the monthly allowance (this month)">Restricted Leave (this month)</th>
+                    <th class="leave-sub-header" title="Approved Loss of Pay days this month (unpaid; does not use the paid-leave quota)">LOP (this month)</th>
+                    <th class="leave-sub-header" title="Leave days requested but not yet approved">Pending</th>
                   </tr>
                 </thead>
                 <tbody id="adminRosterTableBody">
@@ -1602,7 +1603,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="shared.js?v=20261013_ist_apr6"></script>
   <script src="js/confirm-decision-modal.js?v=20261023_apr1"></script>
-  <script src="admin.js?v=20261023_apr10"></script>
+  <script src="admin.js?v=20261023_apr11"></script>
   <script src="js/password-toggle.js?v=20261019_ui1"></script>
 </body>
 </html>

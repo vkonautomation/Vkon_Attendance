@@ -10568,6 +10568,15 @@ body.light-theme .legend-dot.dot-lop { background: #f43f5e; box-shadow: none; }
 body.light-theme .quick-stat-badge.stat-rose { background: #fff1f2; color: #be123c; border-color: #fecdd3; }
 body.light-theme .quick-stat-badge.stat-rose .q-num { color: #be123c !important; }
 
+/* --- Leave balance pills: NEUTRAL when healthy, AMBER when low (<=3 left), RED at 0 ---
+   Colour is never the only signal: each pill also carries an icon and "X left of Y" text. */
+.bal-healthy { background: rgba(100, 116, 139, 0.16); color: #cbd5e1; border: 1px solid rgba(100, 116, 139, 0.32); }
+.bal-low     { background: rgba(245, 158, 11, 0.16); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.38); }
+.bal-zero    { background: rgba(239, 68, 68, 0.15);  color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.36); }
+body.light-theme .bal-healthy { background: #f1f5f9; color: #475569; border-color: #cbd5e1; }
+body.light-theme .bal-low     { background: #fffbeb; color: #b45309; border-color: #fcd34d; }
+body.light-theme .bal-zero    { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
+
 /* --- Admin master sheet: "Today" pill + LoP mini pill in the leave cell --- */
 .today-pill.pill-lop { background: #fff1f2; color: #be123c; }
 body:not(.light-theme) .today-pill.pill-lop { background: rgba(244, 63, 94, 0.16); color: #fda4af; }
