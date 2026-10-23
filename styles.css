@@ -10995,6 +10995,18 @@ body.light-theme .day-badge-pill.badge-override {
   color: #7e22ce;
 }
 
+/* --- In progress (checked in, not out yet) — sky, an open running shift --- */
+.day-badge-pill.badge-inprogress {
+  background: rgba(14, 165, 233, 0.14);
+  border: 1px solid rgba(14, 165, 233, 0.45);
+  color: #7dd3fc;
+}
+body.light-theme .day-badge-pill.badge-inprogress {
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  color: #0369a1;
+}
+
 /* Calendar cell tinting for a flagged short-hours day */
 .calendar-day-cell:has(.badge-shorthours) {
   background: rgba(244, 63, 94, 0.05);

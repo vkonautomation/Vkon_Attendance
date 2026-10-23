@@ -477,20 +477,37 @@ function renderMonthlyCalendar() {
       badgeHtml = `<span class="day-badge-pill badge-weekend-day" title="Weekend"><i class="fa-solid fa-mug-hot"></i> Weekend</span>`;
     } else {
       if (record) {
-        if (record.status === "Present") {
-          countPresent++;
-          badgeHtml = `
-            <span class="day-badge-pill badge-present" title="Present"><i class="fa-solid fa-circle-check"></i> Present</span>
-            ${classificationPill(record)}
-            ${workedMeta(record)}
-          `;
-        } else if (record.status === "WFH") {
-          countWfh++;
-          badgeHtml = `
-            <span class="day-badge-pill badge-wfh-day" title="Work from Home"><i class="fa-solid fa-house-laptop"></i> WFH</span>
-            ${classificationPill(record)}
-            ${workedMeta(record)}
-          `;
+        if (record.status === "Present" || record.status === "WFH") {
+          const isWfh = record.status === "WFH";
+          if (isOpenPunch(record)) {
+            // Checked in but not out yet: not a completed Present. Today it is
+            // still "In Progress"; a past day is finalized to Absent on load.
+            if (isToday) {
+              badgeHtml = `
+                <span class="day-badge-pill badge-inprogress" title="Checked in, awaiting check-out"><i class="fa-solid fa-hourglass-half"></i> In Progress</span>
+                ${workedMeta(record)}
+              `;
+            } else {
+              countAbsent++;
+              badgeHtml = `
+                <span class="day-badge-pill badge-absent-day" title="Absent (no check-out recorded)"><i class="fa-solid fa-circle-xmark"></i> Absent</span>
+              `;
+            }
+          } else if (isWfh) {
+            countWfh++;
+            badgeHtml = `
+              <span class="day-badge-pill badge-wfh-day" title="Work from Home"><i class="fa-solid fa-house-laptop"></i> WFH</span>
+              ${classificationPill(record)}
+              ${workedMeta(record)}
+            `;
+          } else {
+            countPresent++;
+            badgeHtml = `
+              <span class="day-badge-pill badge-present" title="Present"><i class="fa-solid fa-circle-check"></i> Present</span>
+              ${classificationPill(record)}
+              ${workedMeta(record)}
+            `;
+          }
         } else if (record.status === "Loss of Pay") {
           countLop++;
           badgeHtml = `

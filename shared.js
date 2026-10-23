@@ -1125,6 +1125,36 @@ function isShortHoursDay(rec) {
   return !!rec && rec.dayClassification === "Short hours - review";
 }
 
+// A day only counts as Present when the employee both checked in AND checked
+// out. Any Present/WFH punch still open (no check-out) on a PAST day is
+// finalized to Absent so the calendar, dashboard and payroll all agree. Today's
+// open punch is left running (shown as "In Progress") and never auto-absented.
+function finalizeStaleOpenPunches() {
+  try {
+    const records = getStore(STORAGE_KEYS.RECORDS, {});
+    const today = formatDateKey(getNowIST());
+    let changed = false;
+    Object.keys(records).forEach(k => {
+      const r = records[k];
+      if (!r || !isOpenPunch(r) || !r.date) return;
+      if (r.date >= today) return; // today (or future): shift still in progress
+      r.status = "Absent";
+      r.duration = "Absent";
+      r.hoursDecimal = 0;
+      r.dayClassification = "Absent";
+      r.absentReason = "No check-out recorded";
+      delete r.workedHours;
+      changed = true;
+      addAudit("open-punch-auto-absent", {
+        empId: r.employeeId, date: r.date,
+        actor: { id: "system", role: "system" },
+        decision: "Absent", comment: "Checked in but never checked out"
+      });
+    });
+    if (changed) setStore(STORAGE_KEYS.RECORDS, records);
+  } catch (e) { /* non-fatal */ }
+}
+
 // Recalculate the current + previous month (bounded) so "Short hours - review"
 // days flip to half-day LOP once past the payroll cut-off. Runs lazily on load.
 function recalcShortLeaveDays() {
@@ -2195,8 +2225,10 @@ function initializeDatabase() {
   }
 
   cleanExpiredPhotos();
-  // Lazily derive day classifications / auto half-day-LOP for the current and
-  // previous month (there is no server scheduler, so this runs on load/view).
+  // Finalize any past-day punch that was never closed out (in but no out) to
+  // Absent, then lazily derive day classifications / auto half-day-LOP for the
+  // current and previous month (no server scheduler, so this runs on load/view).
+  finalizeStaleOpenPunches();
   recalcShortLeaveDays();
 }
 

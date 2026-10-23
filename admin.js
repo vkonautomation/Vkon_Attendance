@@ -2506,14 +2506,27 @@ function renderEmpCalendar() {
     } else if (isWeekend) {
       badge = `<span class="day-badge-pill badge-weekend-day"><i class="fa-solid fa-mug-hot"></i> Weekend</span>`;
     } else if (rec) {
-      if (rec.status === "Present") {
-        s.present++;
-        badge = `<span class="day-badge-pill badge-present"><i class="fa-solid fa-circle-check"></i> Present</span>${_adminClassPill(rec)}`;
-        canOverride = rec.dayClassification && rec.dayClassification.indexOf("Short hours") === 0;
-      } else if (rec.status === "WFH") {
-        s.wfh++;
-        badge = `<span class="day-badge-pill badge-wfh-day"><i class="fa-solid fa-house-laptop"></i> WFH</span>${_adminClassPill(rec)}`;
-        canOverride = rec.dayClassification && rec.dayClassification.indexOf("Short hours") === 0;
+      if (rec.status === "Present" || rec.status === "WFH") {
+        const isWfh = rec.status === "WFH";
+        if (isOpenPunch(rec)) {
+          // Checked in but not out yet: not a completed Present. Today it is
+          // still "In Progress"; a past day is finalized to Absent on load.
+          if (isToday) {
+            badge = `<span class="day-badge-pill badge-inprogress" title="Checked in, awaiting check-out"><i class="fa-solid fa-hourglass-half"></i> In Progress</span>`;
+          } else {
+            s.absent++;
+            badge = `<span class="day-badge-pill badge-absent-day" title="Absent (no check-out recorded)"><i class="fa-solid fa-circle-xmark"></i> Absent</span>`;
+            canOverride = true;
+          }
+        } else if (isWfh) {
+          s.wfh++;
+          badge = `<span class="day-badge-pill badge-wfh-day"><i class="fa-solid fa-house-laptop"></i> WFH</span>${_adminClassPill(rec)}`;
+          canOverride = rec.dayClassification && rec.dayClassification.indexOf("Short hours") === 0;
+        } else {
+          s.present++;
+          badge = `<span class="day-badge-pill badge-present"><i class="fa-solid fa-circle-check"></i> Present</span>${_adminClassPill(rec)}`;
+          canOverride = rec.dayClassification && rec.dayClassification.indexOf("Short hours") === 0;
+        }
       } else if (rec.status === "Holiday" || rec.status === "Leave") {
         s.leave++;
         const isRh = rec.locationType && rec.locationType.includes("RH");
