@@ -242,6 +242,25 @@ function effectiveHoursDecimal(rec) {
   return Number(rec.hoursDecimal) || 0;
 }
 
+// Worked minutes derived from the actual in/out clock times (AM/PM strings).
+// Returns null if either time is missing/unparsable or the span is negative.
+// Used as the source of truth to repair records whose stored duration was
+// corrupted by the (now removed) "Mark Required Shift Completed" bypass.
+function workedMinutesFromClock(rec) {
+  if (!rec) return null;
+  const parse = (str) => {
+    const m = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i.exec((str || "").trim());
+    if (!m) return null;
+    let h = parseInt(m[1], 10) % 12;
+    if (/pm/i.test(m[3])) h += 12;
+    return h * 60 + parseInt(m[2], 10);
+  };
+  const inM = parse(rec.checkInTime);
+  const outM = parse(rec.checkOutTime);
+  if (inM == null || outM == null) return null;
+  return outM >= inM ? (outM - inM) : null;
+}
+
 // Annual leave days actually used = APPROVED leaves only. A pending request is
 // not yet "used" leave (this is the one source both the portal and admin use).
 // Loss of Pay days are unpaid by choice and never touch the paid-leave quota.
@@ -1530,6 +1549,33 @@ function initializeDatabase() {
       });
       if (changed) setStore(pair[1], list);
     });
+  } catch (e) { /* non-fatal */ }
+  // One-time repair: records punched out through the removed "Mark Required Shift
+  // Completed" bypass stored a bogus ~166h (9999-minute) duration and a stale
+  // simulatedFullShift flag. Recompute the duration/hours from the real in/out
+  // clock times so the roster, dashboard and reports show the true worked time.
+  try {
+    const recs = getStore(STORAGE_KEYS.RECORDS, {});
+    let repaired = false;
+    Object.keys(recs).forEach(k => {
+      const r = recs[k];
+      if (!r || (r.status !== "Present" && r.status !== "WFH")) return;
+      const absurd = Number(r.hoursDecimal) > 24;
+      if (!r.simulatedFullShift && !absurd) return;
+      const mins = workedMinutesFromClock(r);
+      if (mins != null) {
+        const h = Math.floor(mins / 60);
+        const m = mins % 60;
+        r.duration = `${h}h ${String(m).padStart(2, "0")}m`;
+        r.hoursDecimal = Number((h + m / 60).toFixed(2));
+      } else if (isOpenPunch(r)) {
+        r.duration = "In Progress";
+        r.hoursDecimal = 0;
+      }
+      if (r.simulatedFullShift) delete r.simulatedFullShift;
+      repaired = true;
+    });
+    if (repaired) setStore(STORAGE_KEYS.RECORDS, recs);
   } catch (e) { /* non-fatal */ }
   if (!getStore(STORAGE_KEYS.ADMIN_CREDENTIALS, null)) {
     setStore(STORAGE_KEYS.ADMIN_CREDENTIALS, DEFAULT_ADMIN_CREDENTIALS);
