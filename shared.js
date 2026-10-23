@@ -215,6 +215,12 @@ function setMinWorkDurationPolicy(hours, minutes) {
 // payrollCutOffDay       : day-of-month after which an unresolved "Short hours"
 //                          day auto-converts to a half-day LOP (computed lazily
 //                          on load/view, since there is no server scheduler)
+// shiftStart             : official day-start clock time ("09:30 AM"), IST
+// graceMinutes           : minutes after shiftStart before a day counts as late
+// lateFrom               : "shiftStart" (default) measures lateness from the
+//                          shift start; "graceEnd" measures it from the end of
+//                          the grace window. Either way it is only flagged once
+//                          the grace period is exceeded.
 // ============================================================================
 const DEFAULT_SHORT_LEAVE_SETTINGS = {
   requiredHours: 9,
@@ -222,27 +228,51 @@ const DEFAULT_SHORT_LEAVE_SETTINGS = {
   halfDayThresholdHours: 5,
   shortLeaveMonthlyLimit: 2,
   shortLeaveMaxHoursEach: 2,
-  payrollCutOffDay: 1
+  payrollCutOffDay: 1,
+  shiftStart: "09:30 AM",
+  graceMinutes: 15,
+  lateFrom: "shiftStart"
 };
+
+// Which keys are numeric vs text, so the getter/setter can coerce + validate.
+const _SL_NUMERIC_KEYS = ["requiredHours", "minPresentHours", "halfDayThresholdHours",
+  "shortLeaveMonthlyLimit", "shortLeaveMaxHoursEach", "payrollCutOffDay", "graceMinutes"];
+
+// Returns the coerced value for a known setting key, or null if invalid/absent.
+function _validateAttendanceSetting(k, v) {
+  if (v === undefined || v === null || v === "") return null;
+  if (_SL_NUMERIC_KEYS.indexOf(k) !== -1) {
+    const n = Number(v);
+    return isNaN(n) ? null : n;
+  }
+  if (k === "shiftStart") {
+    const m = /^(\d{1,2}):(\d{2}) ?(AM|PM)$/i.exec(String(v).trim());
+    if (!m) return null;
+    const hh = parseInt(m[1], 10);
+    if (hh < 1 || hh > 12) return null;
+    return `${String(hh).padStart(2, "0")}:${m[2]} ${m[3].toUpperCase()}`;
+  }
+  if (k === "lateFrom") {
+    return (v === "graceEnd" || v === "shiftStart") ? v : null;
+  }
+  return null;
+}
 
 function getAttendanceSettings() {
   const saved = getStore(STORAGE_KEYS.SHORT_LEAVE_SETTINGS, {}) || {};
   const s = Object.assign({}, DEFAULT_SHORT_LEAVE_SETTINGS);
   Object.keys(DEFAULT_SHORT_LEAVE_SETTINGS).forEach(k => {
-    if (saved[k] !== undefined && saved[k] !== null && saved[k] !== "" && !isNaN(Number(saved[k]))) {
-      s[k] = Number(saved[k]);
-    }
+    const val = _validateAttendanceSetting(k, saved[k]);
+    if (val !== null) s[k] = val;
   });
   return s;
 }
 
 function setAttendanceSettings(patch) {
-  const cur = getAttendanceSettings();
-  const next = Object.assign({}, cur);
-  Object.keys(DEFAULT_SHORT_LEAVE_SETTINGS).forEach(k => {
-    if (patch && patch[k] !== undefined && patch[k] !== null && patch[k] !== "" && !isNaN(Number(patch[k]))) {
-      next[k] = Number(patch[k]);
-    }
+  const next = Object.assign({}, getAttendanceSettings());
+  if (patch) Object.keys(DEFAULT_SHORT_LEAVE_SETTINGS).forEach(k => {
+    const val = _validateAttendanceSetting(k, patch[k]);
+    if (val !== null) next[k] = val;
   });
   setStore(STORAGE_KEYS.SHORT_LEAVE_SETTINGS, next);
   return next;
@@ -290,21 +320,25 @@ function effectiveHoursDecimal(rec) {
   return Number(rec.hoursDecimal) || 0;
 }
 
+// Parse a "h:mm AM/PM" clock string into minutes since midnight, or null.
+function parseClockToMinutes(str) {
+  const m = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i.exec((str || "").trim());
+  if (!m) return null;
+  let h = parseInt(m[1], 10) % 12;
+  if (/pm/i.test(m[3])) h += 12;
+  const mm = parseInt(m[2], 10);
+  if (h > 23 || mm > 59) return null;
+  return h * 60 + mm;
+}
+
 // Worked minutes derived from the actual in/out clock times (AM/PM strings).
 // Returns null if either time is missing/unparsable or the span is negative.
 // Used as the source of truth to repair records whose stored duration was
 // corrupted by the (now removed) "Mark Required Shift Completed" bypass.
 function workedMinutesFromClock(rec) {
   if (!rec) return null;
-  const parse = (str) => {
-    const m = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i.exec((str || "").trim());
-    if (!m) return null;
-    let h = parseInt(m[1], 10) % 12;
-    if (/pm/i.test(m[3])) h += 12;
-    return h * 60 + parseInt(m[2], 10);
-  };
-  const inM = parse(rec.checkInTime);
-  const outM = parse(rec.checkOutTime);
+  const inM = parseClockToMinutes(rec.checkInTime);
+  const outM = parseClockToMinutes(rec.checkOutTime);
   if (inM == null || outM == null) return null;
   return outM >= inM ? (outM - inM) : null;
 }
@@ -1119,6 +1153,61 @@ function recalcDayForRecord(empId, date) {
 function displayStatusForRecord(rec) {
   if (!rec) return "";
   return rec.dayClassification || rec.status || "";
+}
+
+// Format a minute span as "Xh YYm" (always positive; caller adds the sign/word).
+function formatMinutesHM(mins) {
+  const a = Math.abs(Math.round(mins));
+  return `${Math.floor(a / 60)}h ${String(a % 60).padStart(2, "0")}m`;
+}
+
+// THE single source of truth for a punched day's effective state. The calendar
+// popover, the dashboard and the admin sheet all read this so they can never
+// disagree. Returns null for a non-punch record (Absent/Leave/Holiday/etc.).
+function getEffectiveStatus(rec, settings) {
+  if (!rec) return null;
+  const s = settings || getAttendanceSettings();
+  if (rec.status !== "Present" && rec.status !== "WFH") return null;
+
+  const open = isOpenPunch(rec);
+  const worked = open ? 0 : computeWorkedHours(rec);
+  const cls = classifyDay(rec.employeeId, rec.date, s);
+  const classification = (cls && cls.classification) || rec.dayClassification || rec.status;
+  const checkIn = rec.checkInTime && rec.checkInTime !== "-" ? rec.checkInTime : null;
+  const checkOut = rec.checkOutTime && rec.checkOutTime !== "-" ? rec.checkOutTime : null;
+  const isComplete = !open;
+
+  // Lateness from shift start (+ grace), IST. Only flagged once grace is passed.
+  let late = { isLate: false, minutes: 0, label: "On time" };
+  const inM = parseClockToMinutes(checkIn);
+  const startM = parseClockToMinutes(s.shiftStart);
+  if (inM != null && startM != null) {
+    const graceEnd = startM + (Number(s.graceMinutes) || 0);
+    if (inM > graceEnd) {
+      const from = (s.lateFrom === "graceEnd") ? graceEnd : startM;
+      const diff = inM - from;
+      if (diff > 0) late = { isLate: true, minutes: diff, label: `-${formatMinutesHM(diff)} late` };
+    }
+  }
+
+  // Short-by for a completed day that fell under the required shift hours.
+  let short = { isShort: false, hours: 0, label: "" };
+  if (isComplete && worked < s.requiredHours) {
+    const shortMin = Math.round((s.requiredHours - worked) * 60);
+    short = { isShort: true, hours: Number((s.requiredHours - worked).toFixed(2)), label: `Short by ${formatMinutesHM(shortMin)}` };
+  }
+
+  // Approved early-out / short-leave / override / regularisation tags + reason.
+  const tags = [];
+  if (classification && classification !== "Present" && classification !== "In Progress") {
+    tags.push({ label: classification, reason: rec.shortLeaveReason || (cls && cls.reason) || "" });
+  }
+  if (rec.overridePresent) tags.push({ label: "Admin Override", reason: rec.overrideReason || "" });
+
+  return {
+    status: rec.status, classification, isOpen: open, isComplete,
+    checkIn, checkOut, workedHours: worked, late, short, tags, rec
+  };
 }
 
 function isShortHoursDay(rec) {

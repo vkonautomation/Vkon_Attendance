@@ -11007,6 +11007,54 @@ body.light-theme .day-badge-pill.badge-inprogress {
   color: #0369a1;
 }
 
+/* ==========================================================================
+   DAY DETAILS POPOVER (calendar hover / focus / tap)
+   Punch details live here, not in the day cell. Always dark-themed.
+   ========================================================================== */
+.day-popover {
+  position: fixed;
+  z-index: 4000;
+  max-width: 264px;
+  min-width: 196px;
+  background: #0f172a;
+  color: #e2e8f0;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 12px;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5);
+  padding: 10px 12px;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(4px);
+  transition: opacity 0.12s ease, transform 0.12s ease;
+  pointer-events: none;
+}
+.day-popover.open { opacity: 1; visibility: visible; transform: none; pointer-events: auto; }
+.day-popover .dp-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.day-popover .dp-date { font-weight: 600; color: #f1f5f9; }
+.day-popover .dp-rows { display: flex; flex-direction: column; gap: 5px; }
+.day-popover .dp-row { display: flex; align-items: center; gap: 8px; }
+.day-popover .dp-row i { width: 16px; text-align: center; color: #94a3b8; }
+.day-popover .dp-k { color: #94a3b8; }
+.day-popover .dp-v { margin-left: auto; color: #e2e8f0; font-variant-numeric: tabular-nums; }
+.day-popover .dp-flag { margin-top: 7px; display: flex; align-items: center; gap: 7px; font-weight: 600; }
+.day-popover .dp-flag.dp-ontime { color: #4ade80; }
+.day-popover .dp-flag.dp-late { color: #fbbf24; }
+.day-popover .dp-flag.dp-short { color: #fca5a5; }
+.day-popover .dp-tags { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+.day-popover .dp-tag { background: rgba(148, 163, 184, 0.16); border: 1px solid rgba(148, 163, 184, 0.28); color: #cbd5e1; border-radius: 999px; padding: 2px 8px; font-size: 0.72rem; }
+.day-popover .dp-note { color: #94a3b8; }
+/* Status chips keep their own colors, but stay legible on the dark popover. */
+.day-popover .day-badge-pill { font-size: 0.72rem; }
+
+/* Day cells are keyboard-focusable so keyboard users can open the popover. */
+.calendar-day-cell[data-day-pop] { cursor: pointer; }
+.calendar-day-cell[data-day-pop]:focus-visible {
+  outline: 2px solid var(--color-primary, #ea580c);
+  outline-offset: 2px;
+}
+
 /* Calendar cell tinting for a flagged short-hours day */
 .calendar-day-cell:has(.badge-shorthours) {
   background: rgba(244, 63, 94, 0.05);

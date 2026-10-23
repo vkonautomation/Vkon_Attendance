@@ -1930,33 +1930,47 @@ function initMinWorkPolicyForm() {
   });
 }
 
-// Early Out / Short Leave Policy Form (required/min/half-day hours, monthly limit, cut-off)
+// Early Out / Short Leave + Shift Timing policy form (hours, monthly limit,
+// cut-off, shift start, grace period and how lateness is counted).
 function initShortLeavePolicyForm() {
   const form = document.getElementById("shortLeavePolicyForm");
   if (!form) return;
-  const el = {
+  const num = {
     requiredHours: document.getElementById("slRequiredHoursInput"),
     minPresentHours: document.getElementById("slMinPresentHoursInput"),
     halfDayThresholdHours: document.getElementById("slHalfDayThresholdInput"),
     shortLeaveMonthlyLimit: document.getElementById("slMonthlyLimitInput"),
     shortLeaveMaxHoursEach: document.getElementById("slMaxHoursEachInput"),
-    payrollCutOffDay: document.getElementById("slPayrollCutOffInput")
+    payrollCutOffDay: document.getElementById("slPayrollCutOffInput"),
+    graceMinutes: document.getElementById("slGraceMinutesInput")
   };
+  const shiftStartInput = document.getElementById("slShiftStartInput");
+  const lateFromSel = document.getElementById("slLateFromInput");
+
+  // "09:30 AM" <-> "09:30" (the <input type="time"> uses 24-hour HH:MM).
+  const to24 = (t) => { const m = /^(\d{1,2}):(\d{2}) (AM|PM)$/i.exec((t || "").trim()); if (!m) return "09:30"; let h = parseInt(m[1], 10) % 12; if (/pm/i.test(m[3])) h += 12; return String(h).padStart(2, "0") + ":" + m[2]; };
+  const to12 = (t) => { const m = /^(\d{1,2}):(\d{2})$/.exec((t || "").trim()); if (!m) return "09:30 AM"; let h = parseInt(m[1], 10) % 24; const ap = h < 12 ? "AM" : "PM"; let hh = h % 12; if (hh === 0) hh = 12; return String(hh).padStart(2, "0") + ":" + m[2] + " " + ap; };
 
   const cur = getAttendanceSettings();
-  Object.keys(el).forEach(k => { if (el[k]) el[k].value = cur[k]; });
+  Object.keys(num).forEach(k => { if (num[k]) num[k].value = cur[k]; });
+  if (shiftStartInput) shiftStartInput.value = to24(cur.shiftStart);
+  if (lateFromSel) lateFromSel.value = cur.lateFrom;
 
   form.addEventListener("submit", (e) => {
     e.preventDefault();
     const patch = {};
-    Object.keys(el).forEach(k => { if (el[k]) patch[k] = Number(el[k].value); });
+    Object.keys(num).forEach(k => { if (num[k]) patch[k] = Number(num[k].value); });
+    if (shiftStartInput) patch.shiftStart = to12(shiftStartInput.value);
+    if (lateFromSel) patch.lateFrom = lateFromSel.value;
     const saved = setAttendanceSettings(patch);
-    Object.keys(el).forEach(k => { if (el[k]) el[k].value = saved[k]; });
+    Object.keys(num).forEach(k => { if (num[k]) num[k].value = saved[k]; });
+    if (shiftStartInput) shiftStartInput.value = to24(saved.shiftStart);
+    if (lateFromSel) lateFromSel.value = saved.lateFrom;
     // Re-classify today's and the current month's days under the new thresholds.
     if (typeof recalcShortLeaveDays === "function") recalcShortLeaveDays();
     if (typeof renderStaffRoster === "function") renderStaffRoster();
     if (typeof renderMonthlyReport === "function") renderMonthlyReport();
-    showToast(`Early Out / Short Leave policy saved: ${saved.requiredHours}h required, ${saved.minPresentHours}h Present floor, ${saved.shortLeaveMonthlyLimit}/month.`, "success");
+    showToast(`Attendance policy saved: ${saved.requiredHours}h required, shift starts ${saved.shiftStart} (grace ${saved.graceMinutes}m).`, "success");
   });
 }
 
@@ -2495,6 +2509,7 @@ function renderEmpCalendar() {
     const rec = records[`${empCalState.empId}_${dateStr}`];
 
     let badge = "";
+    let popData = null; // details popover payload (kept out of the cell)
     let cellClass = "calendar-day-cell";
     if (isToday) cellClass += " is-today";
     // Admin can force a Present override on a closed/today working day that is
@@ -2503,8 +2518,10 @@ function renderEmpCalendar() {
 
     if (declaredHoliday) {
       badge = `<span class="day-badge-pill badge-holiday-day" title="${declaredHoliday.name}"><i class="fa-solid fa-star"></i> ${String(declaredHoliday.name).split(/\s+/)[0]}</span>`;
+      popData = { dateStr, punch: false, statusLabel: declaredHoliday.name, chipClass: "badge-holiday-day", icon: "fa-star", detail: "Declared holiday" };
     } else if (isWeekend) {
       badge = `<span class="day-badge-pill badge-weekend-day"><i class="fa-solid fa-mug-hot"></i> Weekend</span>`;
+      popData = { dateStr, punch: false, statusLabel: "Weekend", chipClass: "badge-weekend-day", icon: "fa-mug-hot", detail: "Weekly off" };
     } else if (rec) {
       if (rec.status === "Present" || rec.status === "WFH") {
         const isWfh = rec.status === "WFH";
@@ -2513,47 +2530,58 @@ function renderEmpCalendar() {
           // still "In Progress"; a past day is finalized to Absent on load.
           if (isToday) {
             badge = `<span class="day-badge-pill badge-inprogress" title="Checked in, awaiting check-out"><i class="fa-solid fa-hourglass-half"></i> In Progress</span>`;
+            popData = { dateStr, rec, punch: true, statusLabel: "In Progress", chipClass: "badge-inprogress", icon: "fa-hourglass-half" };
           } else {
             s.absent++;
             badge = `<span class="day-badge-pill badge-absent-day" title="Absent (no check-out recorded)"><i class="fa-solid fa-circle-xmark"></i> Absent</span>`;
             canOverride = true;
+            popData = { dateStr, punch: false, statusLabel: "Absent", chipClass: "badge-absent-day", icon: "fa-circle-xmark", detail: "Checked in but no check-out was recorded" };
           }
         } else if (isWfh) {
           s.wfh++;
           badge = `<span class="day-badge-pill badge-wfh-day"><i class="fa-solid fa-house-laptop"></i> WFH</span>${_adminClassPill(rec)}`;
           canOverride = rec.dayClassification && rec.dayClassification.indexOf("Short hours") === 0;
+          popData = { dateStr, rec, punch: true, statusLabel: "WFH", chipClass: "badge-wfh-day", icon: "fa-house-laptop" };
         } else {
           s.present++;
           badge = `<span class="day-badge-pill badge-present"><i class="fa-solid fa-circle-check"></i> Present</span>${_adminClassPill(rec)}`;
           canOverride = rec.dayClassification && rec.dayClassification.indexOf("Short hours") === 0;
+          popData = { dateStr, rec, punch: true, statusLabel: "Present", chipClass: "badge-present", icon: "fa-circle-check" };
         }
       } else if (rec.status === "Holiday" || rec.status === "Leave") {
         s.leave++;
         const isRh = rec.locationType && rec.locationType.includes("RH");
         badge = `<span class="day-badge-pill ${isRh ? 'badge-rh-day' : 'badge-leave-day'}"><i class="fa-solid ${isRh ? 'fa-calendar-check' : 'fa-umbrella-beach'}"></i> ${isRh ? 'RH' : 'Leave'}</span>`;
+        popData = { dateStr, punch: false, statusLabel: isRh ? "Restricted Holiday" : "Leave", chipClass: isRh ? 'badge-rh-day' : 'badge-leave-day', icon: isRh ? 'fa-calendar-check' : 'fa-umbrella-beach', detail: "Approved" };
       } else if (rec.status === "Loss of Pay") {
         s.lop++;
         badge = `<span class="day-badge-pill badge-lop-day" title="Loss of Pay (Approved) — unpaid"><i class="fa-solid fa-hand-holding-dollar"></i> LoP</span>${_adminClassPill(rec)}`;
         canOverride = true;
+        popData = { dateStr, punch: false, statusLabel: "Loss of Pay", chipClass: "badge-lop-day", icon: "fa-hand-holding-dollar", detail: "Approved unpaid day" };
       } else if (rec.status === "Absent") {
         s.absent++;
         badge = `<span class="day-badge-pill badge-absent-day"><i class="fa-solid fa-circle-xmark"></i> Absent</span>`;
         canOverride = true;
+        popData = { dateStr, punch: false, statusLabel: "Absent", chipClass: "badge-absent-day", icon: "fa-circle-xmark" };
       }
     } else {
       const beforeEnroll = empEnrolledDate && dateObj < empEnrolledDate;
       if (dateObj < nowZero && !beforeEnroll) {
         if (regPending[dateStr]) {
           badge = `<span class="day-badge-pill badge-regpending" title="Regularisation ${regPending[dateStr].id} \u2014 awaiting review"><i class="fa-solid fa-hourglass-half"></i> Reg. Pending</span>`;
+          popData = { dateStr, punch: false, statusLabel: "Reg. Pending", chipClass: "badge-regpending", icon: "fa-hourglass-half", detail: "Regularisation awaiting review" };
         } else {
           s.notmarked++;
           badge = `<span class="day-badge-pill badge-notmarked" title="Closed with no record \u2014 needs regularisation"><i class="fa-solid fa-circle-question"></i> Not Marked</span>`;
           canOverride = true;
+          popData = { dateStr, punch: false, statusLabel: "Not Marked", chipClass: "badge-notmarked", icon: "fa-circle-question", detail: "No punch or leave recorded" };
         }
       } else if (dateObj > nowZero) {
         badge = `<span class="day-badge-pill badge-upcoming"><i class="fa-solid fa-circle-dot"></i> Upcoming</span>`;
+        popData = null; // blank future day: no popover
       } else if (isToday) {
         badge = `<span class="day-badge-pill badge-today-active"><i class="fa-solid fa-clock"></i> Today</span>`;
+        popData = { dateStr, punch: false, statusLabel: "Today", chipClass: "badge-today-active", icon: "fa-clock", detail: "No punch recorded yet today" };
       }
     }
 
@@ -2567,6 +2595,7 @@ function renderEmpCalendar() {
       <div class="cell-top-row"><span class="day-number">${d}</span>${isToday ? '<span class="today-marker-chip"><i class="fa-solid fa-star"></i> Today</span>' : ''}</div>
       <div class="cell-content">${badge}${overrideBtn}</div>
     `;
+    if (popData && window.DayPopover) DayPopover.bind(cell, popData);
     grid.appendChild(cell);
   }
 
@@ -3518,6 +3547,7 @@ function startAdminConsole() {
   isConsoleStarted = true;
 
   initAdminClock();
+  if (window.DayPopover) DayPopover.init();
   initAdminTabs();
   initMasterTableSearch();
   initExtraModules();

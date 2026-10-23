@@ -379,21 +379,6 @@ function renderMonthlyCalendar() {
       .forEach(r => { regPendingMap[r.date] = r; });
   } catch (e) { console.warn("reg pending map err:", e); }
 
-  // "9h 05m" style worked-hours label from a punch record
-  const fmtHoursLabel = (dec) => `${Math.floor(dec)}h ${String(Math.round((dec - Math.floor(dec)) * 60)).padStart(2, "0")}m`;
-  const workedMeta = (record) => {
-    const open = (typeof isOpenPunch === "function") && isOpenPunch(record);
-    const dec = (typeof effectiveHoursDecimal === "function") ? effectiveHoursDecimal(record) : Number(record.hoursDecimal);
-    const hrs = (!open && dec > 0) ? fmtHoursLabel(dec) : null;
-    const inT = record.checkInTime && record.checkInTime !== "-" ? record.checkInTime : null;
-    const outT = record.checkOutTime && record.checkOutTime !== "-" ? record.checkOutTime : null;
-    const span = inT && outT ? `${inT} \u2192 ${outT}` : (inT ? `${inT} \u2192 \u2014` : null);
-    if (open) return `<span class="day-meta-text"><span class="meta-hours">In Progress</span>${span ? ` &bull; ${span}` : ""}</span>`;
-    if (hrs && span) return `<span class="day-meta-text"><span class="meta-hours">${hrs}</span> &bull; ${span}</span>`;
-    if (hrs) return `<span class="day-meta-text"><span class="meta-hours">${hrs}</span></span>`;
-    return `<span class="day-meta-text">${span || (inT || "Remote")}</span>`;
-  };
-
   // A coloured classification pill for short-leave / half-day / short-hours days.
   const classificationPill = (record) => {
     const c = record && record.dayClassification;
@@ -465,6 +450,7 @@ function renderMonthlyCalendar() {
     cell.dataset.date = dateStr;
 
     let badgeHtml = "";
+    let popData = null; // payload for the details popover (kept out of the cell)
 
     if (declaredHoliday) {
       const shortName = String(declaredHoliday.name).split(/\s+/)[0];
@@ -473,8 +459,10 @@ function renderMonthlyCalendar() {
           <i class="fa-solid fa-star"></i> <span class="pill-text">${shortName}</span>
         </span>
       `;
+      popData = { dateStr, punch: false, statusLabel: declaredHoliday.name, chipClass: "badge-holiday-day", icon: "fa-star", detail: "Declared holiday" };
     } else if (isWeekend) {
       badgeHtml = `<span class="day-badge-pill badge-weekend-day" title="Weekend"><i class="fa-solid fa-mug-hot"></i> Weekend</span>`;
+      popData = { dateStr, punch: false, statusLabel: "Weekend", chipClass: "badge-weekend-day", icon: "fa-mug-hot", detail: "Weekly off" };
     } else {
       if (record) {
         if (record.status === "Present" || record.status === "WFH") {
@@ -485,35 +473,36 @@ function renderMonthlyCalendar() {
             if (isToday) {
               badgeHtml = `
                 <span class="day-badge-pill badge-inprogress" title="Checked in, awaiting check-out"><i class="fa-solid fa-hourglass-half"></i> In Progress</span>
-                ${workedMeta(record)}
               `;
+              popData = { dateStr, rec: record, punch: true, statusLabel: "In Progress", chipClass: "badge-inprogress", icon: "fa-hourglass-half" };
             } else {
               countAbsent++;
               badgeHtml = `
                 <span class="day-badge-pill badge-absent-day" title="Absent (no check-out recorded)"><i class="fa-solid fa-circle-xmark"></i> Absent</span>
               `;
+              popData = { dateStr, punch: false, statusLabel: "Absent", chipClass: "badge-absent-day", icon: "fa-circle-xmark", detail: "Checked in but no check-out was recorded" };
             }
           } else if (isWfh) {
             countWfh++;
             badgeHtml = `
               <span class="day-badge-pill badge-wfh-day" title="Work from Home"><i class="fa-solid fa-house-laptop"></i> WFH</span>
               ${classificationPill(record)}
-              ${workedMeta(record)}
             `;
+            popData = { dateStr, rec: record, punch: true, statusLabel: "WFH", chipClass: "badge-wfh-day", icon: "fa-house-laptop" };
           } else {
             countPresent++;
             badgeHtml = `
               <span class="day-badge-pill badge-present" title="Present"><i class="fa-solid fa-circle-check"></i> Present</span>
               ${classificationPill(record)}
-              ${workedMeta(record)}
             `;
+            popData = { dateStr, rec: record, punch: true, statusLabel: "Present", chipClass: "badge-present", icon: "fa-circle-check" };
           }
         } else if (record.status === "Loss of Pay") {
           countLop++;
           badgeHtml = `
             <span class="day-badge-pill badge-lop-day" title="Loss of Pay (Approved)"><i class="fa-solid fa-hand-holding-dollar"></i> LoP</span>
-            <span class="day-meta-text">Unpaid</span>
           `;
+          popData = { dateStr, punch: false, statusLabel: "Loss of Pay", chipClass: "badge-lop-day", icon: "fa-hand-holding-dollar", detail: "Approved unpaid day" };
         } else if (record.status === "Holiday" || record.status === "Leave") {
           countLeave++;
           const isRh = record.locationType && record.locationType.includes("RH");
@@ -521,13 +510,14 @@ function renderMonthlyCalendar() {
             <span class="day-badge-pill ${isRh ? 'badge-rh-day' : 'badge-leave-day'}" title="${isRh ? 'Restricted Holiday' : 'Leave'} (Approved)">
               <i class="fa-solid ${isRh ? 'fa-calendar-check' : 'fa-umbrella-beach'}"></i> ${isRh ? 'RH' : 'Leave'}
             </span>
-            <span class="day-meta-text">Approved</span>
           `;
+          popData = { dateStr, punch: false, statusLabel: isRh ? "Restricted Holiday" : "Leave", chipClass: isRh ? 'badge-rh-day' : 'badge-leave-day', icon: isRh ? 'fa-calendar-check' : 'fa-umbrella-beach', detail: "Approved" };
         } else if (record.status === "Absent") {
           countAbsent++;
           badgeHtml = `
             <span class="day-badge-pill badge-absent-day" title="Absent"><i class="fa-solid fa-circle-xmark"></i> Absent</span>
           `;
+          popData = { dateStr, punch: false, statusLabel: "Absent", chipClass: "badge-absent-day", icon: "fa-circle-xmark" };
         }
       } else {
         // Only evaluate past working days that occurred on or after employee enrollment
@@ -545,6 +535,7 @@ function renderMonthlyCalendar() {
               <span class="day-badge-pill badge-regpending" title="Regularisation ${regPendingMap[dateStr].id} submitted &mdash; awaiting admin review"><i class="fa-solid fa-hourglass-half"></i> Reg. Pending</span>
               <button type="button" class="cell-reg-view" data-reg-date="${dateStr}" title="View your regularisation request for ${dateStr}"><i class="fa-solid fa-eye"></i> View request</button>
             `;
+            popData = { dateStr, punch: false, statusLabel: "Reg. Pending", chipClass: "badge-regpending", icon: "fa-hourglass-half", detail: "Regularisation awaiting admin review" };
           } else {
             // No punch, no leave, no WFH, no pending request — needs regularisation
             countNotMarked++;
@@ -552,15 +543,17 @@ function renderMonthlyCalendar() {
               <span class="day-badge-pill badge-notmarked" title="Day closed with no record and no leave &mdash; raise a regularisation if you were working"><i class="fa-solid fa-circle-question"></i> Not Marked</span>
               <button type="button" class="cell-reg-quick" data-reg-date="${dateStr}" title="Request regularisation for ${dateStr}"><i class="fa-solid fa-wand-magic-sparkles"></i> Regularise</button>
             `;
+            popData = { dateStr, punch: false, statusLabel: "Not Marked", chipClass: "badge-notmarked", icon: "fa-circle-question", detail: "No punch or leave recorded" };
           }
         } else if (isToday && !declaredHoliday && !isWeekend) {
           badgeHtml = `
             <span class="day-badge-pill badge-today-active" title="Today &ndash; ready to punch in"><i class="fa-solid fa-clock"></i> Today (Active)</span>
-            <span class="day-meta-text">Ready to Punch</span>
           `;
+          popData = { dateStr, punch: false, statusLabel: "Today", chipClass: "badge-today-active", icon: "fa-clock", detail: "Ready to punch in" };
         } else if (dayDate > nowZero && !isWeekend && !isBeforeEnrollment) {
           // Upcoming working day: tidy subtle placeholder (weekends are labelled above).
           badgeHtml = `<span class="day-future-ph" title="Upcoming working day">&mdash;</span>`;
+          popData = null; // blank future day: no popover
         }
       }
     }
@@ -600,6 +593,9 @@ function renderMonthlyCalendar() {
         openRegularisationForDate(btn.dataset.regDate, true);
       });
     });
+
+    // Details live in the hover/focus/tap popover, not in the cell itself.
+    if (popData && window.DayPopover) DayPopover.bind(cell, popData);
 
     grid.appendChild(cell);
   }
@@ -3860,6 +3856,7 @@ function renderDashboardStats() {
 
 window.addEventListener("DOMContentLoaded", () => {
   try { initClock(); } catch (e) { console.error("Error in initClock:", e); }
+  try { if (window.DayPopover) DayPopover.init(); } catch (e) { console.error("Error in DayPopover.init:", e); }
   try { initTheme(); } catch (e) { console.error("Error in initTheme:", e); }
   try { initAuthSystem(); } catch (e) { console.error("Error in initAuthSystem:", e); }
   try { initPortalSideNav(); } catch (e) { console.error("Error in initPortalSideNav:", e); }

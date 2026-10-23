@@ -127,11 +127,11 @@ def verify_all():
 
     # ---- 8. Cache tokens + CSS ----------------------------------------------
     print("\n[8] Cache tokens + badge CSS:")
-    need("shared.js?v=20261013_ist_apr10" in index_html and "shared.js?v=20261013_ist_apr10" in admin_html,
+    need("shared.js?v=20261013_ist_apr11" in index_html and "shared.js?v=20261013_ist_apr11" in admin_html,
          "shared.js cache token not bumped")
-    need("app.js?v=20261023_apr9" in index_html, "app.js cache token not bumped")
-    need("admin.js?v=20261023_apr16" in admin_html, "admin.js cache token not bumped")
-    need("styles.css?v=20261023_apr10" in index_html and "styles.css?v=20261023_apr10" in admin_html,
+    need("app.js?v=20261023_apr10" in index_html, "app.js cache token not bumped")
+    need("admin.js?v=20261023_apr17" in admin_html, "admin.js cache token not bumped")
+    need("styles.css?v=20261023_apr11" in index_html and "styles.css?v=20261023_apr11" in admin_html,
          "styles.css cache token not bumped")
     for cls in ["badge-shortleave", "badge-halfday", "badge-shorthours", "badge-override",
                 "badge-inprogress", "icon-bg-teal", "text-teal"]:
