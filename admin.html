@@ -24,7 +24,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="styles.css?v=20261023_apr8">
+  <link rel="stylesheet" href="styles.css?v=20261023_apr9">
 </head>
 <body class="light-theme admin-page">
 
@@ -157,6 +157,9 @@
         <div class="nav-tabs">
           <button class="nav-tab" data-tab="tab-geofence">
             <i class="fa-solid fa-location-dot"></i> Settings
+          </button>
+          <button class="nav-tab" data-tab="tab-audit">
+            <i class="fa-solid fa-clock-rotate-left"></i> Audit Log
           </button>
           <button class="nav-tab" data-tab="tab-account" id="navTabAccount">
             <i class="fa-solid fa-user-shield"></i> Admin Security
@@ -544,6 +547,7 @@
                   <th rowspan="2" title="Past working days with no punch or request &mdash; needs regularisation, not a confirmed absence">Not Marked</th>
                   <th rowspan="2">WFH Days</th>
                   <th rowspan="2" title="Approved Loss of Pay days (unpaid, does not use the paid-leave quota)">Loss of Pay Days</th>
+                  <th rowspan="2" title="Days flagged “Short hours – review” (worked below the Present minimum, not yet resolved)">Short Hours</th>
                   <th colspan="3" class="leave-group-header" title="Leave balances &mdash; shown as &quot;X left of Y&quot;">Leave</th>
                   <th rowspan="2">Total Work Time</th>
                 </tr>
@@ -760,6 +764,12 @@
                 <span>Attendance Regularisation</span>
                 <span class="badge-bubble badge-bubble-drawer" id="drawerRegBadge" style="display: none;">0</span>
               </button>
+
+              <button type="button" class="approvals-nav-pill" data-panel="panel-approval-eo" id="navPillEarlyOut">
+                <i class="fa-solid fa-person-walking-arrow-right text-teal"></i>
+                <span>Early Out / Short Leave</span>
+                <span class="badge-bubble badge-bubble-drawer" id="drawerEarlyOutBadge" style="display: none;">0</span>
+              </button>
             </nav>
           </aside>
 
@@ -886,6 +896,47 @@
               <div class="empty-state-card" id="emptyRegularisationMsg" style="display: none;">
                 <i class="fa-solid fa-clipboard-check"></i>
                 <p>No attendance regularisation requests pending.</p>
+              </div>
+            </div>
+
+            <!-- PANEL 4: EARLY OUT / SHORT LEAVE -->
+            <div class="glass-panel admin-card approval-panel-view" id="panel-approval-eo">
+              <div class="card-header">
+                <div class="header-icon icon-bg-teal">
+                  <i class="fa-solid fa-person-walking-arrow-right"></i>
+                </div>
+                <div class="header-title">
+                  <h3>Early Out / Short Leave Approvals</h3>
+                  <p>Approve or reject early-out requests. Within the monthly limit the day stays Present (tagged Short leave); over the limit it is treated as the employee chose (half-day Personal Leave or LOP).</p>
+                </div>
+              </div>
+
+              <div class="approval-tabs" data-cat="eo">
+                <button type="button" class="approval-tab active" data-cat="eo" data-tab="manager"><i class="fa-solid fa-user-tie"></i> Manager Approval <span class="tab-count" id="eoTabManagerCount">0</span></button>
+                <button type="button" class="approval-tab" data-cat="eo" data-tab="admin"><i class="fa-solid fa-shield-halved"></i> Admin Approval <span class="tab-count" id="eoTabAdminCount">0</span></button>
+                <button type="button" class="approval-tab" data-cat="eo" data-tab="history"><i class="fa-solid fa-clock-rotate-left"></i> History <span class="tab-count" id="eoTabHistoryCount" data-zero="true">0</span></button>
+              </div>
+
+              <div class="table-responsive">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Employee</th>
+                      <th>Date</th>
+                      <th>Planned Leave / Reason</th>
+                      <th>Manager Stage</th>
+                      <th>Admin Stage</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="adminEarlyOutTableBody">
+                    <!-- Populated via JS -->
+                  </tbody>
+                </table>
+              </div>
+              <div class="empty-state-card" id="emptyEarlyOutMsg" style="display: none;">
+                <i class="fa-solid fa-person-walking-arrow-right"></i>
+                <p>No early-out requests pending.</p>
               </div>
             </div>
 
@@ -1036,6 +1087,58 @@
 
               <button type="submit" class="btn btn-warning btn-block">
                 <i class="fa-solid fa-floppy-disk"></i> Save Minimum Work Duration Policy
+              </button>
+            </form>
+          </div>
+
+          <!-- Box 3: Early Out / Short Leave Policy -->
+          <div class="glass-panel admin-card" id="boxShortLeavePolicy">
+            <div class="card-header">
+              <div class="header-icon icon-bg-teal">
+                <i class="fa-solid fa-person-walking-arrow-right"></i>
+              </div>
+              <div class="header-title">
+                <h3>Early Out &amp; Short Leave Policy</h3>
+                <p>Set the shift-hour rules used to classify Present / Short leave / Half-day days and the monthly short-leave allowance</p>
+              </div>
+            </div>
+
+            <form id="shortLeavePolicyForm" class="box-form padding-form">
+              <div class="form-row-2">
+                <div class="form-group">
+                  <label for="slRequiredHoursInput">Required Shift Hours / Day <span class="req">*</span></label>
+                  <input type="number" id="slRequiredHoursInput" required class="form-control" min="1" max="16" step="0.5" value="9">
+                  <span class="form-hint">Worked hours at or above this is a full Present day</span>
+                </div>
+                <div class="form-group">
+                  <label for="slMinPresentHoursInput">Minimum Hours for Present <span class="req">*</span></label>
+                  <input type="number" id="slMinPresentHoursInput" required class="form-control" min="1" max="16" step="0.5" value="8">
+                  <span class="form-hint">Floor below which a day is flagged for review</span>
+                </div>
+                <div class="form-group">
+                  <label for="slHalfDayThresholdInput">Half-Day Threshold Hours <span class="req">*</span></label>
+                  <input type="number" id="slHalfDayThresholdInput" required class="form-control" min="0" max="16" step="0.5" value="5">
+                  <span class="form-hint">Worked below this is a half-day regardless</span>
+                </div>
+                <div class="form-group">
+                  <label for="slMonthlyLimitInput">Short Leave Limit / Month <span class="req">*</span></label>
+                  <input type="number" id="slMonthlyLimitInput" required class="form-control" min="0" max="20" step="1" value="2">
+                  <span class="form-hint">Approved early-outs treated as "Short leave" per month</span>
+                </div>
+                <div class="form-group">
+                  <label for="slMaxHoursEachInput">Max Hours Each <span class="req">*</span></label>
+                  <input type="number" id="slMaxHoursEachInput" required class="form-control" min="0.5" max="8" step="0.5" value="2">
+                  <span class="form-hint">Shortfall cap for a single within-limit short leave</span>
+                </div>
+                <div class="form-group">
+                  <label for="slPayrollCutOffInput">Payroll Cut-Off Day of Month <span class="req">*</span></label>
+                  <input type="number" id="slPayrollCutOffInput" required class="form-control" min="1" max="28" step="1" value="1">
+                  <span class="form-hint">Unresolved short-hours days past this become half-day LOP</span>
+                </div>
+              </div>
+
+              <button type="submit" class="btn btn-primary btn-block">
+                <i class="fa-solid fa-floppy-disk"></i> Save Early Out / Short Leave Policy
               </button>
             </form>
           </div>
@@ -1238,6 +1341,57 @@
               <i class="fa-solid fa-floppy-disk"></i> Save Approval Workflow
             </button>
           </form>
+        </div>
+      </section>
+
+      <!-- ================= TAB: AUDIT LOG (read-only) ================= -->
+      <section id="tab-audit" class="tab-panel">
+        <div class="glass-panel admin-card">
+          <div class="card-header">
+            <div class="header-icon icon-bg-teal">
+              <i class="fa-solid fa-clock-rotate-left"></i>
+            </div>
+            <div class="header-title">
+              <h3>Audit Log</h3>
+              <p>Read-only trail of overrides, auto LOP conversions, cancellations and early-out decisions (actor, decision, comment, timestamp)</p>
+            </div>
+          </div>
+
+          <div class="panel-header-toolbar">
+            <div class="toolbar-title-group">
+              <label class="audit-filter-label" for="auditEmpFilter">Employee
+                <select id="auditEmpFilter" class="form-control form-control-sm"><option value="">All employees</option></select>
+              </label>
+              <label class="audit-filter-label" for="auditDateFilter">Date
+                <input type="date" id="auditDateFilter" class="form-control form-control-sm">
+              </label>
+              <button type="button" id="auditClearFiltersBtn" class="btn btn-ghost btn-sm"><i class="fa-solid fa-xmark"></i> Clear</button>
+            </div>
+            <span class="table-toolbar-count" id="auditLogCount"></span>
+          </div>
+
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>When (IST)</th>
+                  <th>Action</th>
+                  <th>Employee</th>
+                  <th>Date</th>
+                  <th>Actor</th>
+                  <th>Decision</th>
+                  <th>Comment</th>
+                </tr>
+              </thead>
+              <tbody id="auditLogTableBody">
+                <!-- Populated via JS -->
+              </tbody>
+            </table>
+          </div>
+          <div class="empty-state-card" id="emptyAuditLogMsg" style="display: none;">
+            <i class="fa-solid fa-clock-rotate-left"></i>
+            <p>No audit entries yet.</p>
+          </div>
         </div>
       </section>
 
@@ -1601,9 +1755,9 @@
 
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <script src="shared.js?v=20261013_ist_apr8"></script>
+  <script src="shared.js?v=20261013_ist_apr9"></script>
   <script src="js/confirm-decision-modal.js?v=20261023_apr1"></script>
-  <script src="admin.js?v=20261023_apr13"></script>
+  <script src="admin.js?v=20261023_apr14"></script>
   <script src="js/password-toggle.js?v=20261019_ui1"></script>
   <script src="js/data-transfer.js?v=20261023_apr2"></script>
 </body>

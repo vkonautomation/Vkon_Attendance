@@ -105,13 +105,13 @@ def verify_all():
     print("  PASS")
 
     # Deferred items must NOT be built yet.
-    print("\n[Deferred] locking / sandwich / pro-rate / auto-convert / audit absent:")
+    print("\n[Deferred] locking / sandwich / pro-rate / auto-convert absent:")
     for absent in ["lopDivisorValue", "prorateGross", "getLopSettings", "setLopSettings",
                    "PAYROLL_STATUSES", "lockPayrollMonth", "addLopCredit", "logLopAction",
-                   "getAuditLog", "SANDWICH", "sandwichRule"]:
+                   "SANDWICH", "sandwichRule"]:
         need(absent not in shared and absent not in admin, f"deferred symbol '{absent}' should not be built yet")
     need("lopSettingsForm" not in admin_html and "lopSandwichRule" not in admin_html, "deferred LOP settings UI present")
-    need("lopAuditLog" not in admin_html, "deferred audit log UI present")
+    need("lopAuditLog" not in admin_html, "deferred LOP audit log UI present")
     print("  PASS")
 
     # CSS layer present.

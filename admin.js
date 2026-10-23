@@ -154,6 +154,7 @@ function initAdminTabs() {
     "tab-holidays": ["Holidays", "Declared company & restricted holiday calendar"],
     "tab-photos": ["Attendance Photos", "Rolling 24-hour check-in snapshot audit trail"],
     "tab-geofence": ["Settings", "Office location radius & calibration"],
+    "tab-audit": ["Audit Log", "Overrides, auto LOP conversions, cancellations & early-out decisions"],
     "tab-account": ["Admin Security", "Credentials and access control"],
     "tab-help": ["Help & Support", "Policy FAQ and support tickets"]
   };
@@ -198,6 +199,8 @@ function initAdminTabs() {
         setTimeout(() => {
           if (adminMap) adminMap.invalidateSize();
         }, 200);
+      } else if (targetId === "tab-audit") {
+        renderAuditLog();
       } else if (targetId === "tab-account") {
         renderAdminAccountTab();
       }
@@ -276,6 +279,7 @@ function renderMonthlyReport() {
     let halfCount = 0;
     let leaveCount = 0;
     let lopCount = 0;       // approved Loss of Pay days (unpaid, quota-safe)
+    let shortHoursCount = 0; // days flagged "Short hours - review" (worked < minimum, unresolved)
     let empTotalHours = 0;
     let expectedDays = 0;     // closed working days, net of holidays & approved leave
     let closedAttended = 0;   // attendance credit on closed days only (today excluded)
@@ -295,6 +299,7 @@ function renderMonthlyReport() {
       empWorkingDaysElapsed++;
       const dateStr = formatDateKey(dateObj);
       const rec = records[`${emp.id}_${dateStr}`];
+      if (rec && typeof isShortHoursDay === "function" && isShortHoursDay(rec)) shortHoursCount++;
       // A day is "closed" only once its end-of-day cutoff has passed, i.e. strictly
       // before today. Today is reported separately and never counted in the rate.
       const isClosed = dateObj < nowZero;
@@ -435,6 +440,7 @@ function renderMonthlyReport() {
       <td><span class="unmarked-cell${unmarkedCount > 0 ? " has-unmarked" : ""}" title="${unmarkedCount} past working day(s) with no punch or request \u2014 needs regularisation, NOT counted as Absent">${unmarkedCount} Days</span></td>
       <td><span class="text-primary font-bold">${wfhCount} Days</span></td>
       <td><span class="${lopCount ? 'day-badge-pill badge-lop-day' : 'text-muted'}">${lopCount} Days</span></td>
+      <td><span class="${shortHoursCount ? 'day-badge-pill badge-shorthours' : 'text-muted'}" title="${shortHoursCount} day(s) worked below the Present minimum and awaiting review">${shortHoursCount}</span></td>
       <td>${_leaveBalPill(plRemaining, plTotal, "Personal Leave (yearly)")}</td>
       <td>${_leaveBalPill(rlRemaining, rlTotal, "Restricted Leave (this month)")}</td>
       <td>${_leaveBalPill(leaveTotalRemaining, leaveTotalQuota, "Total Leave (Personal + Restricted)")}</td>
@@ -822,13 +828,14 @@ function exportMonthlyExcel() {
 
   const allLeaves = getStore(STORAGE_KEYS.LEAVES, []);
 
-  csv += "Employee ID,Full Name,Role,Department,Geofence Rule,Present Days,Absent Days,WFH Days,Loss of Pay Days,Personal Leave (Left of Total),Restricted Leave (Left of Total),Total Leave (Left of Total),Total Work Hours,Biometric Verified\n";
+  csv += "Employee ID,Full Name,Role,Department,Geofence Rule,Present Days,Absent Days,WFH Days,Loss of Pay Days,Short Hours (Review) Days,Personal Leave (Left of Total),Restricted Leave (Left of Total),Total Leave (Left of Total),Total Work Hours,Biometric Verified\n";
 
   employees.forEach(emp => {
     let presentCount = 0;
     let absentCount = 0;
     let wfhCount = 0;
     let lopCount = 0;
+    let shortHoursCount = 0;
     let empTotalHours = 0;
 
     const empEnrolledDate = emp.enrolledAt ? new Date(emp.enrolledAt + "T00:00:00") : null;
@@ -840,6 +847,7 @@ function exportMonthlyExcel() {
 
       const dateStr = formatDateKey(dateObj);
       const rec = records[`${emp.id}_${dateStr}`];
+      if (rec && typeof isShortHoursDay === "function" && isShortHoursDay(rec)) shortHoursCount++;
 
       if (rec) {
         if (rec.status === "Present") {
@@ -868,7 +876,7 @@ function exportMonthlyExcel() {
 
     const geofenceRule = emp.geofenceEnforcement === "exempt" ? "Exempt (Any Location)" : "Enforced (<= 500m)";
 
-    csv += `"${emp.id}","${emp.name}","${emp.role}","${emp.department}","${geofenceRule}","${presentCount}","${absentCount}","${wfhCount}","${lopCount}","${plRemainingCsv} left of ${plTotalCsv}","${rlRemainingCsv} left of ${rlTotalCsv}","${leaveTotalRemainingCsv} left of ${leaveTotalQuotaCsv}","${empTotalHours.toFixed(1)} hrs","Verified Snapshot"\n`;
+    csv += `"${emp.id}","${emp.name}","${emp.role}","${emp.department}","${geofenceRule}","${presentCount}","${absentCount}","${wfhCount}","${lopCount}","${shortHoursCount}","${plRemainingCsv} left of ${plTotalCsv}","${rlRemainingCsv} left of ${rlTotalCsv}","${leaveTotalRemainingCsv} left of ${leaveTotalQuotaCsv}","${empTotalHours.toFixed(1)} hrs","Verified Snapshot"\n`;
   });
 
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -1300,6 +1308,7 @@ function renderApprovalsCenter() {
   renderWfhApprovals();
   renderLeaveApprovals();
   renderRegularisationApprovals();
+  renderEarlyOutApprovals();
   updatePendingBadges();
 }
 
@@ -1308,11 +1317,13 @@ function updatePendingBadges() {
   const wfh = getStore(STORAGE_KEYS.WFH, []);
   const leaves = getStore(STORAGE_KEYS.LEAVES, []);
   const regs = getStore(STORAGE_KEYS.REGULARISATIONS, []);
+  const eos = getStore(STORAGE_KEYS.EARLY_OUTS, []);
 
   const _isPending = s => s === "Pending Manager" || s === "Pending Admin" || s === "Pending";
   const pendingWfh = wfh.filter(w => _isPending(w.status) || w.status === "Cancellation Requested").length;
   const pendingLeaves = leaves.filter(l => _isPending(l.status) || l.status === "Cancellation Requested").length;
   const pendingRegs = regs.filter(r => _isPending(r.status)).length;
+  const pendingEos = eos.filter(x => _isPending(x.status) || x.status === "Cancellation Requested").length;
 
   // Per-tab pending counts (Manager / Admin / History) for each category.
   const _cnt = (list, st) => list.filter(x => st.indexOf(x.status) !== -1).length;
@@ -1325,8 +1336,11 @@ function updatePendingBadges() {
   _setTabCount("regTabManagerCount", _cnt(regs, ["Pending Manager"]));
   _setTabCount("regTabAdminCount", _cnt(regs, ["Pending Admin", "Cancellation Requested"]));
   _setTabCount("regTabHistoryCount", _cnt(regs, ["Approved", "Rejected", "Cancelled"]));
+  _setTabCount("eoTabManagerCount", _cnt(eos, ["Pending Manager"]));
+  _setTabCount("eoTabAdminCount", _cnt(eos, ["Pending Admin", "Cancellation Requested"]));
+  _setTabCount("eoTabHistoryCount", _cnt(eos, ["Approved", "Rejected", "Cancelled"]));
 
-  const total = pendingWfh + pendingLeaves + pendingRegs;
+  const total = pendingWfh + pendingLeaves + pendingRegs + pendingEos;
   
   // Main header tab bubble (only shows number if > 0, hidden if 0)
   const badge = document.getElementById("pendingRequestsBadge");
@@ -1373,6 +1387,17 @@ function updatePendingBadges() {
       regBadge.style.display = "none";
     }
   }
+
+  const eoBadge = document.getElementById("drawerEarlyOutBadge");
+  if (eoBadge) {
+    if (pendingEos > 0) {
+      eoBadge.textContent = pendingEos;
+      eoBadge.style.display = "inline-flex";
+    } else {
+      eoBadge.textContent = "";
+      eoBadge.style.display = "none";
+    }
+  }
 }
 
 // Requirement 5: Approvals Center Side Drawer switcher
@@ -1399,7 +1424,7 @@ function initApprovalsSideDrawer() {
 // ROW 1: WORK FROM HOME APPROVALS
 // -------------------------------------------------------------
 // ---- Approvals: shared rendering + interaction helpers --------------------
-const APPROVAL_TAB_STATE = { wfh: "manager", leave: "manager", reg: "manager" };
+const APPROVAL_TAB_STATE = { wfh: "manager", leave: "manager", reg: "manager", eo: "manager" };
 const APPROVAL_TAB_STATUSES = {
   manager: ["Pending Manager"],
   admin: ["Pending Admin", "Cancellation Requested"],
@@ -1496,7 +1521,7 @@ function _wfhWarn(r) {
   return "";
 }
 function _emptyApprovalText(cat, tab) {
-  const kind = cat === "wfh" ? "Work From Home" : cat === "leave" ? "Leave" : "Regularisation";
+  const kind = cat === "wfh" ? "Work From Home" : cat === "leave" ? "Leave" : cat === "eo" ? "Early Out" : "Regularisation";
   if (tab === "manager") return `No ${kind} requests awaiting manager approval.`;
   if (tab === "admin") return `No ${kind} requests awaiting admin approval.`;
   return `No ${kind} history yet.`;
@@ -1540,6 +1565,7 @@ function initApprovalTabs() {
       document.querySelectorAll(`.approval-tabs[data-cat="${cat}"] .approval-tab`).forEach(x => x.classList.toggle("active", x === tab));
       if (cat === "wfh") renderWfhApprovals();
       else if (cat === "leave") renderLeaveApprovals();
+      else if (cat === "eo") renderEarlyOutApprovals();
       else renderRegularisationApprovals();
     });
   });
@@ -1738,6 +1764,39 @@ function handleRegularisationDecision(id, decision) {
   _adminApprovalDecision("regularisation", id, decision);
 }
 
+// -------------------------------------------------------------
+// ROW 4: EARLY OUT / SHORT LEAVE APPROVALS
+// -------------------------------------------------------------
+function renderEarlyOutApprovals() {
+  _renderApprovalRows("eo", "earlyout", STORAGE_KEYS.EARLY_OUTS, "adminEarlyOutTableBody", "emptyEarlyOutMsg", (cat, type, x, emp, tab) => {
+    const treat = x.overLimitTreatment === "lop" ? "LOP if over limit" : "Half-day PL if over limit";
+    const time = `<span class="font-mono">Out ${_esc(x.plannedLeaveTime || '-')}</span>`;
+    const emg = x.emergency ? '<span class="badge-mini">Emergency</span>' : '';
+    const treatPill = `<span class="badge-mini">${_esc(treat)}</span>`;
+    const reason = x.reason ? `<div class="stage-meta"><span class="stage-comment">${_esc(x.reason)}</span></div>` : "";
+    let dayNote = "";
+    try {
+      const rec = getStore(STORAGE_KEYS.RECORDS, {})[`${x.employeeId}_${x.date}`];
+      if (rec) {
+        const wh = (typeof computeWorkedHours === "function") ? computeWorkedHours(rec) : (Number(rec.hoursDecimal) || 0);
+        const cls = rec.dayClassification ? ` \u00b7 ${rec.dayClassification}` : "";
+        dayNote = `<div class="stage-meta"><span class="stage-when">Worked ${wh}h${_esc(cls)}</span></div>`;
+      }
+    } catch (e) { /* non-fatal */ }
+    return `
+    <td><strong class="font-bold">${_esc(emp.name)}</strong><span class="table-sub font-mono">${_esc(x.employeeId)}</span></td>
+    <td><strong class="font-mono text-primary">${_esc(x.date)}</strong></td>
+    <td>${time} ${emg}<div class="stage-meta">${treatPill}</div>${dayNote}${reason}</td>
+    <td>${_managerStageCell(x, type)}</td>
+    <td>${_adminStageCell(x, type)}</td>
+    <td>${_actionCell(cat, type, x, tab)}</td>`;
+  });
+}
+
+function handleEarlyOutDecision(id, decision) {
+  _adminApprovalDecision("earlyout", id, decision);
+}
+
 // ============================================================================
 // 5. TAB 4: COMPANY HOLIDAYS & LEAVE POLICIES MANAGEMENT
 // ============================================================================
@@ -1870,6 +1929,36 @@ function initMinWorkPolicyForm() {
     const saved = setMinWorkDurationPolicy(h, m);
     updatePreview();
     showToast(`Minimum shift duration saved: ${saved.hours}h ${String(saved.minutes).padStart(2, '0')}m required before punch-out.`, "success");
+  });
+}
+
+// Early Out / Short Leave Policy Form (required/min/half-day hours, monthly limit, cut-off)
+function initShortLeavePolicyForm() {
+  const form = document.getElementById("shortLeavePolicyForm");
+  if (!form) return;
+  const el = {
+    requiredHours: document.getElementById("slRequiredHoursInput"),
+    minPresentHours: document.getElementById("slMinPresentHoursInput"),
+    halfDayThresholdHours: document.getElementById("slHalfDayThresholdInput"),
+    shortLeaveMonthlyLimit: document.getElementById("slMonthlyLimitInput"),
+    shortLeaveMaxHoursEach: document.getElementById("slMaxHoursEachInput"),
+    payrollCutOffDay: document.getElementById("slPayrollCutOffInput")
+  };
+
+  const cur = getAttendanceSettings();
+  Object.keys(el).forEach(k => { if (el[k]) el[k].value = cur[k]; });
+
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const patch = {};
+    Object.keys(el).forEach(k => { if (el[k]) patch[k] = Number(el[k].value); });
+    const saved = setAttendanceSettings(patch);
+    Object.keys(el).forEach(k => { if (el[k]) el[k].value = saved[k]; });
+    // Re-classify today's and the current month's days under the new thresholds.
+    if (typeof recalcShortLeaveDays === "function") recalcShortLeaveDays();
+    if (typeof renderStaffRoster === "function") renderStaffRoster();
+    if (typeof renderMonthlyReport === "function") renderMonthlyReport();
+    showToast(`Early Out / Short Leave policy saved: ${saved.requiredHours}h required, ${saved.minPresentHours}h Present floor, ${saved.shortLeaveMonthlyLimit}/month.`, "success");
   });
 }
 
@@ -2220,6 +2309,124 @@ function initPhotoLightboxModal() {
 // ============================================================================
 const empCalState = { empId: null, viewDate: null };
 
+// Coloured classification pill for a record's short-leave / half-day / short-hours day.
+function _adminClassPill(rec) {
+  const c = rec && rec.dayClassification;
+  if (!c) return "";
+  const MAP = {
+    "Short leave": ["badge-shortleave", "fa-person-walking-arrow-right", "Short leave"],
+    "Half-day": ["badge-halfday", "fa-hourglass-half", "Half-day"],
+    "Half-day (LOP)": ["badge-halfday", "fa-hourglass-half", "Half-day (LOP)"],
+    "Short hours - review": ["badge-shorthours", "fa-triangle-exclamation", "Short hours \u2013 review"],
+    "Short hours (LOP)": ["badge-halfday", "fa-hourglass-half", "Short hours (LOP)"],
+    "Present (Override)": ["badge-override", "fa-user-shield", "Override"]
+  };
+  const m = MAP[c];
+  if (!m) return "";
+  const wh = (rec.workedHours ? ` \u00b7 ${rec.workedHours}h` : "");
+  const rsn = rec.shortLeaveReason ? ` \u2014 ${rec.shortLeaveReason}` : "";
+  return `<span class="day-badge-pill ${m[0]}" title="${c}${wh}${rsn}"><i class="fa-solid ${m[1]}"></i> <span class="pill-text">${m[2]}</span></span>`;
+}
+
+// Admin override a single day to Present. Requires a reason (ConfirmDecisionModal),
+// then delegates to the shared engine (applyAdminOverride) which audit-logs the edit.
+function _adminOverridePresent(empId, date) {
+  const employees = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
+  const emp = employees.find(e => e.id === empId) || { name: empId };
+  ConfirmDecisionModal.open({
+    title: "Override to Present",
+    summary: `${emp.name} \u00b7 ${date}`,
+    detail: "This forces the day to Present, clears any short-leave LOP / half-day deduction for it, and records the change in the audit log.",
+    actionLabel: "Mark Present",
+    actionStyle: "primary",
+    reasonRequired: true,
+    reasonLabel: "Reason",
+    placeholder: "Required \u2014 recorded in the audit log",
+    run: (reason) => {
+      const res = applyAdminOverride(empId, date, reason, { id: "ADMIN", name: "Admin", role: "admin" });
+      if (res && res.error === "reason_required") return { ok: false, error: "A reason is required." };
+      if (typeof recalcShortLeaveDays === "function") recalcShortLeaveDays();
+      renderEmpCalendar();
+      renderMonthlyReport();
+      showToast("Day marked Present (override recorded).", "success");
+      return { ok: true };
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
+// AUDIT LOG PANEL (read-only)
+// ---------------------------------------------------------------------------
+const _AUDIT_ACTION_LABELS = {
+  "earlyout-created": "Early Out submitted",
+  "admin-override-present": "Override to Present",
+  "short-hours-auto-lop": "Auto half-day LOP",
+  "request-cancelled": "Request cancelled",
+  "admin-cancel-requested": "Admin cancel requested",
+  "approved": "Approved",
+  "rejected": "Rejected"
+};
+function _auditActionLabel(a) { return _AUDIT_ACTION_LABELS[a] || (a ? a.replace(/[-_]/g, " ") : ""); }
+function _auditAtIST(iso) {
+  if (!iso) return "";
+  try {
+    return new Date(iso).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  } catch (e) { return String(iso); }
+}
+
+function initAuditLogFilters() {
+  const empSel = document.getElementById("auditEmpFilter");
+  const dateInp = document.getElementById("auditDateFilter");
+  const clearBtn = document.getElementById("auditClearFiltersBtn");
+  if (empSel) {
+    const employees = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
+    employees.forEach(e => {
+      const opt = document.createElement("option");
+      opt.value = e.id;
+      opt.textContent = `${e.name} (${e.id})`;
+      empSel.appendChild(opt);
+    });
+    empSel.addEventListener("change", renderAuditLog);
+  }
+  if (dateInp) dateInp.addEventListener("change", renderAuditLog);
+  if (clearBtn) clearBtn.addEventListener("click", () => {
+    if (empSel) empSel.value = "";
+    if (dateInp) dateInp.value = "";
+    renderAuditLog();
+  });
+}
+
+function renderAuditLog() {
+  const tbody = document.getElementById("auditLogTableBody");
+  const emptyMsg = document.getElementById("emptyAuditLogMsg");
+  const countEl = document.getElementById("auditLogCount");
+  if (!tbody) return;
+  const empSel = document.getElementById("auditEmpFilter");
+  const dateInp = document.getElementById("auditDateFilter");
+  const filter = { empId: empSel && empSel.value ? empSel.value : "", date: dateInp && dateInp.value ? dateInp.value : "" };
+  const rows = (typeof getAuditLog === "function") ? getAuditLog(filter) : [];
+  tbody.innerHTML = "";
+  if (!rows.length) {
+    if (emptyMsg) emptyMsg.style.display = "flex";
+    if (countEl) countEl.textContent = "";
+    return;
+  }
+  if (emptyMsg) emptyMsg.style.display = "none";
+  if (countEl) countEl.textContent = `${rows.length} entr${rows.length === 1 ? "y" : "ies"}`;
+  rows.forEach(a => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td class="font-mono">${_esc(_auditAtIST(a.at))}</td>
+      <td><span class="day-badge-pill badge-override">${_esc(_auditActionLabel(a.action))}</span></td>
+      <td><strong class="font-bold">${_esc(a.empName || a.empId || "\u2014")}</strong>${a.empId ? `<span class="table-sub font-mono">${_esc(a.empId)}</span>` : ""}</td>
+      <td class="font-mono">${_esc(a.date || "\u2014")}</td>
+      <td>${_esc(a.actorName || "system")}${a.actorRole && a.actorRole !== "system" ? ` <span class="table-sub">(${_esc(a.actorRole)})</span>` : ""}</td>
+      <td>${_esc(a.decision || "\u2014")}</td>
+      <td class="stage-comment">${_esc(a.comment || "\u2014")}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
 function openEmpCalendar(empId) {
   const employees = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
   const emp = employees.find(e => e.id === empId);
@@ -2292,6 +2499,9 @@ function renderEmpCalendar() {
     let badge = "";
     let cellClass = "calendar-day-cell";
     if (isToday) cellClass += " is-today";
+    // Admin can force a Present override on a closed/today working day that is
+    // not already a clean Present (short hours, half-day, LoP, absent, not-marked).
+    let canOverride = false;
 
     if (declaredHoliday) {
       badge = `<span class="day-badge-pill badge-holiday-day" title="${declaredHoliday.name}"><i class="fa-solid fa-star"></i> ${String(declaredHoliday.name).split(/\s+/)[0]}</span>`;
@@ -2300,20 +2510,24 @@ function renderEmpCalendar() {
     } else if (rec) {
       if (rec.status === "Present") {
         s.present++;
-        badge = `<span class="day-badge-pill badge-present"><i class="fa-solid fa-circle-check"></i> Present</span>`;
+        badge = `<span class="day-badge-pill badge-present"><i class="fa-solid fa-circle-check"></i> Present</span>${_adminClassPill(rec)}`;
+        canOverride = rec.dayClassification && rec.dayClassification.indexOf("Short hours") === 0;
       } else if (rec.status === "WFH") {
         s.wfh++;
-        badge = `<span class="day-badge-pill badge-wfh-day"><i class="fa-solid fa-house-laptop"></i> WFH</span>`;
+        badge = `<span class="day-badge-pill badge-wfh-day"><i class="fa-solid fa-house-laptop"></i> WFH</span>${_adminClassPill(rec)}`;
+        canOverride = rec.dayClassification && rec.dayClassification.indexOf("Short hours") === 0;
       } else if (rec.status === "Holiday" || rec.status === "Leave") {
         s.leave++;
         const isRh = rec.locationType && rec.locationType.includes("RH");
         badge = `<span class="day-badge-pill ${isRh ? 'badge-rh-day' : 'badge-leave-day'}"><i class="fa-solid ${isRh ? 'fa-calendar-check' : 'fa-umbrella-beach'}"></i> ${isRh ? 'RH' : 'Leave'}</span>`;
       } else if (rec.status === "Loss of Pay") {
         s.lop++;
-        badge = `<span class="day-badge-pill badge-lop-day" title="Loss of Pay (Approved) — unpaid"><i class="fa-solid fa-hand-holding-dollar"></i> LoP</span>`;
+        badge = `<span class="day-badge-pill badge-lop-day" title="Loss of Pay (Approved) — unpaid"><i class="fa-solid fa-hand-holding-dollar"></i> LoP</span>${_adminClassPill(rec)}`;
+        canOverride = true;
       } else if (rec.status === "Absent") {
         s.absent++;
         badge = `<span class="day-badge-pill badge-absent-day"><i class="fa-solid fa-circle-xmark"></i> Absent</span>`;
+        canOverride = true;
       }
     } else {
       const beforeEnroll = empEnrolledDate && dateObj < empEnrolledDate;
@@ -2323,6 +2537,7 @@ function renderEmpCalendar() {
         } else {
           s.notmarked++;
           badge = `<span class="day-badge-pill badge-notmarked" title="Closed with no record \u2014 needs regularisation"><i class="fa-solid fa-circle-question"></i> Not Marked</span>`;
+          canOverride = true;
         }
       } else if (dateObj > nowZero) {
         badge = `<span class="day-badge-pill badge-upcoming"><i class="fa-solid fa-circle-dot"></i> Upcoming</span>`;
@@ -2331,14 +2546,23 @@ function renderEmpCalendar() {
       }
     }
 
+    const overrideBtn = canOverride
+      ? `<button type="button" class="cell-admin-override" data-override-emp="${empCalState.empId}" data-override-date="${dateStr}" title="Mark this day Present (admin override, requires a reason)"><i class="fa-solid fa-user-shield"></i> Override</button>`
+      : "";
+
     const cell = document.createElement("div");
     cell.className = cellClass;
     cell.innerHTML = `
       <div class="cell-top-row"><span class="day-number">${d}</span>${isToday ? '<span class="today-marker-chip"><i class="fa-solid fa-star"></i> Today</span>' : ''}</div>
-      <div class="cell-content">${badge}</div>
+      <div class="cell-content">${badge}${overrideBtn}</div>
     `;
     grid.appendChild(cell);
   }
+
+  grid.querySelectorAll(".cell-admin-override").forEach(btn => btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    _adminOverridePresent(btn.dataset.overrideEmp, btn.dataset.overrideDate);
+  }));
 
   if (summaryEl) {
     summaryEl.innerHTML = `
@@ -3297,6 +3521,8 @@ function startAdminConsole() {
   initHolidayForm();
   initGlobalLeaveQuotasForm();
   initMinWorkPolicyForm();
+  initShortLeavePolicyForm();
+  initAuditLogFilters();
   renderAttendancePhotosTable();
   initAdminGeofence();
   initPhotoLightboxModal();

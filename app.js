@@ -394,6 +394,24 @@ function renderMonthlyCalendar() {
     return `<span class="day-meta-text">${span || (inT || "Remote")}</span>`;
   };
 
+  // A coloured classification pill for short-leave / half-day / short-hours days.
+  const classificationPill = (record) => {
+    const c = record && record.dayClassification;
+    if (!c) return "";
+    const MAP = {
+      "Short leave": ["badge-shortleave", "fa-person-walking-arrow-right", "Short leave"],
+      "Half-day": ["badge-halfday", "fa-hourglass-half", "Half-day"],
+      "Half-day (LOP)": ["badge-halfday", "fa-hourglass-half", "Half-day (LOP)"],
+      "Short hours - review": ["badge-shorthours", "fa-triangle-exclamation", "Short hours \u2013 review"],
+      "Short hours (LOP)": ["badge-halfday", "fa-hourglass-half", "Short hours (LOP)"],
+      "Present (Override)": ["badge-override", "fa-user-shield", "Override"]
+    };
+    const m = MAP[c];
+    if (!m) return "";
+    const rsn = record.shortLeaveReason ? ` \u2014 ${record.shortLeaveReason}` : "";
+    return `<span class="day-badge-pill ${m[0]}" title="${c}${rsn}"><i class="fa-solid ${m[1]}"></i> <span class="pill-text">${m[2]}</span></span>`;
+  };
+
   // todayKey = formatDateKey(new Date())
   const todayDateObj = (typeof getPresentDate === "function") ? getPresentDate() : new Date();
   const todayKey = formatDateKey(todayDateObj);
@@ -463,12 +481,14 @@ function renderMonthlyCalendar() {
           countPresent++;
           badgeHtml = `
             <span class="day-badge-pill badge-present" title="Present"><i class="fa-solid fa-circle-check"></i> Present</span>
+            ${classificationPill(record)}
             ${workedMeta(record)}
           `;
         } else if (record.status === "WFH") {
           countWfh++;
           badgeHtml = `
             <span class="day-badge-pill badge-wfh-day" title="Work from Home"><i class="fa-solid fa-house-laptop"></i> WFH</span>
+            ${classificationPill(record)}
             ${workedMeta(record)}
           `;
         } else if (record.status === "Loss of Pay") {
@@ -535,11 +555,19 @@ function renderMonthlyCalendar() {
       </div>
       <div class="cell-content">
         ${badgeHtml}
+        ${isToday && !declaredHoliday && !isWeekend ? `<button type="button" class="cell-early-out" data-eo-date="${dateStr}" title="Request Early Out for today"><i class="fa-solid fa-person-walking-arrow-right"></i> Early Out</button>` : ''}
       </div>
     `;
 
     cell.addEventListener("click", () => {
       openDayDetailsModal(dateStr, record, isWeekend, declaredHoliday);
+    });
+
+    cell.querySelectorAll(".cell-early-out").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        quickEarlyOutDate(btn.dataset.eoDate);
+      });
     });
 
     cell.querySelectorAll(".cell-reg-quick").forEach(btn => {
@@ -2007,6 +2035,9 @@ async function handleConfirmVerification() {
       existing.outSelfieUrl = capturedLiveSelfie;
       records[`${employeeState.currentEmployee.id}_${todayKey}`] = existing;
       setStore(STORAGE_KEYS.RECORDS, records);
+      // Re-derive the day classification (Present / Short leave / Half-day /
+      // Short hours) now that worked hours are known.
+      try { if (typeof recalcDayForRecord === "function") recalcDayForRecord(employeeState.currentEmployee.id, todayKey); } catch (e) { console.error(e); }
       showToast(`Punched out at ${timeStr}. Shift logged!`, "success");
     }
   }
@@ -2071,7 +2102,7 @@ function initVerificationModal() {
 // ============================================================================
 
 function openActionCard(modalId) {
-  ["modalCardMarkPresent", "modalCardApplyLeave", "modalCardWfh"].forEach(id => {
+  ["modalCardMarkPresent", "modalCardApplyLeave", "modalCardWfh", "modalCardEarlyOut"].forEach(id => {
     const el = document.getElementById(id);
     if (el && id !== modalId && el.classList.contains("open")) {
       closeActionCard(id);
@@ -2099,21 +2130,25 @@ function initActionHubToggles() {
   const btnMark = document.getElementById("btnToggleMarkPresent");
   const btnLeave = document.getElementById("btnToggleApplyLeave");
   const btnWfh = document.getElementById("btnToggleWfh");
+  const btnEarlyOut = document.getElementById("btnToggleEarlyOut");
 
   const closeMark = document.getElementById("closeCardMarkPresentBtn");
   const closeLeave = document.getElementById("closeCardApplyLeaveBtn");
   const closeWfh = document.getElementById("closeCardWfhBtn");
+  const closeEarlyOut = document.getElementById("closeCardEarlyOutBtn");
 
   if (btnMark) btnMark.addEventListener("click", () => openActionCard("modalCardMarkPresent"));
   if (btnLeave) btnLeave.addEventListener("click", () => openActionCard("modalCardApplyLeave"));
   if (btnWfh) btnWfh.addEventListener("click", () => openActionCard("modalCardWfh"));
+  if (btnEarlyOut) btnEarlyOut.addEventListener("click", () => openActionCard("modalCardEarlyOut"));
 
   if (closeMark) closeMark.addEventListener("click", () => closeActionCard("modalCardMarkPresent"));
   if (closeLeave) closeLeave.addEventListener("click", () => closeActionCard("modalCardApplyLeave"));
   if (closeWfh) closeWfh.addEventListener("click", () => closeActionCard("modalCardWfh"));
+  if (closeEarlyOut) closeEarlyOut.addEventListener("click", () => closeActionCard("modalCardEarlyOut"));
 
   // Click on backdrop background to dismiss
-  ["modalCardMarkPresent", "modalCardApplyLeave", "modalCardWfh"].forEach(id => {
+  ["modalCardMarkPresent", "modalCardApplyLeave", "modalCardWfh", "modalCardEarlyOut"].forEach(id => {
     const el = document.getElementById(id);
     if (el) {
       el.addEventListener("click", (e) => {
@@ -2409,6 +2444,123 @@ function initWfhBox() {
     try { renderMyRequests(); } catch (e) { console.error(e); }
     showToast(`Work From Home request submitted for Admin approval! (Status: Pending)`, "success");
     closeActionCard("modalCardWfh");
+  });
+}
+
+// ============================================================================
+// 7b. EARLY OUT / SHORT LEAVE (employee request)
+// ============================================================================
+function updateEarlyOutBalanceDisplay() {
+  if (!employeeState.currentEmployee) return;
+  const empId = employeeState.currentEmployee.id;
+  const s = (typeof getAttendanceSettings === "function") ? getAttendanceSettings() : { shortLeaveMonthlyLimit: 2, shortLeaveMaxHoursEach: 2 };
+  const monthStr = formatDateKey(new Date()).slice(0, 7);
+  const used = (typeof getShortLeaveUsage === "function") ? getShortLeaveUsage(empId, monthStr) : 0;
+  const label = `${used} / ${s.shortLeaveMonthlyLimit}`;
+  const sub = `${used} of ${s.shortLeaveMonthlyLimit} used`;
+  const el = id => document.getElementById(id);
+  if (el("dashStatShortLeave")) el("dashStatShortLeave").textContent = label;
+  if (el("dashStatShortLeaveSub")) el("dashStatShortLeaveSub").textContent = sub;
+  if (el("earlyOutBalanceText")) el("earlyOutBalanceText").textContent = sub;
+  if (el("earlyOutMaxEachText")) el("earlyOutMaxEachText").textContent = `${s.shortLeaveMaxHoursEach} hrs`;
+  const btnMeta = el("earlyOutBtnSubMeta");
+  if (btnMeta) btnMeta.innerHTML = `Short leave &bull; Balance: ${label}`;
+}
+
+function renderEarlyOutBox() {
+  const listEl = document.getElementById("myEarlyOutStatusList");
+  const badge = document.getElementById("myEarlyOutCountBadge");
+  if (!listEl || !employeeState.currentEmployee) return;
+  const empId = employeeState.currentEmployee.id;
+  const items = getStore(STORAGE_KEYS.EARLY_OUTS, [])
+    .filter(x => x.employeeId === empId)
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  if (badge) badge.textContent = `${items.length} Request${items.length !== 1 ? "s" : ""}`;
+  if (!items.length) { listEl.innerHTML = `<p class="form-hint">No early-out requests yet.</p>`; return; }
+  listEl.innerHTML = items.map(x => `
+    <div class="my-status-row">
+      <span><i class="fa-solid fa-person-walking-arrow-right text-primary"></i> ${x.date}${x.plannedLeaveTime ? " &middot; " + x.plannedLeaveTime : ""}${x.emergency ? " &middot; <em>Emergency</em>" : ""}</span>
+      <span class="badge-mini">${x.status || "Pending"}</span>
+    </div>`).join("");
+}
+
+// Open the Early Out card pre-set to a given date (from a calendar cell).
+function quickEarlyOutDate(dateStr) {
+  openActionCard("modalCardEarlyOut");
+  const dateInput = document.getElementById("earlyOutDateInput");
+  if (dateInput && dateStr) dateInput.value = dateStr;
+  const emergency = document.getElementById("earlyOutEmergency");
+  const today = formatDateKey(new Date());
+  if (emergency && dateStr && dateStr < today) emergency.checked = true;
+}
+
+function initEarlyOutBox() {
+  const form = document.getElementById("earlyOutRequestForm");
+  if (!form) return;
+  const dateInput = document.getElementById("earlyOutDateInput");
+  const timeInput = document.getElementById("earlyOutTimeInput");
+  const reasonInput = document.getElementById("earlyOutReasonInput");
+  const treatInput = document.getElementById("earlyOutTreatment");
+  const emergencyInput = document.getElementById("earlyOutEmergency");
+
+  if (dateInput) {
+    const today = formatDateKey(new Date());
+    dateInput.min = today;
+    dateInput.value = today;
+  }
+  renderEarlyOutBox();
+  updateEarlyOutBalanceDisplay();
+
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    if (!employeeState.currentEmployee) return;
+    const empId = employeeState.currentEmployee.id;
+    const dateVal = (dateInput && dateInput.value) || "";
+    const timeVal = (timeInput && timeInput.value) || "";
+    const reason = ((reasonInput && reasonInput.value) || "").trim();
+    const treatment = (treatInput && treatInput.value) === "lop" ? "lop" : "half-day-leave";
+    const emergency = !!(emergencyInput && emergencyInput.checked);
+    const today = formatDateKey(new Date());
+
+    if (!dateVal || !timeVal || !reason) { showToast("Please fill the date, planned leave time and reason.", "error"); return; }
+
+    const yesterdayObj = new Date(); yesterdayObj.setDate(yesterdayObj.getDate() - 1);
+    const yesterday = formatDateKey(yesterdayObj);
+    if (!emergency) {
+      if (dateVal < today) { showToast("Planned early-outs must be for today or a future day. Tick Emergency for a past day.", "error"); return; }
+    } else {
+      if (dateVal < yesterday || dateVal > today) { showToast("Emergency early-outs must be within the last 24 hours.", "error"); return; }
+    }
+
+    const allEO = getStore(STORAGE_KEYS.EARLY_OUTS, []);
+    if (allEO.some(x => x.employeeId === empId && x.date === dateVal && x.status !== "Cancelled" && x.status !== "Rejected")) {
+      showToast("An early-out request for this date is already active or approved.", "warning"); return;
+    }
+
+    const newReq = {
+      id: `EO-${Date.now()}`,
+      employeeId: empId,
+      employeeName: employeeState.currentEmployee.name,
+      date: dateVal,
+      plannedLeaveTime: timeVal,
+      plannedLeaveHours: null,
+      reason,
+      overLimitTreatment: treatment,
+      emergency,
+      createdAt: new Date().toISOString()
+    };
+    Object.assign(newReq, routingForNewRequest("earlyout", empId));
+    allEO.push(newReq);
+    setStore(STORAGE_KEYS.EARLY_OUTS, allEO);
+    if (typeof addAudit === "function") addAudit("earlyout-created", { empId, date: dateVal, decision: "submitted", comment: reason });
+
+    form.reset();
+    if (dateInput) dateInput.value = formatDateKey(new Date());
+    renderEarlyOutBox();
+    updateEarlyOutBalanceDisplay();
+    try { renderMyRequests(); } catch (err) { console.error(err); }
+    showToast("Early Out request submitted for approval!", "success");
+    closeActionCard("modalCardEarlyOut");
   });
 }
 
@@ -2992,6 +3144,22 @@ function renderMyRequests() {
     });
   });
 
+  // Early Out / Short Leave requests
+  getStore(STORAGE_KEYS.EARLY_OUTS, []).forEach(x => {
+    if (x.employeeId !== empId) return;
+    items.push({
+      type: "earlyout", id: x.id,
+      kind: "Early Out" + (x.emergency ? " (Emergency)" : ""),
+      icon: "fa-person-walking-arrow-right",
+      dates: `${x.date || ""}${x.plannedLeaveTime ? " \u00b7 out " + x.plannedLeaveTime : ""}`,
+      days: 1,
+      reason: x.reason || "",
+      status: x.status || "Pending",
+      trail: x.approvalTrail || [],
+      createdAt: (x.createdAt || x.date || "").slice(0, 10)
+    });
+  });
+
   // Newest first (createdAt is a YYYY-MM-DD key, stable string sort).
   items.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
 
@@ -3146,6 +3314,7 @@ function syncAdminUpdates(empId) {
   syncOne(STORAGE_KEYS.LEAVES, "Leave", "LEAVE");
   syncOne(STORAGE_KEYS.WFH, "WFH", "WFH");
   syncOne(STORAGE_KEYS.REGULARISATIONS, "Regularisation", "REG");
+  syncOne(STORAGE_KEYS.EARLY_OUTS, "Early Out", "EO");
   getStore("vkon_tasks_v1", []).forEach(t => {
     if (t.assigneeId !== empId) return;
     const key = `TASK:${t.id}`;
@@ -3664,6 +3833,7 @@ function renderDashboardStats() {
   setDashText("dashStatLeaveSub", `${leavesUsed} used of ${quota.personalLeave} / year`);
   setDashText("dashStatHours", Math.round(hours));
   setDashText("dashStatHoursSub", monthName);
+  try { updateEarlyOutBalanceDisplay(); renderEarlyOutBox(); } catch (e) { console.error("early-out balance err:", e); }
   try { renderUpcomingHolidays(); } catch (e) { console.error("renderUpcomingHolidays err:", e); }
 }
 
@@ -3682,6 +3852,7 @@ window.addEventListener("DOMContentLoaded", () => {
   try { initLeaveBox(); } catch (e) { console.error("Error in initLeaveBox:", e); }
   try { initVerificationModal(); } catch (e) { console.error("Error in initVerificationModal:", e); }
   try { initWfhBox(); } catch (e) { console.error("Error in initWfhBox:", e); }
+  try { initEarlyOutBox(); } catch (e) { console.error("Error in initEarlyOutBox:", e); }
   try { initAttendanceRegularisation(); } catch (e) { console.error("Error in initAttendanceRegularisation:", e); }
 
   try { checkActiveSession(); } catch (e) { console.error("Error in checkActiveSession:", e); }
