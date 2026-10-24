@@ -102,12 +102,11 @@ def verify_all():
     print("  PASS")
 
     # ---- 6. Worked-on-holiday override -------------------------------------
-    print("\n[6] Worked-on-holiday exception + audit (req 6):")
+    print("\n[6] Worked-on-holiday exception (req 6):")
     need("function markWorkedOnHoliday" in shared, "markWorkedOnHoliday missing")
     need("function clearWorkedOnHoliday" in shared, "clearWorkedOnHoliday missing")
-    need("isWorkedOnHoliday" in shared and "isWorkedOnHoliday" in shared,
+    need("isWorkedOnHoliday" in shared,
          "override not consulted by the engine")
-    need('addAudit("worked-on-holiday"' in shared, "override is not audit-logged")
     need("STORAGE_KEYS.HOLIDAY_WORK" in shared, "override store key not wired")
     need("_adminMarkWorkedOnHoliday" in admin, "admin override control missing")
     need("reasonRequired" in admin and "hwModeSelect" in admin,
@@ -128,7 +127,8 @@ def verify_all():
     # ---- 8. Holiday add/remove keeps punches + warns -----------------------
     print("\n[8] Holiday change reconciliation (req 8):")
     need("_reconcileHolidayChange" in admin, "holiday change reconciliation missing")
-    need("holiday-changed-with-punches" in admin, "no audit/warning when punches already exist")
+    need("Records were kept and the day recalculated" in admin,
+         "no admin warning that existing punch records were kept")
     # finalizeStaleOpenPunches must not retro-flag holiday punches
     assert "isNonWorkingDay(r.date" in shared or "isNonWorkingDay(r.date" in shared.replace(" ", ""), \
         "stale-punch finaliser does not preserve holiday punches"
@@ -143,11 +143,11 @@ def verify_all():
     # shared rule used by every JS screen
     for f in [app, admin]:
         need("isNonWorkingDay" in f, "a screen does not use the shared isNonWorkingDay rule")
-    need("shared.js?v=20261013_ist_apr12" in index_html and "shared.js?v=20261013_ist_apr12" in admin_html,
+    need("shared.js?v=20261024_rm1" in index_html and "shared.js?v=20261024_rm1" in admin_html,
          "shared.js token not bumped")
-    need("app.js?v=20261023_apr11" in index_html, "app.js token not bumped")
-    need("admin.js?v=20261023_apr18" in admin_html, "admin.js token not bumped")
-    need("styles.css?v=20261023_apr12" in index_html and "styles.css?v=20261023_apr12" in admin_html,
+    need("app.js?v=20261024_rm1" in index_html, "app.js token not bumped")
+    need("admin.js?v=20261024_rm1" in admin_html, "admin.js token not bumped")
+    need("styles.css?v=20261024_rm2" in index_html and "styles.css?v=20261024_rm2" in admin_html,
          "styles.css token not bumped")
     # text + icon holiday states, not colour alone
     for cls in [".holiday-today-card", ".pill-holiday", ".badge-holidaywork", ".cell-holiday-work"]:

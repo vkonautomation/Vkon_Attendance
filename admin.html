@@ -24,7 +24,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="styles.css?v=20261023_apr12">
+  <link rel="stylesheet" href="styles.css?v=20261024_rm2">
 </head>
 <body class="light-theme admin-page">
 
@@ -157,9 +157,6 @@
         <div class="nav-tabs">
           <button class="nav-tab" data-tab="tab-geofence">
             <i class="fa-solid fa-location-dot"></i> Settings
-          </button>
-          <button class="nav-tab" data-tab="tab-audit">
-            <i class="fa-solid fa-clock-rotate-left"></i> Audit Log
           </button>
           <button class="nav-tab" data-tab="tab-account" id="navTabAccount">
             <i class="fa-solid fa-user-shield"></i> Admin Security
@@ -1379,57 +1376,6 @@
         </div>
       </section>
 
-      <!-- ================= TAB: AUDIT LOG (read-only) ================= -->
-      <section id="tab-audit" class="tab-panel">
-        <div class="glass-panel admin-card">
-          <div class="card-header">
-            <div class="header-icon icon-bg-teal">
-              <i class="fa-solid fa-clock-rotate-left"></i>
-            </div>
-            <div class="header-title">
-              <h3>Audit Log</h3>
-              <p>Read-only trail of overrides, auto LOP conversions, cancellations and early-out decisions (actor, decision, comment, timestamp)</p>
-            </div>
-          </div>
-
-          <div class="panel-header-toolbar">
-            <div class="toolbar-title-group">
-              <label class="audit-filter-label" for="auditEmpFilter">Employee
-                <select id="auditEmpFilter" class="form-control form-control-sm"><option value="">All employees</option></select>
-              </label>
-              <label class="audit-filter-label" for="auditDateFilter">Date
-                <input type="date" id="auditDateFilter" class="form-control form-control-sm">
-              </label>
-              <button type="button" id="auditClearFiltersBtn" class="btn btn-ghost btn-sm"><i class="fa-solid fa-xmark"></i> Clear</button>
-            </div>
-            <span class="table-toolbar-count" id="auditLogCount"></span>
-          </div>
-
-          <div class="table-responsive">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>When (IST)</th>
-                  <th>Action</th>
-                  <th>Employee</th>
-                  <th>Date</th>
-                  <th>Actor</th>
-                  <th>Decision</th>
-                  <th>Comment</th>
-                </tr>
-              </thead>
-              <tbody id="auditLogTableBody">
-                <!-- Populated via JS -->
-              </tbody>
-            </table>
-          </div>
-          <div class="empty-state-card" id="emptyAuditLogMsg" style="display: none;">
-            <i class="fa-solid fa-clock-rotate-left"></i>
-            <p>No audit entries yet.</p>
-          </div>
-        </div>
-      </section>
-
       <!-- ================= TAB 7: ADMIN ACCOUNT & SECURITY CREDENTIALS ================= -->
       <section id="tab-account" class="tab-panel">
         <div class="admin-panel glass-panel">
@@ -1790,10 +1736,10 @@
 
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <script src="shared.js?v=20261013_ist_apr12"></script>
+  <script src="shared.js?v=20261024_rm1"></script>
   <script src="js/confirm-decision-modal.js?v=20261023_apr1"></script>
   <script src="js/day-popover.js?v=20261023_apr1"></script>
-  <script src="admin.js?v=20261023_apr18"></script>
+  <script src="admin.js?v=20261024_rm1"></script>
   <script src="js/password-toggle.js?v=20261019_ui1"></script>
   <script src="js/data-transfer.js?v=20261023_apr2"></script>
 </body>

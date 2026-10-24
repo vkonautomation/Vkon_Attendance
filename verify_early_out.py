@@ -7,8 +7,8 @@ index.html / admin.html / styles.css. The classification decision-table itself i
 exercised for real by `node test_early_out.js` (pure engine, localStorage shim).
 
 Single-source-of-truth note: point 8's "server-side calculations" is satisfied for
-this pure-static app by centralising ALL rules in the shared.js policy engine plus
-a persisted audit log, with payroll-cut-off conversion computed lazily on load.
+this pure-static app by centralising ALL rules in the shared.js policy engine,
+with payroll-cut-off conversion computed lazily on load.
 """
 
 import sys
@@ -112,26 +112,13 @@ def verify_all():
          "override control missing in admin.js")
     print("  PASS")
 
-    # ---- 7. Audit log -------------------------------------------------------
-    print("\n[7] Audit log (actor, decision, comment, timestamp):")
-    need('AUDIT_LOG: "vkon_audit_log_v1"' in shared, "AUDIT_LOG store key missing")
-    need("function addAudit" in shared and "function getAuditLog" in shared, "audit helpers missing in shared.js")
-    need("addAudit(" in app, "audit logging not called from app.js")
-    need('addAudit("earlyout-created"' in app, "early-out submission not audit logged")
-    for action in ["admin-override-present", "short-hours-auto-lop"]:
-        need(action in shared, f"audit action '{action}' not logged")
-    need('id="tab-audit"' in admin_html, "audit log panel missing in admin.html")
-    need('id="auditLogTableBody"' in admin_html, "audit log table missing in admin.html")
-    need("function renderAuditLog" in admin and "renderAuditLog()" in admin, "audit log renderer missing in admin.js")
-    print("  PASS")
-
-    # ---- 8. Cache tokens + CSS ----------------------------------------------
-    print("\n[8] Cache tokens + badge CSS:")
-    need("shared.js?v=20261013_ist_apr12" in index_html and "shared.js?v=20261013_ist_apr12" in admin_html,
+    # ---- 7. Cache tokens + CSS ----------------------------------------------
+    print("\n[7] Cache tokens + badge CSS:")
+    need("shared.js?v=20261024_rm1" in index_html and "shared.js?v=20261024_rm1" in admin_html,
          "shared.js cache token not bumped")
-    need("app.js?v=20261023_apr11" in index_html, "app.js cache token not bumped")
-    need("admin.js?v=20261023_apr18" in admin_html, "admin.js cache token not bumped")
-    need("styles.css?v=20261023_apr12" in index_html and "styles.css?v=20261023_apr12" in admin_html,
+    need("app.js?v=20261024_rm1" in index_html, "app.js cache token not bumped")
+    need("admin.js?v=20261024_rm1" in admin_html, "admin.js cache token not bumped")
+    need("styles.css?v=20261024_rm2" in index_html and "styles.css?v=20261024_rm2" in admin_html,
          "styles.css cache token not bumped")
     for cls in ["badge-shortleave", "badge-halfday", "badge-shorthours", "badge-override",
                 "badge-inprogress", "icon-bg-teal", "text-teal"]:

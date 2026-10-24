@@ -76,7 +76,6 @@ function clearAll() {
   ctx.setStore(S.EARLY_OUTS, []);
   ctx.setStore(S.LEAVES, []);
   ctx.setStore(S.LOP_ENTRIES, []);
-  ctx.setStore(S.AUDIT_LOG, []);
 }
 function classify(empId, date) { return ctx.classifyDay(empId, date); }
 function activeLopForDate(empId, date) {
@@ -189,13 +188,10 @@ ctx.removeApprovedEffect("earlyout", target);
 const leavesAfterCancel = ctx.getStore(S.LEAVES, []).filter(l => l.id === `EOPH-EMP001-2026-10-14`).length;
 ok(leavesAfterCancel === 0, "Cancelling the EO releases the synthetic half-day PL (balance restored)");
 
-// ---- audit log records overrides ------------------------------------------
+// ---- admin override to Present --------------------------------------------
 clearAll();
-const auditBefore = ctx.getAuditLog({}).length;
 const ov = ctx.applyAdminOverride("EMP001", "2026-10-20", "Manager confirmed on-site work", { id: "ADMIN", name: "Admin", role: "admin" });
-const auditAfter = ctx.getAuditLog({}).length;
 ok(ov && ov.dayClassification === "Present (Override)", "applyAdminOverride marks the day Present (Override)");
-ok(auditAfter === auditBefore + 1, "applyAdminOverride writes exactly one audit entry");
 ok(ctx.applyAdminOverride("EMP001", "2026-10-21", "", { id: "ADMIN" }).error === "reason_required", "applyAdminOverride requires a reason");
 
 console.log(`\n=== ${passed} Early Out / Short Leave assertions passed, ${failed} failed ===`);

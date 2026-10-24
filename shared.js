@@ -27,8 +27,7 @@ const STORAGE_KEYS = {
   EARLY_OUTS: "vkon_early_outs_v1",
   SHORT_LEAVE_SETTINGS: "vkon_short_leave_settings_v1",
   // --- Worked-on-holiday overrides (Admin/Manager exception) ---
-  HOLIDAY_WORK: "vkon_holiday_work_v1",
-  AUDIT_LOG: "vkon_audit_log_v1"
+  HOLIDAY_WORK: "vkon_holiday_work_v1"
 };
 
 // Default Company Geofence Coordinates
@@ -1156,9 +1155,6 @@ function recalcDayForRecord(empId, date) {
   rec.shortLeaveReason = res.reason || "";
   setStore(STORAGE_KEYS.RECORDS, records);
 
-  if (res.classification === "Short hours (LOP)" || res.classification === "Half-day (LOP)") {
-    addAudit("short-hours-auto-lop", { empId, date, decision: "half-day-loP", comment: `Auto-converted ${res.classification} on recalculation` });
-  }
   return rec;
 }
 
@@ -1276,10 +1272,6 @@ function markWorkedOnHoliday(empId, dateStr, reason, mode, actor) {
   };
   map[`${empId}_${dateStr}`] = entry;
   setStore(STORAGE_KEYS.HOLIDAY_WORK, map);
-  addAudit("worked-on-holiday", {
-    empId, date: dateStr, actor: actor || { role: "admin" },
-    decision: "Worked on holiday", comment: `${entry.mode} \u00b7 ${entry.reason}`
-  });
   return entry;
 }
 
@@ -1288,10 +1280,6 @@ function clearWorkedOnHoliday(empId, dateStr, actor) {
   if (map[`${empId}_${dateStr}`]) {
     delete map[`${empId}_${dateStr}`];
     setStore(STORAGE_KEYS.HOLIDAY_WORK, map);
-    addAudit("worked-on-holiday-cleared", {
-      empId, date: dateStr, actor: actor || { role: "admin" },
-      decision: "Reverted", comment: "Worked-on-holiday override removed"
-    });
   }
 }
 
@@ -1381,11 +1369,6 @@ function finalizeStaleOpenPunches() {
       r.absentReason = "No check-out recorded";
       delete r.workedHours;
       changed = true;
-      addAudit("open-punch-auto-absent", {
-        empId: r.employeeId, date: r.date,
-        actor: { id: "system", role: "system" },
-        decision: "Absent", comment: "Checked in but never checked out"
-      });
     });
     if (changed) setStore(STORAGE_KEYS.RECORDS, records);
   } catch (e) { /* non-fatal */ }
@@ -1409,43 +1392,7 @@ function recalcShortLeaveDays() {
   } catch (e) { /* non-fatal */ }
 }
 
-// ============================================================================
-// AUDIT LOG — actor, decision, comment and timestamp for overrides, cancellations
-// and auto conversions. Approval/rejection also lives in each request's
-// approvalTrail; this log is the cross-cutting trail for payroll-relevant edits.
-// ============================================================================
-function addAudit(action, opts) {
-  opts = opts || {};
-  const list = getStore(STORAGE_KEYS.AUDIT_LOG, []);
-  const actor = opts.actor || {};
-  const entry = {
-    id: "AUD-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 6),
-    at: new Date().toISOString(),
-    action: action || "",
-    empId: opts.empId || "",
-    empName: opts.empId ? _employeeName(opts.empId) : "",
-    date: opts.date || "",
-    actorId: actor.id || "",
-    actorName: actor.name || actor.id || (actor.role === "admin" ? "Admin" : "system"),
-    actorRole: actor.role || "system",
-    decision: opts.decision || "",
-    comment: opts.comment || opts.reason || ""
-  };
-  list.push(entry);
-  setStore(STORAGE_KEYS.AUDIT_LOG, list.slice(-500));
-  return entry;
-}
-
-function getAuditLog(filter) {
-  let list = getStore(STORAGE_KEYS.AUDIT_LOG, []);
-  filter = filter || {};
-  if (filter.empId) list = list.filter(a => a.empId === filter.empId);
-  if (filter.date) list = list.filter(a => a.date === filter.date);
-  if (filter.action) list = list.filter(a => a.action === filter.action);
-  return list.slice().reverse();
-}
-
-// Admin overrides a day to Present. Requires a reason and is audit logged.
+// Admin overrides a day to Present. Requires a reason.
 function applyAdminOverride(empId, date, reason, actor) {
   if (!reason || !String(reason).trim()) return { error: "reason_required" };
   const records = getStore(STORAGE_KEYS.RECORDS, {});
@@ -1461,7 +1408,6 @@ function applyAdminOverride(empId, date, reason, actor) {
   cancelLopEntriesByRef(_earlyOutLopRef(empId, date));
   releaseEarlyOutHalfDayLeave(empId, date);
   setStore(STORAGE_KEYS.RECORDS, records);
-  addAudit("admin-override-present", { empId, date, actor, decision: "override-present", comment: String(reason).trim() });
   return rec;
 }
 

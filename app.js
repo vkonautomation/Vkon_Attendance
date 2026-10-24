@@ -2627,7 +2627,6 @@ function initEarlyOutBox() {
     Object.assign(newReq, routingForNewRequest("earlyout", empId));
     allEO.push(newReq);
     setStore(STORAGE_KEYS.EARLY_OUTS, allEO);
-    if (typeof addAudit === "function") addAudit("earlyout-created", { empId, date: dateVal, decision: "submitted", comment: reason });
 
     form.reset();
     if (dateInput) dateInput.value = formatDateKey(new Date());

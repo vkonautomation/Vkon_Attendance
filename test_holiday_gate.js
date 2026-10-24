@@ -73,10 +73,6 @@ ok(ctx.isNonWorkingDay("2026-10-15", "E1") === false, "override reopens the day 
 ok(ctx.punchBlockedReason("E1", "2026-10-15") === null, "punch allowed once worked-on-holiday is approved");
 ok(ctx.isNonWorkingDay("2026-10-15", "E2") === true, "override is scoped to one employee, not everyone");
 
-// 5. Audit log captured the override.
-const audited = ctx.getAuditLog({ action: "worked-on-holiday" }).some(a => a.empId === "E1" && a.date === "2026-10-15");
-ok(audited, "override is audit-logged");
-
 // 6. Clearing the override returns the day to non-working.
 ctx.clearWorkedOnHoliday("E1", "2026-10-15", { id: "ADMIN", role: "admin" });
 ok(ctx.isNonWorkingDay("2026-10-15", "E1") === true, "clearing override hides punching again");

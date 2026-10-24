@@ -21,7 +21,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="styles.css?v=20261023_apr12">
+  <link rel="stylesheet" href="styles.css?v=20261024_rm2">
 </head>
 <body class="light-theme">
   
@@ -281,7 +281,9 @@
             <i class="fa-solid fa-arrow-up-right-from-square open-card-icon" id="arrowWfh"></i>
           </button>
 
-          <button type="button" id="btnToggleEarlyOut" class="btn-sub-action btn-sub-earlyout">
+          <!-- Request Early Out entry point hidden by product decision; the
+               Early Out / Short Leave engine and admin approvals remain intact. -->
+          <button type="button" id="btnToggleEarlyOut" class="btn-sub-action btn-sub-earlyout" style="display: none;">
             <div class="sub-btn-content">
               <i class="fa-solid fa-person-walking-arrow-right"></i>
               <div class="sub-btn-texts">
@@ -1145,10 +1147,10 @@
   <div class="toast-container" id="toastContainer"></div>
 
   <!-- Shared Engine & App Controller -->
-  <script src="shared.js?v=20261013_ist_apr12"></script>
+  <script src="shared.js?v=20261024_rm1"></script>
   <script src="js/confirm-decision-modal.js?v=20261023_apr1"></script>
   <script src="js/day-popover.js?v=20261023_apr1"></script>
-  <script src="app.js?v=20261023_apr11"></script>
+  <script src="app.js?v=20261024_rm1"></script>
   <script src="js/password-toggle.js?v=20261019_ui1"></script>
   <script src="js/data-transfer.js?v=20261023_apr2"></script>
 

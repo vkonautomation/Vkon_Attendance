@@ -11172,22 +11172,6 @@ body.light-theme .holiday-today-icon { background: #dbeafe; color: #1d4ed8; }
 .policy-check-line input { width: auto; margin: 0; }
 
 
-/* Audit log toolbar filters */
-.audit-filter-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-size: 0.78rem;
-  font-weight: 700;
-  color: var(--text-muted);
-}
-.audit-filter-label .form-control-sm {
-  padding: 0.25rem 0.5rem;
-  font-size: 0.78rem;
-  width: auto;
-}
-
-
 
 
 

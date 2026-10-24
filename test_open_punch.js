@@ -75,9 +75,4 @@ ok(r[`EMP004_${past}`].status === "Present" && !ctx.isOpenPunch(r[`EMP004_${past
 ok(r[`EMP005_${past}`].status === "Absent", "an already-Absent day is unchanged");
 ok(r[`EMP006_${future}`].status === "Present", "future open punch is left untouched");
 
-// Audit trail recorded the automatic conversion.
-const audit = ctx.getAuditLog({ empId: "EMP001", date: past });
-ok(audit.some(a => a.action === "open-punch-auto-absent"),
-   "auto-absent conversion is written to the audit log");
-
 console.log(`\n${passed} passed, ${failed} failed`);

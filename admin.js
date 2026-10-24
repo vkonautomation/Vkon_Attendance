@@ -154,7 +154,6 @@ function initAdminTabs() {
     "tab-holidays": ["Holidays", "Declared company & restricted holiday calendar"],
     "tab-photos": ["Attendance Photos", "Rolling 24-hour check-in snapshot audit trail"],
     "tab-geofence": ["Settings", "Office location radius & calibration"],
-    "tab-audit": ["Audit Log", "Overrides, auto LOP conversions, cancellations & early-out decisions"],
     "tab-account": ["Admin Security", "Credentials and access control"],
     "tab-help": ["Help & Support", "Policy FAQ and support tickets"]
   };
@@ -199,8 +198,6 @@ function initAdminTabs() {
         setTimeout(() => {
           if (adminMap) adminMap.invalidateSize();
         }, 200);
-      } else if (targetId === "tab-audit") {
-        renderAuditLog();
       } else if (targetId === "tab-account") {
         renderAdminAccountTab();
       }
@@ -1837,12 +1834,6 @@ function _reconcileHolidayChange(dateStr, holidayName) {
   // Keep the punch records; only re-derive classifications so the sheet agrees.
   if (typeof finalizeStaleOpenPunches === "function") finalizeStaleOpenPunches();
   if (typeof recalcShortLeaveDays === "function") recalcShortLeaveDays();
-  if (typeof addAudit === "function") {
-    addAudit("holiday-changed-with-punches", {
-      date: dateStr, actor: { id: "ADMIN", name: "Admin", role: "admin" },
-      decision: "Kept existing punches", comment: `${holidayName || "Holiday"} change affects ${affected.length} punched record(s)`
-    });
-  }
   const names = affected.map(id => {
     const e = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES).find(x => x.id === id);
     return e ? e.name : id;
@@ -2459,79 +2450,6 @@ function _adminMarkWorkedOnHoliday(empId, date, holidayName) {
       showToast(`Marked worked on holiday (${mode === "extrapay" ? "extra pay" : "comp-off"}). Punching enabled for this day.`, "success");
       return { ok: true };
     }
-  });
-}
-
-// ---------------------------------------------------------------------------
-// AUDIT LOG PANEL (read-only)
-// ---------------------------------------------------------------------------
-const _AUDIT_ACTION_LABELS = {
-  "earlyout-created": "Early Out submitted",
-  "admin-override-present": "Override to Present",
-  "short-hours-auto-lop": "Auto half-day LOP",
-  "request-cancelled": "Request cancelled",
-  "admin-cancel-requested": "Admin cancel requested",
-  "approved": "Approved",
-  "rejected": "Rejected"
-};
-function _auditActionLabel(a) { return _AUDIT_ACTION_LABELS[a] || (a ? a.replace(/[-_]/g, " ") : ""); }
-function _auditAtIST(iso) {
-  if (!iso) return "";
-  try {
-    return new Date(iso).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" });
-  } catch (e) { return String(iso); }
-}
-
-function initAuditLogFilters() {
-  const empSel = document.getElementById("auditEmpFilter");
-  const dateInp = document.getElementById("auditDateFilter");
-  const clearBtn = document.getElementById("auditClearFiltersBtn");
-  if (empSel) {
-    const employees = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
-    employees.forEach(e => {
-      const opt = document.createElement("option");
-      opt.value = e.id;
-      opt.textContent = `${e.name} (${e.id})`;
-      empSel.appendChild(opt);
-    });
-    empSel.addEventListener("change", renderAuditLog);
-  }
-  if (dateInp) dateInp.addEventListener("change", renderAuditLog);
-  if (clearBtn) clearBtn.addEventListener("click", () => {
-    if (empSel) empSel.value = "";
-    if (dateInp) dateInp.value = "";
-    renderAuditLog();
-  });
-}
-
-function renderAuditLog() {
-  const tbody = document.getElementById("auditLogTableBody");
-  const emptyMsg = document.getElementById("emptyAuditLogMsg");
-  const countEl = document.getElementById("auditLogCount");
-  if (!tbody) return;
-  const empSel = document.getElementById("auditEmpFilter");
-  const dateInp = document.getElementById("auditDateFilter");
-  const filter = { empId: empSel && empSel.value ? empSel.value : "", date: dateInp && dateInp.value ? dateInp.value : "" };
-  const rows = (typeof getAuditLog === "function") ? getAuditLog(filter) : [];
-  tbody.innerHTML = "";
-  if (!rows.length) {
-    if (emptyMsg) emptyMsg.style.display = "flex";
-    if (countEl) countEl.textContent = "";
-    return;
-  }
-  if (emptyMsg) emptyMsg.style.display = "none";
-  if (countEl) countEl.textContent = `${rows.length} entr${rows.length === 1 ? "y" : "ies"}`;
-  rows.forEach(a => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td class="font-mono">${_esc(_auditAtIST(a.at))}</td>
-      <td><span class="day-badge-pill badge-override">${_esc(_auditActionLabel(a.action))}</span></td>
-      <td><strong class="font-bold">${_esc(a.empName || a.empId || "\u2014")}</strong>${a.empId ? `<span class="table-sub font-mono">${_esc(a.empId)}</span>` : ""}</td>
-      <td class="font-mono">${_esc(a.date || "\u2014")}</td>
-      <td>${_esc(a.actorName || "system")}${a.actorRole && a.actorRole !== "system" ? ` <span class="table-sub">(${_esc(a.actorRole)})</span>` : ""}</td>
-      <td>${_esc(a.decision || "\u2014")}</td>
-      <td class="stage-comment">${_esc(a.comment || "\u2014")}</td>`;
-    tbody.appendChild(tr);
   });
 }
 
@@ -3687,7 +3605,6 @@ function startAdminConsole() {
   initGlobalLeaveQuotasForm();
   initMinWorkPolicyForm();
   initShortLeavePolicyForm();
-  initAuditLogFilters();
   renderAttendancePhotosTable();
   initAdminGeofence();
   initPhotoLightboxModal();

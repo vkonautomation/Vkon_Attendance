@@ -93,11 +93,11 @@ def verify_all():
         "index.html script order wrong (expected shared -> day-popover -> app)"
     assert admin_html.index("shared.js?v=") < admin_html.index("day-popover.js?v=") < admin_html.index("admin.js?v="), \
         "admin.html script order wrong (expected shared -> day-popover -> admin)"
-    need("shared.js?v=20261013_ist_apr12" in index_html and "shared.js?v=20261013_ist_apr12" in admin_html,
+    need("shared.js?v=20261024_rm1" in index_html and "shared.js?v=20261024_rm1" in admin_html,
          "shared.js token not bumped")
-    need("app.js?v=20261023_apr11" in index_html, "app.js token not bumped")
-    need("admin.js?v=20261023_apr18" in admin_html, "admin.js token not bumped")
-    need("styles.css?v=20261023_apr12" in index_html and "styles.css?v=20261023_apr12" in admin_html,
+    need("app.js?v=20261024_rm1" in index_html, "app.js token not bumped")
+    need("admin.js?v=20261024_rm1" in admin_html, "admin.js token not bumped")
+    need("styles.css?v=20261024_rm2" in index_html and "styles.css?v=20261024_rm2" in admin_html,
          "styles.css token not bumped")
     for cls in [".day-popover", ".dp-late", ".dp-short", ".dp-ontime", "focus-visible"]:
         need(cls in styles, f"CSS '{cls}' missing in styles.css")
