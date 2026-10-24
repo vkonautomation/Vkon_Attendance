@@ -11097,6 +11097,81 @@ body.light-theme .calendar-day-cell:has(.badge-shorthours) {
 body.light-theme .cell-early-out { background: #ccfbf1; color: #0f766e; border-color: #99f6e4; }
 body.light-theme .cell-admin-override { background: #f3e8ff; color: #7e22ce; border-color: #e9d5ff; }
 
+/* In-cell "Worked on holiday" control (Admin/Manager exception, req 6) */
+.cell-holiday-work {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.3rem;
+  width: 100%;
+  justify-content: center;
+  padding: 0.22rem 0.4rem;
+  font-size: 0.66rem;
+  font-weight: 700;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  background: rgba(245, 158, 11, 0.16);
+  color: #fcd34d;
+  line-height: 1.2;
+}
+.cell-holiday-work:hover { background: rgba(245, 158, 11, 0.28); }
+body.light-theme .cell-holiday-work { background: #fef3c7; color: #b45309; border-color: #fde68a; }
+
+/* "Worked on holiday" status chip (text + icon, not colour alone) */
+.day-badge-pill.badge-holidaywork {
+  background: rgba(245, 158, 11, 0.16);
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  color: #fcd34d;
+}
+body.light-theme .day-badge-pill.badge-holidaywork {
+  background: #fffbeb; border: 1px solid #fde68a; color: #b45309;
+}
+
+/* Today-column holiday pill in the admin master sheet */
+.pill-holiday { background: #eef4ff; color: #1d4ed8; }
+body:not(.light-theme) .pill-holiday { background: rgba(59, 130, 246, 0.18); color: #93c5fd; }
+
+/* Holiday / non-working-day card on the employee dashboard (req 2) */
+.holiday-today-card {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  margin: 0.2rem 0 0.9rem;
+  padding: 1rem 1.1rem;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.16), rgba(124, 58, 237, 0.14));
+  border: 1px solid rgba(59, 130, 246, 0.4);
+  color: #e2e8f0;
+}
+body.light-theme .holiday-today-card {
+  background: linear-gradient(135deg, #eff6ff, #f5f3ff);
+  border-color: #bfdbfe; color: #1e293b;
+}
+.holiday-today-icon {
+  flex: 0 0 auto;
+  width: 44px; height: 44px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 12px;
+  background: rgba(59, 130, 246, 0.22);
+  color: #bfdbfe;
+  font-size: 1.2rem;
+}
+body.light-theme .holiday-today-icon { background: #dbeafe; color: #1d4ed8; }
+.holiday-today-body { display: flex; flex-direction: column; gap: 0.2rem; }
+.holiday-today-name { font-weight: 800; font-size: 1.02rem; }
+.holiday-today-msg { font-size: 0.88rem; color: inherit; opacity: 0.85; }
+.holiday-today-next { font-size: 0.82rem; margin-top: 0.25rem; opacity: 0.9; }
+.holiday-today-next i { margin-right: 0.3rem; }
+
+/* Checkbox line used in the settings policy form (weekends non-working) */
+.policy-check-line {
+  display: inline-flex; align-items: center; gap: 0.5rem;
+  font-weight: 600; font-size: 0.86rem; cursor: pointer;
+}
+.policy-check-line input { width: auto; margin: 0; }
+
+
 /* Audit log toolbar filters */
 .audit-filter-label {
   display: inline-flex;

@@ -296,8 +296,21 @@ function renderMonthlyReport() {
       // Do not count days before employee enrollment date
       if (empEnrolledDate && dateObj < empEnrolledDate) continue;
 
-      empWorkingDaysElapsed++;
       const dateStr = formatDateKey(dateObj);
+      // Req 5: a declared holiday (or a weekend under the non-working setting) is
+      // not a working day for this employee, so it never counts in "Working days
+      // elapsed" and is never flagged Not Marked. A worked-on-holiday override
+      // makes the day a real working day again (isNonWorkingDay returns false).
+      const isNonWorking = (typeof isNonWorkingDay === "function") && isNonWorkingDay(dateStr, emp.id);
+      if (isNonWorking) {
+        // Still credit any real punch (worked-on-holiday) but do not expect one.
+        const hrec = records[`${emp.id}_${dateStr}`];
+        if (hrec && hrec.status === "Present") { presentCount++; empTotalHours += effectiveHoursDecimal(hrec); }
+        else if (hrec && hrec.status === "WFH") { wfhCount++; empTotalHours += effectiveHoursDecimal(hrec); }
+        continue;
+      }
+
+      empWorkingDaysElapsed++;
       const rec = records[`${emp.id}_${dateStr}`];
       if (rec && typeof isShortHoursDay === "function" && isShortHoursDay(rec)) shortHoursCount++;
       // A day is "closed" only once its end-of-day cutoff has passed, i.e. strictly
@@ -359,7 +372,15 @@ function renderMonthlyReport() {
     let pillLabel = "Not Punched In";
     let checkinMin = null;
 
-    if (todayRec && (todayRec.status === "Present" || todayRec.status === "WFH")) {
+    // Req 5: a holiday is neither "Not Punched In" nor "Late" for the today column.
+    const todayNonWorking = (typeof isNonWorkingDay === "function") && isNonWorkingDay(todayKey, emp.id);
+    const todayHolidayMatch = todayNonWorking && (typeof findHolidayForDate === "function") ? findHolidayForDate(todayKey) : null;
+    if (todayNonWorking && !(todayRec && (todayRec.status === "Present" || todayRec.status === "WFH"))) {
+      todayStatus = "holiday";
+      pillClass = "pill-holiday";
+      pillLabel = todayHolidayMatch ? "Holiday" : "Non-working";
+      typeLabel = todayHolidayMatch ? todayHolidayMatch.name : "Off";
+    } else if (todayRec && (todayRec.status === "Present" || todayRec.status === "WFH")) {
       const inStr = todayRec.checkInTime && todayRec.checkInTime !== "-" ? todayRec.checkInTime : null;
       const outStr = todayRec.checkOutTime && todayRec.checkOutTime !== "-" ? todayRec.checkOutTime : null;
       checkinMin = inStr ? parseAmPmToMinutes(inStr) : null;
@@ -624,7 +645,8 @@ const MASTER_TODAY_LABELS = {
   "late": "Late",
   "remote": "Remote",
   "leave": "Leave / Holiday",
-  "not-in": "Not Punched In"
+  "not-in": "Not Punched In",
+  "holiday": "Holiday"
 };
 
 function parseAmPmToMinutes(str) {
@@ -1799,6 +1821,35 @@ function handleEarlyOutDecision(id, decision) {
 // 5. TAB 4: COMPANY HOLIDAYS & LEAVE POLICIES MANAGEMENT
 // ============================================================================
 
+// Req 8: when a holiday is added or removed on a date that already has punch
+// records, keep the existing records, warn the admin, and recalc that day. The
+// shared engine is the source of truth (isNonWorkingDay / finalize / recalc).
+function _reconcileHolidayChange(dateStr, holidayName) {
+  const records = getStore(STORAGE_KEYS.RECORDS, {});
+  const affected = [];
+  Object.keys(records).forEach(k => {
+    const r = records[k];
+    if (r && r.date === dateStr && (r.status === "Present" || r.status === "WFH" || r.status === "Absent")) {
+      affected.push(r.employeeId);
+    }
+  });
+  if (!affected.length) return;
+  // Keep the punch records; only re-derive classifications so the sheet agrees.
+  if (typeof finalizeStaleOpenPunches === "function") finalizeStaleOpenPunches();
+  if (typeof recalcShortLeaveDays === "function") recalcShortLeaveDays();
+  if (typeof addAudit === "function") {
+    addAudit("holiday-changed-with-punches", {
+      date: dateStr, actor: { id: "ADMIN", name: "Admin", role: "admin" },
+      decision: "Kept existing punches", comment: `${holidayName || "Holiday"} change affects ${affected.length} punched record(s)`
+    });
+  }
+  const names = affected.map(id => {
+    const e = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES).find(x => x.id === id);
+    return e ? e.name : id;
+  });
+  showToast(`Warning: ${dateStr} already has ${affected.length} punch record(s) (${names.slice(0, 3).join(", ")}${names.length > 3 ? "\u2026" : ""}). Records were kept and the day recalculated.`, "warning");
+}
+
 function renderHolidaysTable() {
   const holidays = getStore(STORAGE_KEYS.HOLIDAYS, DEFAULT_HOLIDAYS);
   const tbody = document.getElementById("adminHolidaysTableBody");
@@ -1829,10 +1880,12 @@ function renderHolidaysTable() {
     btn.addEventListener("click", () => {
       const id = btn.dataset.id;
       let list = getStore(STORAGE_KEYS.HOLIDAYS, DEFAULT_HOLIDAYS);
+      const removed = list.find(h => h.id === id);
       list = list.filter(h => h.id !== id);
       setStore(STORAGE_KEYS.HOLIDAYS, list);
       renderHolidaysTable();
       renderMonthlyReport();
+      if (removed) _reconcileHolidayChange(removed.date, null);
       showToast("Company holiday removed from calendar.", "info");
     });
   });
@@ -1868,6 +1921,7 @@ function initHolidayForm() {
     dateInput.value = "2026-11-01";
     renderHolidaysTable();
     renderMonthlyReport();
+    _reconcileHolidayChange(date, name);
     showToast(`Added ${type}: "${name}" on ${date}!`, "success");
   });
 }
@@ -1946,6 +2000,8 @@ function initShortLeavePolicyForm() {
   };
   const shiftStartInput = document.getElementById("slShiftStartInput");
   const lateFromSel = document.getElementById("slLateFromInput");
+  const weekendsOffChk = document.getElementById("slWeekendsNonWorkingInput");
+  const hwModeSel = document.getElementById("slHolidayWorkModeInput");
 
   // "09:30 AM" <-> "09:30" (the <input type="time"> uses 24-hour HH:MM).
   const to24 = (t) => { const m = /^(\d{1,2}):(\d{2}) (AM|PM)$/i.exec((t || "").trim()); if (!m) return "09:30"; let h = parseInt(m[1], 10) % 12; if (/pm/i.test(m[3])) h += 12; return String(h).padStart(2, "0") + ":" + m[2]; };
@@ -1955,6 +2011,8 @@ function initShortLeavePolicyForm() {
   Object.keys(num).forEach(k => { if (num[k]) num[k].value = cur[k]; });
   if (shiftStartInput) shiftStartInput.value = to24(cur.shiftStart);
   if (lateFromSel) lateFromSel.value = cur.lateFrom;
+  if (weekendsOffChk) weekendsOffChk.checked = !!cur.treatWeekendsAsNonWorking;
+  if (hwModeSel) hwModeSel.value = cur.holidayWorkMode;
 
   form.addEventListener("submit", (e) => {
     e.preventDefault();
@@ -1962,10 +2020,14 @@ function initShortLeavePolicyForm() {
     Object.keys(num).forEach(k => { if (num[k]) patch[k] = Number(num[k].value); });
     if (shiftStartInput) patch.shiftStart = to12(shiftStartInput.value);
     if (lateFromSel) patch.lateFrom = lateFromSel.value;
+    if (weekendsOffChk) patch.treatWeekendsAsNonWorking = weekendsOffChk.checked;
+    if (hwModeSel) patch.holidayWorkMode = hwModeSel.value;
     const saved = setAttendanceSettings(patch);
     Object.keys(num).forEach(k => { if (num[k]) num[k].value = saved[k]; });
     if (shiftStartInput) shiftStartInput.value = to24(saved.shiftStart);
     if (lateFromSel) lateFromSel.value = saved.lateFrom;
+    if (weekendsOffChk) weekendsOffChk.checked = !!saved.treatWeekendsAsNonWorking;
+    if (hwModeSel) hwModeSel.value = saved.holidayWorkMode;
     // Re-classify today's and the current month's days under the new thresholds.
     if (typeof recalcShortLeaveDays === "function") recalcShortLeaveDays();
     if (typeof renderStaffRoster === "function") renderStaffRoster();
@@ -2366,6 +2428,40 @@ function _adminOverridePresent(empId, date) {
   });
 }
 
+// Req 6: mark an employee as "Worked on holiday" so punching is reopened for that
+// employee + date only. Reason is required; comp-off / extra-pay is configurable
+// per override (defaulting to the policy setting). The action is audit-logged.
+function _adminMarkWorkedOnHoliday(empId, date, holidayName) {
+  const employees = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
+  const emp = employees.find(e => e.id === empId) || { name: empId };
+  const defMode = (typeof getAttendanceSettings === "function" ? getAttendanceSettings().holidayWorkMode : "compoff") || "compoff";
+  ConfirmDecisionModal.open({
+    title: "Work on holiday",
+    summary: `${emp.name} \u00b7 ${holidayName || "Holiday"} \u00b7 ${date}`,
+    detail: `<p>Reopens the check-in / check-out controls for this employee on this holiday only, and records the day as worked.</p>` +
+      `<label class="cdm-field-label" for="hwModeSelect" style="margin-top:8px;">Compensation policy</label>` +
+      `<select id="hwModeSelect" class="form-control" style="width:100%;">` +
+      `<option value="compoff"${defMode === "compoff" ? " selected" : ""}>Comp-off</option>` +
+      `<option value="extrapay"${defMode === "extrapay" ? " selected" : ""}>Extra pay</option>` +
+      `</select>`,
+    actionLabel: "Mark Worked on Holiday",
+    actionStyle: "warning",
+    reasonRequired: true,
+    reasonLabel: "Reason",
+    placeholder: "Required \u2014 recorded in the audit log",
+    run: (reason) => {
+      const sel = document.getElementById("hwModeSelect");
+      const mode = sel ? sel.value : defMode;
+      if (typeof markWorkedOnHoliday !== "function") return { ok: false, error: "Override engine unavailable." };
+      markWorkedOnHoliday(empId, date, reason, mode, { id: "ADMIN", name: "Admin", role: "admin" });
+      renderEmpCalendar();
+      renderMonthlyReport();
+      showToast(`Marked worked on holiday (${mode === "extrapay" ? "extra pay" : "comp-off"}). Punching enabled for this day.`, "success");
+      return { ok: true };
+    }
+  });
+}
+
 // ---------------------------------------------------------------------------
 // AUDIT LOG PANEL (read-only)
 // ---------------------------------------------------------------------------
@@ -2505,8 +2601,13 @@ function renderEmpCalendar() {
     const dateStr = formatDateKey(dateObj);
     const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
     const isToday = dateStr === todayKey;
-    const declaredHoliday = holidayMap[dateStr];
     const rec = records[`${empCalState.empId}_${dateStr}`];
+    const hMatch = holidayMap[dateStr];
+    const holidayOff = !!hMatch && hMatch.type !== "Restricted Holiday";
+    const rhOff = !!hMatch && hMatch.type === "Restricted Holiday" &&
+      (typeof hasApprovedRestrictedLeaveOnDate === "function") && hasApprovedRestrictedLeaveOnDate(empCalState.empId, dateStr);
+    const workedOnHoliday = !!hMatch && (typeof isWorkedOnHoliday === "function") && isWorkedOnHoliday(empCalState.empId, dateStr);
+    const declaredHoliday = (holidayOff || rhOff) && !workedOnHoliday ? hMatch : null;
 
     let badge = "";
     let popData = null; // details popover payload (kept out of the cell)
@@ -2515,10 +2616,24 @@ function renderEmpCalendar() {
     // Admin can force a Present override on a closed/today working day that is
     // not already a clean Present (short hours, half-day, LoP, absent, not-marked).
     let canOverride = false;
+    // Req 6: on a (non-worked) holiday, an Admin/Manager may mark the day
+    // "Worked on holiday" (reason required) to reopen punching for this employee.
+    let canMarkHolidayWork = false;
 
     if (declaredHoliday) {
       badge = `<span class="day-badge-pill badge-holiday-day" title="${declaredHoliday.name}"><i class="fa-solid fa-star"></i> ${String(declaredHoliday.name).split(/\s+/)[0]}</span>`;
-      popData = { dateStr, punch: false, statusLabel: declaredHoliday.name, chipClass: "badge-holiday-day", icon: "fa-star", detail: "Declared holiday" };
+      popData = { dateStr, punch: false, statusLabel: declaredHoliday.name, chipClass: "badge-holiday-day", icon: "fa-star", detail: (declaredHoliday.type === "Restricted Holiday") ? "Restricted holiday (approved RH leave)" : "Declared holiday" };
+      canMarkHolidayWork = true;
+    } else if (workedOnHoliday) {
+      const wEntry = (typeof getHolidayWorkOverrides === "function" && getHolidayWorkOverrides()[`${empCalState.empId}_${dateStr}`]) || {};
+      const modeLbl = wEntry.mode === "extrapay" ? "Extra pay" : "Comp-off";
+      badge = `<span class="day-badge-pill badge-holidaywork" title="Worked on holiday (${String(hMatch.name)})"><i class="fa-solid fa-briefcase"></i> Holiday Work</span>`;
+      if (rec && (rec.status === "Present" || rec.status === "WFH")) {
+        popData = { dateStr, rec, punch: true, statusLabel: "Worked on holiday", chipClass: "badge-holidaywork", icon: "fa-briefcase", detail: `${String(hMatch.name)} \u00b7 ${modeLbl}` };
+        s.present++;
+      } else {
+        popData = { dateStr, punch: false, statusLabel: "Worked on holiday", chipClass: "badge-holidaywork", icon: "fa-briefcase", detail: `${String(hMatch.name)} \u00b7 ${modeLbl} \u00b7 punching enabled` };
+      }
     } else if (isWeekend) {
       badge = `<span class="day-badge-pill badge-weekend-day"><i class="fa-solid fa-mug-hot"></i> Weekend</span>`;
       popData = { dateStr, punch: false, statusLabel: "Weekend", chipClass: "badge-weekend-day", icon: "fa-mug-hot", detail: "Weekly off" };
@@ -2589,11 +2704,15 @@ function renderEmpCalendar() {
       ? `<button type="button" class="cell-admin-override" data-override-emp="${empCalState.empId}" data-override-date="${dateStr}" title="Mark this day Present (admin override, requires a reason)"><i class="fa-solid fa-user-shield"></i> Override</button>`
       : "";
 
+    const holidayWorkBtn = canMarkHolidayWork
+      ? `<button type="button" class="cell-holiday-work" data-hw-emp="${empCalState.empId}" data-hw-date="${dateStr}" data-hw-name="${String(declaredHoliday.name).replace(/"/g, '')}" title="Mark this employee as working on the holiday (requires a reason)"><i class="fa-solid fa-briefcase"></i> Worked</button>`
+      : "";
+
     const cell = document.createElement("div");
     cell.className = cellClass;
     cell.innerHTML = `
       <div class="cell-top-row"><span class="day-number">${d}</span>${isToday ? '<span class="today-marker-chip"><i class="fa-solid fa-star"></i> Today</span>' : ''}</div>
-      <div class="cell-content">${badge}${overrideBtn}</div>
+      <div class="cell-content">${badge}${overrideBtn}${holidayWorkBtn}</div>
     `;
     if (popData && window.DayPopover) DayPopover.bind(cell, popData);
     grid.appendChild(cell);
@@ -2602,6 +2721,11 @@ function renderEmpCalendar() {
   grid.querySelectorAll(".cell-admin-override").forEach(btn => btn.addEventListener("click", (e) => {
     e.stopPropagation();
     _adminOverridePresent(btn.dataset.overrideEmp, btn.dataset.overrideDate);
+  }));
+
+  grid.querySelectorAll(".cell-holiday-work").forEach(btn => btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    _adminMarkWorkedOnHoliday(btn.dataset.hwEmp, btn.dataset.hwDate, btn.dataset.hwName);
   }));
 
   if (summaryEl) {

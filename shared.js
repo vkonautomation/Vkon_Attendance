@@ -26,6 +26,8 @@ const STORAGE_KEYS = {
   // --- Early Out / Short Leave ---
   EARLY_OUTS: "vkon_early_outs_v1",
   SHORT_LEAVE_SETTINGS: "vkon_short_leave_settings_v1",
+  // --- Worked-on-holiday overrides (Admin/Manager exception) ---
+  HOLIDAY_WORK: "vkon_holiday_work_v1",
   AUDIT_LOG: "vkon_audit_log_v1"
 };
 
@@ -231,16 +233,27 @@ const DEFAULT_SHORT_LEAVE_SETTINGS = {
   payrollCutOffDay: 1,
   shiftStart: "09:30 AM",
   graceMinutes: 15,
-  lateFrom: "shiftStart"
+  lateFrom: "shiftStart",
+  // Holidays / non-working-day policy.
+  treatWeekendsAsNonWorking: false,
+  holidayWorkMode: "compoff" // "compoff" | "extrapay"
 };
 
 // Which keys are numeric vs text, so the getter/setter can coerce + validate.
 const _SL_NUMERIC_KEYS = ["requiredHours", "minPresentHours", "halfDayThresholdHours",
   "shortLeaveMonthlyLimit", "shortLeaveMaxHoursEach", "payrollCutOffDay", "graceMinutes"];
+const _SL_BOOL_KEYS = ["treatWeekendsAsNonWorking"];
 
 // Returns the coerced value for a known setting key, or null if invalid/absent.
 function _validateAttendanceSetting(k, v) {
   if (v === undefined || v === null || v === "") return null;
+  if (_SL_BOOL_KEYS.indexOf(k) !== -1) {
+    if (typeof v === "boolean") return v;
+    return (v === "true" || v === 1 || v === "1") ? true : (v === "false" || v === 0 || v === "0") ? false : null;
+  }
+  if (k === "holidayWorkMode") {
+    return (v === "compoff" || v === "extrapay") ? v : null;
+  }
   if (_SL_NUMERIC_KEYS.indexOf(k) !== -1) {
     const n = Number(v);
     return isNaN(n) ? null : n;
@@ -1210,6 +1223,136 @@ function getEffectiveStatus(rec, settings) {
   };
 }
 
+// ============================================================================
+// NON-WORKING DAY (HOLIDAY) ENGINE
+// ----------------------------------------------------------------------------
+// One shared function decides whether a date is a working day for a given
+// employee, so the dashboard, both calendars, the punch service, the admin
+// counts, attendance rate and payroll LOP all agree. Company time zone is IST.
+// ============================================================================
+
+// The holiday record (if any) declared for a date, from the raw store so BOTH
+// Declared and Restricted types are seen (getDeclaredHolidays() is type-scoped).
+function findHolidayForDate(dateStr) {
+  const holidays = getStore(STORAGE_KEYS.HOLIDAYS, DEFAULT_HOLIDAYS);
+  return holidays.find(h => h.date === dateStr) || null;
+}
+
+// Does this employee have an APPROVED restricted-holiday leave on the date?
+// Restricted holidays only hide punching for the employee who took that RH.
+function hasApprovedRestrictedLeaveOnDate(empId, dateStr) {
+  if (!empId) return false;
+  const leaves = getStore(STORAGE_KEYS.LEAVES, []);
+  const hit = leaves.some(l =>
+    l.employeeId === empId && l.status === "Approved" &&
+    (l.category === "Restricted" || l.category === "RH" || /restricted/i.test(l.type || "")) &&
+    (l.date ? l.date === dateStr
+      : (l.startDate && l.endDate && dateStr >= l.startDate && dateStr <= l.endDate)));
+  if (hit) return true;
+  // A materialised RH record (status Leave, locationType contains "RH") also counts.
+  const rec = getStore(STORAGE_KEYS.RECORDS, {})[`${empId}_${dateStr}`];
+  return !!(rec && rec.status === "Leave" && rec.locationType && rec.locationType.indexOf("RH") !== -1);
+}
+
+// Worked-on-holiday overrides, keyed `${empId}_${date}` -> { reason, mode, actor, at }.
+function getHolidayWorkOverrides() {
+  return getStore(STORAGE_KEYS.HOLIDAY_WORK, {}) || {};
+}
+
+function isWorkedOnHoliday(empId, dateStr) {
+  if (!empId) return false;
+  return !!getHolidayWorkOverrides()[`${empId}_${dateStr}`];
+}
+
+function markWorkedOnHoliday(empId, dateStr, reason, mode, actor) {
+  if (!empId || !dateStr) return null;
+  const map = getHolidayWorkOverrides();
+  const entry = {
+    empId, date: dateStr,
+    reason: String(reason || "").trim(),
+    mode: (mode === "extrapay" ? "extrapay" : "compoff"),
+    actor: (actor && (actor.name || actor.id)) || "Admin",
+    at: new Date().toISOString()
+  };
+  map[`${empId}_${dateStr}`] = entry;
+  setStore(STORAGE_KEYS.HOLIDAY_WORK, map);
+  addAudit("worked-on-holiday", {
+    empId, date: dateStr, actor: actor || { role: "admin" },
+    decision: "Worked on holiday", comment: `${entry.mode} \u00b7 ${entry.reason}`
+  });
+  return entry;
+}
+
+function clearWorkedOnHoliday(empId, dateStr, actor) {
+  const map = getHolidayWorkOverrides();
+  if (map[`${empId}_${dateStr}`]) {
+    delete map[`${empId}_${dateStr}`];
+    setStore(STORAGE_KEYS.HOLIDAY_WORK, map);
+    addAudit("worked-on-holiday-cleared", {
+      empId, date: dateStr, actor: actor || { role: "admin" },
+      decision: "Reverted", comment: "Worked-on-holiday override removed"
+    });
+  }
+}
+
+// THE single source of truth: is `date` a non-working day for this employee?
+// date: "YYYY-MM-DD" or a Date; employee: id string or employee object (optional).
+// Optionally counts weekends as non-working by setting (treatWeekendsAsNonWorking).
+// Returns false when a "Worked on holiday" override exists for that emp+date.
+function isNonWorkingDay(date, employee) {
+  try {
+    const dateStr = (typeof date === "string") ? date : formatDateKey(date);
+    const empId = employee ? (typeof employee === "string" ? employee : employee.id) : null;
+    const s = getAttendanceSettings();
+    const dObj = new Date(dateStr + "T00:00:00");
+    const dow = dObj.getDay();
+    const isWeekend = (dow === 0 || dow === 6);
+
+    let nonWorking = false;
+    const h = findHolidayForDate(dateStr);
+    if (h) {
+      if (h.type === "Restricted Holiday") {
+        // Req 7: a restricted holiday only hides punching when the employee's
+        // restricted leave for that date is approved.
+        nonWorking = hasApprovedRestrictedLeaveOnDate(empId, dateStr);
+      } else {
+        nonWorking = true; // Declared Holiday is mandatory off for everyone
+      }
+    }
+    if (!nonWorking && s.treatWeekendsAsNonWorking && isWeekend) nonWorking = true;
+    if (!nonWorking) return false;
+
+    // Req 6 exception: an approved worked-on-holiday override reopens the day.
+    if (empId && isWorkedOnHoliday(empId, dateStr)) return false;
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+// The punch-service gate. Returns a short reason string when punching must be
+// blocked on this date (a holiday / non-working day with no override), else null.
+// shared.js is the "server" for this pure-static app, so both the UI and this
+// guard consult the same rule and a direct action call cannot bypass it.
+function punchBlockedReason(empId, dateStr) {
+  const dStr = dateStr || formatDateKey(getNowIST());
+  if (!isNonWorkingDay(dStr, empId)) return null;
+  const h = findHolidayForDate(dStr);
+  return h ? h.name : "Non-working day";
+}
+
+// Next working day on/after `fromDateStr` (exclusive of the start day), IST-safe.
+function getNextWorkingDay(fromDateStr, employee) {
+  const start = new Date(fromDateStr + "T00:00:00");
+  for (let i = 1; i <= 40; i++) {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    const key = formatDateKey(d);
+    if (!isNonWorkingDay(key, employee)) return { dateStr: key, dateObj: d };
+  }
+  return null;
+}
+
 function isShortHoursDay(rec) {
   return !!rec && rec.dayClassification === "Short hours - review";
 }
@@ -1227,6 +1370,10 @@ function finalizeStaleOpenPunches() {
       const r = records[k];
       if (!r || !isOpenPunch(r) || !r.date) return;
       if (r.date >= today) return; // today (or future): shift still in progress
+      // Req 8: a holiday that was declared AFTER a punch already exists keeps the
+      // record as-is (and is never counted Absent) unless a worked-on-holiday
+      // override makes it a genuine working day for this employee.
+      if (isNonWorkingDay(r.date, r.employeeId)) return;
       r.status = "Absent";
       r.duration = "Absent";
       r.hoursDecimal = 0;
@@ -2311,6 +2458,9 @@ function initializeDatabase() {
   }
   if (!getStore(STORAGE_KEYS.EARLY_OUTS, null)) {
     setStore(STORAGE_KEYS.EARLY_OUTS, []);
+  }
+  if (!getStore(STORAGE_KEYS.HOLIDAY_WORK, null)) {
+    setStore(STORAGE_KEYS.HOLIDAY_WORK, {});
   }
 
   cleanExpiredPhotos();

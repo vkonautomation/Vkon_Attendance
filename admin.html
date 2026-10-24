@@ -24,7 +24,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="styles.css?v=20261023_apr11">
+  <link rel="stylesheet" href="styles.css?v=20261023_apr12">
 </head>
 <body class="light-theme admin-page">
 
@@ -1096,8 +1096,8 @@
                 <i class="fa-solid fa-person-walking-arrow-right"></i>
               </div>
               <div class="header-title">
-                <h3>Early Out, Short Leave &amp; Shift Timing Policy</h3>
-                <p>Set the shift start, grace period and hour rules used to classify Present / Short leave / Half-day days and the late indicator</p>
+                <h3>Shift Timing, Early Out &amp; Holiday Policy</h3>
+                <p>Set shift start, grace and hour rules for the late indicator, and control holiday / weekend punching restrictions</p>
               </div>
             </div>
 
@@ -1150,6 +1150,25 @@
                     <option value="graceEnd">End of grace period</option>
                   </select>
                   <span class="form-hint">Where the &quot;late by&quot; duration is measured from</span>
+                </div>
+              </div>
+
+              <div class="form-row-2">
+                <div class="form-group">
+                  <label for="slHolidayWorkModeInput">Work-on-Holiday Policy <span class="req">*</span></label>
+                  <select id="slHolidayWorkModeInput" class="form-control">
+                    <option value="compoff">Comp-off (default)</option>
+                    <option value="extrapay">Extra pay</option>
+                  </select>
+                  <span class="form-hint">How hours worked on a holiday are recorded by default</span>
+                </div>
+                <div class="form-group">
+                  <label for="slWeekendsNonWorkingInput">Weekends</label>
+                  <label class="policy-check-line" for="slWeekendsNonWorkingInput">
+                    <input type="checkbox" id="slWeekendsNonWorkingInput">
+                    <span>Treat Sat &amp; Sun as non-working days (hide punching)</span>
+                  </label>
+                  <span class="form-hint">Declared holidays always hide punching; this extends it to weekends</span>
                 </div>
               </div>
 
@@ -1771,10 +1790,10 @@
 
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <script src="shared.js?v=20261013_ist_apr11"></script>
+  <script src="shared.js?v=20261013_ist_apr12"></script>
   <script src="js/confirm-decision-modal.js?v=20261023_apr1"></script>
   <script src="js/day-popover.js?v=20261023_apr1"></script>
-  <script src="admin.js?v=20261023_apr17"></script>
+  <script src="admin.js?v=20261023_apr18"></script>
   <script src="js/password-toggle.js?v=20261019_ui1"></script>
   <script src="js/data-transfer.js?v=20261023_apr2"></script>
 </body>

@@ -443,7 +443,16 @@ function renderMonthlyCalendar() {
     const isToday = dateStr === todayKey;
 
     const record = records[`${employeeState.currentEmployee.id}_${dateStr}`];
-    const declaredHoliday = holidayMap[dateStr];
+    const _empId = employeeState.currentEmployee.id;
+    const hMatch = holidayMap[dateStr];
+    // A declared holiday is off for everyone; a restricted holiday is off only
+    // for the employee whose restricted leave for that date is approved (req 7).
+    // A worked-on-holiday override reopens the day and shows the record (req 6).
+    const holidayOff = !!hMatch && hMatch.type !== "Restricted Holiday";
+    const rhOff = !!hMatch && hMatch.type === "Restricted Holiday" &&
+      (typeof hasApprovedRestrictedLeaveOnDate === "function") && hasApprovedRestrictedLeaveOnDate(_empId, dateStr);
+    const workedOnHoliday = !!hMatch && (typeof isWorkedOnHoliday === "function") && isWorkedOnHoliday(_empId, dateStr);
+    const declaredHoliday = (holidayOff || rhOff) && !workedOnHoliday ? hMatch : null;
 
     const cell = document.createElement("div");
     cell.className = `calendar-day-cell ${isToday ? "is-today" : ""}`;
@@ -460,6 +469,14 @@ function renderMonthlyCalendar() {
         </span>
       `;
       popData = { dateStr, punch: false, statusLabel: declaredHoliday.name, chipClass: "badge-holiday-day", icon: "fa-star", detail: "Declared holiday" };
+    } else if (workedOnHoliday) {
+      const wReason = (typeof getHolidayWorkOverrides === "function" && getHolidayWorkOverrides()[`${_empId}_${dateStr}`] || {}).reason || "";
+      badgeHtml = `
+        <span class="day-badge-pill badge-holidaywork" title="Worked on holiday (${String(hMatch.name)})">
+          <i class="fa-solid fa-briefcase"></i> <span class="pill-text">Holiday\u2009Work</span>
+        </span>
+      `;
+      popData = { dateStr, rec: record, punch: !!record, statusLabel: "Worked on holiday", chipClass: "badge-holidaywork", icon: "fa-briefcase", detail: String(hMatch.name) + (wReason ? " \u00b7 " + wReason : "") };
     } else if (isWeekend) {
       badgeHtml = `<span class="day-badge-pill badge-weekend-day" title="Weekend"><i class="fa-solid fa-mug-hot"></i> Weekend</span>`;
       popData = { dateStr, punch: false, statusLabel: "Weekend", chipClass: "badge-weekend-day", icon: "fa-mug-hot", detail: "Weekly off" };
@@ -1303,6 +1320,38 @@ function updatePunchStatus() {
   const records = getStore(STORAGE_KEYS.RECORDS, {});
   const todayRecord = records[`${employeeState.currentEmployee.id}_${todayKey}`];
 
+  // Req 2/3: on a holiday / non-working day, hide the Mark Present card and the
+  // "Ready to Punch"/"Not Punched In" status and show a holiday card instead.
+  const isOffToday = (typeof isNonWorkingDay === "function") &&
+    isNonWorkingDay(todayKey, employeeState.currentEmployee);
+  const holidayCard = document.getElementById("holidayTodayCard");
+  const markBar = document.querySelector(".mark-present-bar-wrapper");
+  const statusBadge = document.getElementById("todayStatusBadge");
+  if (isOffToday) {
+    if (markBar) markBar.style.display = "none";
+    if (statusBadge) statusBadge.style.display = "none";
+    if (holidayCard) {
+      const _h = (typeof findHolidayForDate === "function") ? findHolidayForDate(todayKey) : null;
+      const nameEl = document.getElementById("holidayTodayName");
+      const msgEl = document.getElementById("holidayTodayMsg");
+      const nextEl = document.getElementById("holidayTodayNext");
+      if (nameEl) nameEl.textContent = _h ? _h.name : "Non-working day";
+      if (msgEl) msgEl.textContent = "Today is a holiday. No check-in needed.";
+      if (nextEl) {
+        const nx = (typeof getNextWorkingDay === "function") ? getNextWorkingDay(todayKey, employeeState.currentEmployee) : null;
+        if (nx) {
+          const label = nx.dateObj.toLocaleDateString("en-US", { timeZone: "Asia/Kolkata", weekday: "long", day: "numeric", month: "long" });
+          nextEl.innerHTML = `<i class="fa-solid fa-arrow-right"></i> Next working day: <strong>${label}</strong>`;
+        } else { nextEl.innerHTML = ""; }
+      }
+      holidayCard.style.display = "";
+    }
+    return;
+  }
+  if (holidayCard) holidayCard.style.display = "none";
+  if (markBar) markBar.style.display = "";
+  if (statusBadge) statusBadge.style.display = "";
+
   const todayDot = document.getElementById("todayDot");
   const todayStatusText = document.getElementById("todayStatusText");
   const punchStateLabel = document.getElementById("punchStateLabel");
@@ -1980,6 +2029,19 @@ function handleRetakePhoto() {
 
 // Confirm Attendance after Photo is Captured: Immediately marked present and photo sent to Admin
 async function handleConfirmVerification() {
+  // Req 3: the shared attendance service rejects a punch on a holiday / non-
+  // working day (unless an approved worked-on-holiday override exists), so the
+  // rule cannot be bypassed by invoking the action directly.
+  if (employeeState.currentEmployee && typeof punchBlockedReason === "function") {
+    const _blocked = punchBlockedReason(employeeState.currentEmployee.id, getTodayKey());
+    if (_blocked) {
+      showToast(`Punch rejected: ${_blocked} is a holiday \u2014 no check-in is permitted.`, "error");
+      playSound("error");
+      closeVerificationModal();
+      return;
+    }
+  }
+
   if (!capturedLiveSelfie || !isLivePhotoVerified || typeof capturedLiveSelfie !== "string" || !capturedLiveSelfie.startsWith("data:image")) {
     showToast("Photo required: You must capture your photo to mark attendance.", "warning");
     playSound("error");

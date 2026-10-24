@@ -21,7 +21,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="styles.css?v=20261023_apr11">
+  <link rel="stylesheet" href="styles.css?v=20261023_apr12">
 </head>
 <body class="light-theme">
   
@@ -245,6 +245,16 @@
               <i class="fa-solid fa-arrow-up-right-from-square open-card-icon" id="arrowMarkPresent"></i>
             </div>
           </button>
+        </div>
+
+        <!-- Holiday / non-working-day card (replaces the Mark Present card on a holiday) -->
+        <div class="holiday-today-card" id="holidayTodayCard" role="status" style="display: none;">
+          <div class="holiday-today-icon"><i class="fa-solid fa-umbrella-beach"></i></div>
+          <div class="holiday-today-body">
+            <span class="holiday-today-name" id="holidayTodayName">Today is a holiday</span>
+            <span class="holiday-today-msg" id="holidayTodayMsg">Today is a holiday. No check-in needed.</span>
+            <span class="holiday-today-next" id="holidayTodayNext"></span>
+          </div>
         </div>
 
         <!-- 2. Single Row with Two Buttons: Apply for Leave and Work From Home -->
@@ -1135,10 +1145,10 @@
   <div class="toast-container" id="toastContainer"></div>
 
   <!-- Shared Engine & App Controller -->
-  <script src="shared.js?v=20261013_ist_apr11"></script>
+  <script src="shared.js?v=20261013_ist_apr12"></script>
   <script src="js/confirm-decision-modal.js?v=20261023_apr1"></script>
   <script src="js/day-popover.js?v=20261023_apr1"></script>
-  <script src="app.js?v=20261023_apr10"></script>
+  <script src="app.js?v=20261023_apr11"></script>
   <script src="js/password-toggle.js?v=20261019_ui1"></script>
   <script src="js/data-transfer.js?v=20261023_apr2"></script>
 
