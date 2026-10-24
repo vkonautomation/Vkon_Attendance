@@ -10529,13 +10529,12 @@ body:not(.light-theme) .pay-status-paid { color: #6ee7b7; }
 .toggle-label input.form-checkbox { margin-top: 0.15rem; width: auto; }
 .form-checkbox { width: 1.05rem; height: 1.05rem; accent-color: var(--primary, #2563eb); cursor: pointer; }
 
-/* --- Employee estimate + half-day --- */
+/* --- Employee estimate --- */
 .warning-box-lop { background: rgba(225, 29, 72, 0.09) !important; border-color: rgba(225, 29, 72, 0.34) !important; color: #be123c !important; }
 body:not(.light-theme) .warning-box-lop { color: #fda4af !important; }
 .lop-est-note { display: block; margin-top: 0.28rem; font-size: 0.72rem; font-weight: 700; color: #be123c; }
 .lop-est-note i { margin-right: 0.25rem; }
 body:not(.light-theme) .lop-est-note { color: #fda4af; }
-.lop-halfday-label { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-weight: 600; }
 
 /* ==========================================================================
    v8.4 LOSS OF PAY + MY REQUESTS — rose LoP identity across portal & admin,
@@ -10938,38 +10937,12 @@ thead th.leave-sub-header {
 .action-btn-cluster .btn:disabled { opacity: 0.55; cursor: not-allowed; }
 
 /* ==========================================================================
-   Early Out / Short Leave — day classification badges, override & audit UI
+   Attendance policy — day classification badges (short hours, override)
    ========================================================================== */
 
-/* Teal accent used by the Early Out nav pill, settings icon and audit panel */
+/* Teal accent used by the shift-timing policy settings icon */
 .icon-bg-teal { background: rgba(20, 184, 166, 0.16); color: #2dd4bf; }
-.text-teal { color: #2dd4bf; }
 body.light-theme .icon-bg-teal { background: #ccfbf1; color: #0f766e; }
-body.light-theme .text-teal { color: #0f766e; }
-
-/* --- Short leave (approved, within limit) — calm teal, reads as excused --- */
-.day-badge-pill.badge-shortleave {
-  background: rgba(20, 184, 166, 0.14);
-  border: 1px solid rgba(20, 184, 166, 0.45);
-  color: #5eead4;
-}
-body.light-theme .day-badge-pill.badge-shortleave {
-  background: #f0fdfa;
-  border: 1px solid #99f6e4;
-  color: #0f766e;
-}
-
-/* --- Half-day (PL or LOP) — amber, a partial day --- */
-.day-badge-pill.badge-halfday {
-  background: rgba(245, 158, 11, 0.14);
-  border: 1px solid rgba(245, 158, 11, 0.45);
-  color: #fcd34d;
-}
-body.light-theme .day-badge-pill.badge-halfday {
-  background: #fffbeb;
-  border: 1px solid #fcd34d;
-  color: #b45309;
-}
 
 /* --- Short hours (needs review) — rose, flags attention --- */
 .day-badge-pill.badge-shorthours {
@@ -11065,8 +11038,7 @@ body.light-theme .calendar-day-cell:has(.badge-shorthours) {
   border-color: #fecdd3;
 }
 
-/* In-cell quick action buttons (Early Out on today, admin Override) */
-.cell-early-out,
+/* In-cell quick action button (admin Override) */
 .cell-admin-override {
   display: inline-flex;
   align-items: center;
@@ -11082,19 +11054,12 @@ body.light-theme .calendar-day-cell:has(.badge-shorthours) {
   border: 1px solid transparent;
   line-height: 1.2;
 }
-.cell-early-out {
-  background: rgba(20, 184, 166, 0.16);
-  color: #2dd4bf;
-  border-color: rgba(20, 184, 166, 0.45);
-}
-.cell-early-out:hover { background: rgba(20, 184, 166, 0.28); }
 .cell-admin-override {
   background: rgba(168, 85, 247, 0.16);
   color: #d8b4fe;
   border-color: rgba(168, 85, 247, 0.45);
 }
 .cell-admin-override:hover { background: rgba(168, 85, 247, 0.28); }
-body.light-theme .cell-early-out { background: #ccfbf1; color: #0f766e; border-color: #99f6e4; }
 body.light-theme .cell-admin-override { background: #f3e8ff; color: #7e22ce; border-color: #e9d5ff; }
 
 /* In-cell "Worked on holiday" control (Admin/Manager exception, req 6) */

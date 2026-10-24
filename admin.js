@@ -1325,7 +1325,6 @@ function renderApprovalsCenter() {
   renderWfhApprovals();
   renderLeaveApprovals();
   renderRegularisationApprovals();
-  renderEarlyOutApprovals();
   updatePendingBadges();
 }
 
@@ -1334,13 +1333,11 @@ function updatePendingBadges() {
   const wfh = getStore(STORAGE_KEYS.WFH, []);
   const leaves = getStore(STORAGE_KEYS.LEAVES, []);
   const regs = getStore(STORAGE_KEYS.REGULARISATIONS, []);
-  const eos = getStore(STORAGE_KEYS.EARLY_OUTS, []);
 
   const _isPending = s => s === "Pending Manager" || s === "Pending Admin" || s === "Pending";
   const pendingWfh = wfh.filter(w => _isPending(w.status) || w.status === "Cancellation Requested").length;
   const pendingLeaves = leaves.filter(l => _isPending(l.status) || l.status === "Cancellation Requested").length;
   const pendingRegs = regs.filter(r => _isPending(r.status)).length;
-  const pendingEos = eos.filter(x => _isPending(x.status) || x.status === "Cancellation Requested").length;
 
   // Per-tab pending counts (Manager / Admin / History) for each category.
   const _cnt = (list, st) => list.filter(x => st.indexOf(x.status) !== -1).length;
@@ -1353,11 +1350,8 @@ function updatePendingBadges() {
   _setTabCount("regTabManagerCount", _cnt(regs, ["Pending Manager"]));
   _setTabCount("regTabAdminCount", _cnt(regs, ["Pending Admin", "Cancellation Requested"]));
   _setTabCount("regTabHistoryCount", _cnt(regs, ["Approved", "Rejected", "Cancelled"]));
-  _setTabCount("eoTabManagerCount", _cnt(eos, ["Pending Manager"]));
-  _setTabCount("eoTabAdminCount", _cnt(eos, ["Pending Admin", "Cancellation Requested"]));
-  _setTabCount("eoTabHistoryCount", _cnt(eos, ["Approved", "Rejected", "Cancelled"]));
 
-  const total = pendingWfh + pendingLeaves + pendingRegs + pendingEos;
+  const total = pendingWfh + pendingLeaves + pendingRegs;
   
   // Main header tab bubble (only shows number if > 0, hidden if 0)
   const badge = document.getElementById("pendingRequestsBadge");
@@ -1402,17 +1396,6 @@ function updatePendingBadges() {
     } else {
       regBadge.textContent = "";
       regBadge.style.display = "none";
-    }
-  }
-
-  const eoBadge = document.getElementById("drawerEarlyOutBadge");
-  if (eoBadge) {
-    if (pendingEos > 0) {
-      eoBadge.textContent = pendingEos;
-      eoBadge.style.display = "inline-flex";
-    } else {
-      eoBadge.textContent = "";
-      eoBadge.style.display = "none";
     }
   }
 }
@@ -1538,7 +1521,7 @@ function _wfhWarn(r) {
   return "";
 }
 function _emptyApprovalText(cat, tab) {
-  const kind = cat === "wfh" ? "Work From Home" : cat === "leave" ? "Leave" : cat === "eo" ? "Early Out" : "Regularisation";
+  const kind = cat === "wfh" ? "Work From Home" : cat === "leave" ? "Leave" : "Regularisation";
   if (tab === "manager") return `No ${kind} requests awaiting manager approval.`;
   if (tab === "admin") return `No ${kind} requests awaiting admin approval.`;
   return `No ${kind} history yet.`;
@@ -1582,7 +1565,6 @@ function initApprovalTabs() {
       document.querySelectorAll(`.approval-tabs[data-cat="${cat}"] .approval-tab`).forEach(x => x.classList.toggle("active", x === tab));
       if (cat === "wfh") renderWfhApprovals();
       else if (cat === "leave") renderLeaveApprovals();
-      else if (cat === "eo") renderEarlyOutApprovals();
       else renderRegularisationApprovals();
     });
   });
@@ -1781,39 +1763,6 @@ function handleRegularisationDecision(id, decision) {
   _adminApprovalDecision("regularisation", id, decision);
 }
 
-// -------------------------------------------------------------
-// ROW 4: EARLY OUT / SHORT LEAVE APPROVALS
-// -------------------------------------------------------------
-function renderEarlyOutApprovals() {
-  _renderApprovalRows("eo", "earlyout", STORAGE_KEYS.EARLY_OUTS, "adminEarlyOutTableBody", "emptyEarlyOutMsg", (cat, type, x, emp, tab) => {
-    const treat = x.overLimitTreatment === "lop" ? "LOP if over limit" : "Half-day PL if over limit";
-    const time = `<span class="font-mono">Out ${_esc(x.plannedLeaveTime || '-')}</span>`;
-    const emg = x.emergency ? '<span class="badge-mini">Emergency</span>' : '';
-    const treatPill = `<span class="badge-mini">${_esc(treat)}</span>`;
-    const reason = x.reason ? `<div class="stage-meta"><span class="stage-comment">${_esc(x.reason)}</span></div>` : "";
-    let dayNote = "";
-    try {
-      const rec = getStore(STORAGE_KEYS.RECORDS, {})[`${x.employeeId}_${x.date}`];
-      if (rec) {
-        const wh = (typeof computeWorkedHours === "function") ? computeWorkedHours(rec) : (Number(rec.hoursDecimal) || 0);
-        const cls = rec.dayClassification ? ` \u00b7 ${rec.dayClassification}` : "";
-        dayNote = `<div class="stage-meta"><span class="stage-when">Worked ${wh}h${_esc(cls)}</span></div>`;
-      }
-    } catch (e) { /* non-fatal */ }
-    return `
-    <td><strong class="font-bold">${_esc(emp.name)}</strong><span class="table-sub font-mono">${_esc(x.employeeId)}</span></td>
-    <td><strong class="font-mono text-primary">${_esc(x.date)}</strong></td>
-    <td>${time} ${emg}<div class="stage-meta">${treatPill}</div>${dayNote}${reason}</td>
-    <td>${_managerStageCell(x, type)}</td>
-    <td>${_adminStageCell(x, type)}</td>
-    <td>${_actionCell(cat, type, x, tab)}</td>`;
-  });
-}
-
-function handleEarlyOutDecision(id, decision) {
-  _adminApprovalDecision("earlyout", id, decision);
-}
-
 // ============================================================================
 // 5. TAB 4: COMPANY HOLIDAYS & LEAVE POLICIES MANAGEMENT
 // ============================================================================
@@ -1833,7 +1782,7 @@ function _reconcileHolidayChange(dateStr, holidayName) {
   if (!affected.length) return;
   // Keep the punch records; only re-derive classifications so the sheet agrees.
   if (typeof finalizeStaleOpenPunches === "function") finalizeStaleOpenPunches();
-  if (typeof recalcShortLeaveDays === "function") recalcShortLeaveDays();
+  if (typeof recalcShortHoursDays === "function") recalcShortHoursDays();
   const names = affected.map(id => {
     const e = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES).find(x => x.id === id);
     return e ? e.name : id;
@@ -1975,7 +1924,7 @@ function initMinWorkPolicyForm() {
   });
 }
 
-// Early Out / Short Leave + Shift Timing policy form (hours, monthly limit,
+// Shift Timing / short-hours policy form (required hours, min-present hours,
 // cut-off, shift start, grace period and how lateness is counted).
 function initShortLeavePolicyForm() {
   const form = document.getElementById("shortLeavePolicyForm");
@@ -1983,9 +1932,6 @@ function initShortLeavePolicyForm() {
   const num = {
     requiredHours: document.getElementById("slRequiredHoursInput"),
     minPresentHours: document.getElementById("slMinPresentHoursInput"),
-    halfDayThresholdHours: document.getElementById("slHalfDayThresholdInput"),
-    shortLeaveMonthlyLimit: document.getElementById("slMonthlyLimitInput"),
-    shortLeaveMaxHoursEach: document.getElementById("slMaxHoursEachInput"),
     payrollCutOffDay: document.getElementById("slPayrollCutOffInput"),
     graceMinutes: document.getElementById("slGraceMinutesInput")
   };
@@ -2020,7 +1966,7 @@ function initShortLeavePolicyForm() {
     if (weekendsOffChk) weekendsOffChk.checked = !!saved.treatWeekendsAsNonWorking;
     if (hwModeSel) hwModeSel.value = saved.holidayWorkMode;
     // Re-classify today's and the current month's days under the new thresholds.
-    if (typeof recalcShortLeaveDays === "function") recalcShortLeaveDays();
+    if (typeof recalcShortHoursDays === "function") recalcShortHoursDays();
     if (typeof renderStaffRoster === "function") renderStaffRoster();
     if (typeof renderMonthlyReport === "function") renderMonthlyReport();
     showToast(`Attendance policy saved: ${saved.requiredHours}h required, shift starts ${saved.shiftStart} (grace ${saved.graceMinutes}m).`, "success");
@@ -2374,23 +2320,19 @@ function initPhotoLightboxModal() {
 // ============================================================================
 const empCalState = { empId: null, viewDate: null };
 
-// Coloured classification pill for a record's short-leave / half-day / short-hours day.
+// Coloured classification pill for a record's short-hours / override day.
 function _adminClassPill(rec) {
   const c = rec && rec.dayClassification;
   if (!c) return "";
   const MAP = {
-    "Short leave": ["badge-shortleave", "fa-person-walking-arrow-right", "Short leave"],
-    "Half-day": ["badge-halfday", "fa-hourglass-half", "Half-day"],
-    "Half-day (LOP)": ["badge-halfday", "fa-hourglass-half", "Half-day (LOP)"],
     "Short hours - review": ["badge-shorthours", "fa-triangle-exclamation", "Short hours \u2013 review"],
-    "Short hours (LOP)": ["badge-halfday", "fa-hourglass-half", "Short hours (LOP)"],
+    "Short hours (LOP)": ["badge-shorthours", "fa-hourglass-half", "Short hours (LOP)"],
     "Present (Override)": ["badge-override", "fa-user-shield", "Override"]
   };
   const m = MAP[c];
   if (!m) return "";
   const wh = (rec.workedHours ? ` \u00b7 ${rec.workedHours}h` : "");
-  const rsn = rec.shortLeaveReason ? ` \u2014 ${rec.shortLeaveReason}` : "";
-  return `<span class="day-badge-pill ${m[0]}" title="${c}${wh}${rsn}"><i class="fa-solid ${m[1]}"></i> <span class="pill-text">${m[2]}</span></span>`;
+  return `<span class="day-badge-pill ${m[0]}" title="${c}${wh}"><i class="fa-solid ${m[1]}"></i> <span class="pill-text">${m[2]}</span></span>`;
 }
 
 // Admin override a single day to Present. Requires a reason (ConfirmDecisionModal),
@@ -2401,7 +2343,7 @@ function _adminOverridePresent(empId, date) {
   ConfirmDecisionModal.open({
     title: "Override to Present",
     summary: `${emp.name} \u00b7 ${date}`,
-    detail: "This forces the day to Present, clears any short-leave LOP / half-day deduction for it, and records the change in the audit log.",
+    detail: "This forces the day to Present and clears any auto short-hours LOP for it.",
     actionLabel: "Mark Present",
     actionStyle: "primary",
     reasonRequired: true,
@@ -2410,7 +2352,7 @@ function _adminOverridePresent(empId, date) {
     run: (reason) => {
       const res = applyAdminOverride(empId, date, reason, { id: "ADMIN", name: "Admin", role: "admin" });
       if (res && res.error === "reason_required") return { ok: false, error: "A reason is required." };
-      if (typeof recalcShortLeaveDays === "function") recalcShortLeaveDays();
+      if (typeof recalcShortHoursDays === "function") recalcShortHoursDays();
       renderEmpCalendar();
       renderMonthlyReport();
       showToast("Day marked Present (override recorded).", "success");

@@ -43,9 +43,10 @@ if (ctx.money2(5000) !== "5000.00" || ctx.money2(45000.5) !== "45000.50") {
   console.error("  FAIL: money2 formatting"); process.exitCode = 1;
 } else { console.log("  PASS: money2 => 5000.00 / 45000.50"); passed++; }
 
-// 3) Half-day LOP (0.5) => half of a full per-day deduction (60000 / 30 * 0.5).
-const rHalf = ctx.computeLopDeduction({ monthlySalary: 60000, lopDays: 0.5 });
-assertClose(rHalf.lopAmount, 1000.00, "Half-day LOP (60000 / 30 * 0.5)");
+// 3) Whole-day LOP (2 days) => 2 x per-day deduction (60000 / 30 * 2).
+// LOP is always counted in whole days now (the half-day / 0.5 LOP was removed).
+const rTwo = ctx.computeLopDeduction({ monthlySalary: 60000, lopDays: 2 });
+assertClose(rTwo.lopAmount, 4000.00, "Whole-day LOP (60000 / 30 * 2)");
 
 // 4) Zero LOP days => no deduction, net equals salary.
 const rZero = ctx.computeLopDeduction({ monthlySalary: 50000, lopDays: 0 });

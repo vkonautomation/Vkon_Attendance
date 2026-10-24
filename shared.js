@@ -23,8 +23,7 @@ const STORAGE_KEYS = {
   LOP_ENTRIES: "vkon_lop_entries_v1",
   // --- Manager + Admin approval workflow ---
   APPROVAL_FLOW: "vkon_approval_flow_v1",
-  // --- Early Out / Short Leave ---
-  EARLY_OUTS: "vkon_early_outs_v1",
+  // --- Attendance policy (shift timing, short hours, holidays) ---
   SHORT_LEAVE_SETTINGS: "vkon_short_leave_settings_v1",
   // --- Worked-on-holiday overrides (Admin/Manager exception) ---
   HOLIDAY_WORK: "vkon_holiday_work_v1"
@@ -206,15 +205,12 @@ function setMinWorkDurationPolicy(hours, minutes) {
 }
 
 // ============================================================================
-// EARLY OUT / SHORT LEAVE SETTINGS (admin-configurable attendance policy)
+// ATTENDANCE POLICY SETTINGS (admin-configurable shift timing + short hours)
 // ----------------------------------------------------------------------------
 // requiredHours        : full shift target (a day at/above this is a clean Present)
 // minPresentHours      : Present floor (below this an un-explained day is short)
-// halfDayThresholdHours: below this a day is always a half-day regardless
-// shortLeaveMonthlyLimit : approved early-outs allowed per calendar month
-// shortLeaveMaxHoursEach : an early-out longer than this is never a "short leave"
 // payrollCutOffDay       : day-of-month after which an unresolved "Short hours"
-//                          day auto-converts to a half-day LOP (computed lazily
+//                          day auto-converts to a (full-day) LOP (computed lazily
 //                          on load/view, since there is no server scheduler)
 // shiftStart             : official day-start clock time ("09:30 AM"), IST
 // graceMinutes           : minutes after shiftStart before a day counts as late
@@ -226,9 +222,6 @@ function setMinWorkDurationPolicy(hours, minutes) {
 const DEFAULT_SHORT_LEAVE_SETTINGS = {
   requiredHours: 9,
   minPresentHours: 8,
-  halfDayThresholdHours: 5,
-  shortLeaveMonthlyLimit: 2,
-  shortLeaveMaxHoursEach: 2,
   payrollCutOffDay: 1,
   shiftStart: "09:30 AM",
   graceMinutes: 15,
@@ -239,8 +232,8 @@ const DEFAULT_SHORT_LEAVE_SETTINGS = {
 };
 
 // Which keys are numeric vs text, so the getter/setter can coerce + validate.
-const _SL_NUMERIC_KEYS = ["requiredHours", "minPresentHours", "halfDayThresholdHours",
-  "shortLeaveMonthlyLimit", "shortLeaveMaxHoursEach", "payrollCutOffDay", "graceMinutes"];
+const _SL_NUMERIC_KEYS = ["requiredHours", "minPresentHours",
+  "payrollCutOffDay", "graceMinutes"];
 const _SL_BOOL_KEYS = ["treatWeekendsAsNonWorking"];
 
 // Returns the coerced value for a known setting key, or null if invalid/absent.
@@ -485,7 +478,8 @@ function computeLopDeduction(opts) {
 }
 
 // ---- LOP day entries (the single source of truth for LOP day counts) ----
-// { id, employeeId, date 'YYYY-MM-DD', fraction 0.5|1, source leave|excess, refId, status active|cancelled }
+// { id, employeeId, date 'YYYY-MM-DD', fraction 1, source leave|short-hours, refId, status active|cancelled }
+// LOP is always counted in WHOLE days (half-day / 0.5 LOP was removed by policy).
 function getLopEntries() { return getStore(STORAGE_KEYS.LOP_ENTRIES, []); }
 function addLopEntry(empId, date, fraction, source, refId) {
   const list = getLopEntries();
@@ -496,7 +490,7 @@ function addLopEntry(empId, date, fraction, source, refId) {
     id: "LOP-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 6),
     employeeId: empId,
     date,
-    fraction: Number(fraction) > 0 ? Number(fraction) : 1,
+    fraction: 1,
     source: source || "leave",
     refId: refId || null,
     status: "active",
@@ -524,12 +518,10 @@ function computeLopDaysForMonth(empId, monthStr) {
 }
 
 // Expand an approved leave range into LOP day objects. Weekends / declared
-// holidays are skipped; a single-day half request yields one 0.5 day.
+// holidays are skipped. LOP is always whole-day (a half-day request counts as 1).
 function lopDatesForRange(startDate, endDate, opts) {
   opts = opts || {};
   const out = [];
-  const single = (!endDate || endDate === startDate);
-  if (single && opts.halfDay) { out.push({ date: startDate, fraction: 0.5 }); return out; }
   const holSet = new Set(getDeclaredHolidays().map(h => h.date));
   const cur = new Date(startDate + "T00:00:00");
   const end = new Date((endDate || startDate) + "T00:00:00");
@@ -537,19 +529,18 @@ function lopDatesForRange(startDate, endDate, opts) {
     const key = formatDateKey(cur);
     const wd = cur.getDay();
     const isOff = (wd === 0 || wd === 6 || holSet.has(key));
-    if (!isOff) out.push({ date: key, fraction: single && opts.halfDay ? 0.5 : 1 });
+    if (!isOff) out.push({ date: key, fraction: 1 });
     cur.setDate(cur.getDate() + 1);
   }
   return out;
 }
 
-// Create the LOP entries for an approved LOP leave request.
+// Create the LOP entries for an approved LOP leave request (whole-day).
 function createLopEntriesForLeave(req) {
   if (!req || req.status !== "Approved") return 0;
-  const half = (Number(req.daysCount) === 0.5);
-  const dates = lopDatesForRange(req.startDate, req.endDate, { halfDay: half });
+  const dates = lopDatesForRange(req.startDate, req.endDate);
   let n = 0;
-  dates.forEach(d => { if (addLopEntry(req.employeeId, d.date, d.fraction, "leave", req.id)) n++; });
+  dates.forEach(d => { if (addLopEntry(req.employeeId, d.date, 1, "leave", req.id)) n++; });
   return n;
 }
 
@@ -586,15 +577,14 @@ function estimateLopDeduction(empId, lopDays) {
 // The four request types that flow through the approval engine. A Leave whose
 // category is Loss of Pay is routed with its own "lop" rule, so LOP can default
 // to Manager-then-Admin while ordinary Leave is Manager-only.
-const APPROVAL_TYPES = ["leave", "wfh", "regularisation", "lop", "earlyout"];
+const APPROVAL_TYPES = ["leave", "wfh", "regularisation", "lop"];
 const APPROVAL_ROUTES = ["manager_only", "manager_then_admin"];
 const APPROVAL_STATUSES = ["Pending Manager", "Pending Admin", "Approved", "Rejected", "Cancelled", "Cancellation Requested"];
 const DEFAULT_APPROVAL_FLOW = {
   leave: "manager_only",
   wfh: "manager_only",
   regularisation: "manager_only",
-  lop: "manager_then_admin",
-  earlyout: "manager_only"
+  lop: "manager_then_admin"
 };
 
 function getApprovalFlow() {
@@ -617,7 +607,6 @@ function setApprovalFlow(next) {
 function approvalTypeStoreKey(type) {
   if (type === "wfh") return STORAGE_KEYS.WFH;
   if (type === "regularisation") return STORAGE_KEYS.REGULARISATIONS;
-  if (type === "earlyout") return STORAGE_KEYS.EARLY_OUTS;
   return STORAGE_KEYS.LEAVES;
 }
 
@@ -770,10 +759,6 @@ function applyApprovedEffect(type, req) {
       capturedTimestamp: Date.now(), selfieUrl: emp.avatar || null
     };
     setStore(STORAGE_KEYS.RECORDS, records);
-  } else if (type === "earlyout") {
-    // The day's status/LOP/PL side effects are derived centrally by the policy
-    // engine from the punch record + the now-approved early-out.
-    recalcDayForRecord(req.employeeId, req.date);
   }
 }
 
@@ -797,16 +782,10 @@ function removeApprovedEffect(type, req) {
   } else if (type === "regularisation") {
     const rec = records[`${req.employeeId}_${req.date}`];
     if (rec && rec.regularised) { delete records[`${req.employeeId}_${req.date}`]; setStore(STORAGE_KEYS.RECORDS, records); }
-  } else if (type === "earlyout") {
-    // Removing an approved early-out releases any synthetic half-day PL and
-    // any auto-generated LOP for that day, then re-derives the day.
-    releaseEarlyOutHalfDayLeave(req);
-    cancelLopEntriesByRef(_earlyOutLopRef(req.employeeId, req.date));
-    recalcDayForRecord(req.employeeId, req.date);
   }
 }
 
-function _approvalLabel(type) { return type === "wfh" ? "WFH" : type === "regularisation" ? "Regularisation" : type === "earlyout" ? "Early Out" : "Leave"; }
+function _approvalLabel(type) { return type === "wfh" ? "WFH" : type === "regularisation" ? "Regularisation" : "Leave"; }
 
 
 // The single source of truth for one approval step, used by BOTH the manager
@@ -897,7 +876,7 @@ function getTeamRequests(managerId, statuses) {
   const ids = new Set(reports.map(r => r.id));
   const want = statuses || ["Pending Manager"];
   const out = [];
-  ["wfh", "leave", "regularisation", "earlyout"].forEach(t => {
+  ["wfh", "leave", "regularisation"].forEach(t => {
     getStore(approvalTypeStoreKey(t), []).forEach(r => {
       if (ids.has(r.employeeId) && want.indexOf(r.status) !== -1) out.push({ type: t, request: r });
     });
@@ -979,21 +958,14 @@ function getDeclaredHolidays() {
 }
 
 // ============================================================================
-// EARLY OUT / SHORT LEAVE POLICY ENGINE
+// ATTENDANCE POLICY ENGINE (shift timing + short-hours)
 // ----------------------------------------------------------------------------
 // The SINGLE source of truth for classifying a punched work-day against the
 // admin-configurable attendance policy. Both the employee portal and the admin
-// console read the derived day classification, worked hours and reason from here
-// so the calendar, dashboard and master sheet can never disagree. All rules are
-// centralized in this module (the static-app equivalent of "server-side").
+// console read the derived day classification and worked hours from here so the
+// calendar, dashboard and master sheet can never disagree. LOP is always whole
+// day (the half-day / 0.5 LOP and the Early Out feature were removed).
 // ============================================================================
-
-function getEarlyOuts() { return getStore(STORAGE_KEYS.EARLY_OUTS, []); }
-function saveEarlyOuts(list) { setStore(STORAGE_KEYS.EARLY_OUTS, list); }
-
-// A single stable reference id so every auto-generated LOP for a day (short
-// hours, over-limit early-out) can be created and reversed idempotently.
-function _earlyOutLopRef(empId, date) { return `SL-${empId}-${date}`; }
 
 // Worked hours (decimal) for a finished punch. Prefer the real clock times
 // (repaired source of truth) and fall back to the stored hoursDecimal.
@@ -1013,120 +985,34 @@ function _isPastPayrollCutOff(dateStr, cutOffDay) {
   return getNowIST().getTime() > cut.getTime();
 }
 
-function _earlyOutsWithinLimit(empId, monthStr, s) {
-  const recs = getStore(STORAGE_KEYS.RECORDS, {});
-  return getEarlyOuts()
-    .filter(x => x.employeeId === empId && x.status === "Approved" && x.date && x.date.slice(0, 7) === monthStr)
-    .map(x => {
-      const r = recs[`${empId}_${x.date}`];
-      if (!r || isOpenPunch(r)) return null;
-      const sh = Number((s.requiredHours - computeWorkedHours(r)).toFixed(2));
-      if (sh <= 0 || sh > s.shortLeaveMaxHoursEach) return null;
-      return { eo: x, shortfall: sh };
-    })
-    .filter(Boolean)
-    .sort((a, b) => String(a.eo.date + (a.eo.createdAt || "")).localeCompare(String(b.eo.date + (b.eo.createdAt || ""))));
-}
-
-// Actual hours the employee left early on the early-out's day (or null if the
-// day is not finished yet).
-function _earlyOutShortfallHours(eo, s) {
-  if (!eo) return null;
-  s = s || getAttendanceSettings();
-  const recs = getStore(STORAGE_KEYS.RECORDS, {});
-  const r = recs[`${eo.employeeId}_${eo.date}`];
-  if (!r || isOpenPunch(r)) return null;
-  return Number((s.requiredHours - computeWorkedHours(r)).toFixed(2));
-}
-
-// An approved early-out is a "within limit" short leave only when the hours
-// actually left early fit the per-request cap AND the early-out falls inside the
-// monthly allowance when ordered chronologically within the month.
-function isEarlyOutWithinLimit(eo, s, shortfall) {
-  if (!eo) return false;
-  s = s || getAttendanceSettings();
-  if (shortfall == null) shortfall = _earlyOutShortfallHours(eo, s);
-  if (shortfall == null || shortfall <= 0 || shortfall > s.shortLeaveMaxHoursEach) return false;
-  const elig = _earlyOutsWithinLimit(eo.employeeId, eo.date.slice(0, 7), s);
-  const idx = elig.findIndex(o => o.eo.id === eo.id);
-  return idx !== -1 && idx < s.shortLeaveMonthlyLimit;
-}
-
-// "X of N used" for the dashboard balance.
-function getShortLeaveUsage(empId, monthStr) {
-  const s = getAttendanceSettings();
-  const eligible = _earlyOutsWithinLimit(empId, monthStr, s);
-  return Math.min(eligible.length, s.shortLeaveMonthlyLimit);
-}
-
-// The synthetic half-day Personal Leave created when an over-limit early-out is
-// treated as "Half-day Personal Leave". Keyed so it is idempotent and reversible.
-function _eopLeaveId(empId, date) { return `EOPH-${empId}-${date}`; }
-function _ensureEarlyOutHalfDayLeave(empId, date, reason) {
-  const leaves = getStore(STORAGE_KEYS.LEAVES, []);
-  const lid = _eopLeaveId(empId, date);
-  if (leaves.some(l => l.id === lid)) return;
-  leaves.push({
-    id: lid, employeeId: empId, employeeName: _employeeName(empId),
-    startDate: date, endDate: date, daysCount: 0.5,
-    category: "Personal", type: "Personal Leave",
-    reason: reason || "Early-out over short-leave limit (half-day Personal Leave)",
-    status: "Approved", auto: true, createdAt: new Date().toISOString(),
-    approvalRoute: ["system"], approvalTrail: []
-  });
-  setStore(STORAGE_KEYS.LEAVES, leaves);
-}
-function releaseEarlyOutHalfDayLeave(empId, date) {
-  const leaves = getStore(STORAGE_KEYS.LEAVES, []);
-  const lid = _eopLeaveId(empId, date);
-  const idx = leaves.findIndex(l => l.id === lid);
-  if (idx !== -1) { leaves.splice(idx, 1); setStore(STORAGE_KEYS.LEAVES, leaves); }
-}
-
-// Classify one punched day. Pure read of policy + requests; returns the desired
-// outcome without mutating storage (recalcDayForRecord applies the side effects).
+// Classify one punched day. Pure read of policy; returns the desired outcome
+// without mutating storage (recalcDayForRecord applies the side effects).
 function classifyDay(empId, date, settings) {
   const s = settings || getAttendanceSettings();
   const records = getStore(STORAGE_KEYS.RECORDS, {});
   const rec = records[`${empId}_${date}`];
   if (!rec) return null;
   if (rec.status !== "Present" && rec.status !== "WFH") return null;
-  if (isOpenPunch(rec)) return { classification: "In Progress", worked: 0, reason: "", rec };
+  if (isOpenPunch(rec)) return { classification: "In Progress", worked: 0, rec };
 
   const W = computeWorkedHours(rec);
-  const eo = getEarlyOuts().find(x => x.employeeId === empId && x.date === date && x.status === "Approved");
-  const reason = eo ? (eo.reason || "") : (rec.overrideReason || "");
-
   if (rec.overridePresent) {
-    return { classification: "Present (Override)", worked: W, reason: rec.overrideReason || "", lopFraction: 0, consumePLHalf: false, rec };
+    return { classification: "Present (Override)", worked: W, lopFraction: 0, rec };
   }
 
-  let classification, lopFraction = 0, consumePLHalf = false;
-  if (W >= s.requiredHours) {
+  let classification, lopFraction = 0;
+  if (W >= s.minPresentHours) {
     classification = "Present";
-  } else if (W >= s.minPresentHours) {
-    classification = "Present";
-  } else if (W < s.halfDayThresholdHours) {
-    // A day below the half-day threshold is always a half-day (unpaid half).
-    classification = "Half-day (LOP)"; lopFraction = 0.5;
-  } else if (eo) {
-    const shortfall = Number((s.requiredHours - W).toFixed(2));
-    if (isEarlyOutWithinLimit(eo, s, shortfall)) {
-      classification = "Short leave";
-    } else if (eo.overLimitTreatment === "lop") {
-      classification = "Half-day (LOP)"; lopFraction = 0.5;
-    } else {
-      classification = "Half-day"; consumePLHalf = true;
-    }
   } else if (_isPastPayrollCutOff(date, s.payrollCutOffDay)) {
-    classification = "Short hours (LOP)"; lopFraction = 0.5;
+    // Under-worked day past the payroll cut-off: a FULL-day LOP (no half).
+    classification = "Short hours (LOP)"; lopFraction = 1;
   } else {
     classification = "Short hours - review";
   }
-  return { classification, worked: W, reason, lopFraction, consumePLHalf, rec };
+  return { classification, worked: W, lopFraction, rec };
 }
 
-// Derive + apply the classification and its LOP / half-day-PL side effects.
+// Derive + apply the classification and its whole-day LOP side effect.
 function recalcDayForRecord(empId, date) {
   const res = classifyDay(empId, date);
   if (!res) return null;
@@ -1140,22 +1026,29 @@ function recalcDayForRecord(empId, date) {
     return rec; // already consistent; avoid storage churn on every load
   }
 
-  // Clear any auto effects for the day, then re-apply per the desired outcome.
-  cancelLopEntriesByRef(_earlyOutLopRef(empId, date));
-  releaseEarlyOutHalfDayLeave(empId, date);
+  // Clear any auto short-hours LOP for the day, then re-apply if still due.
+  _cancelShortHoursLop(empId, date);
   if (res.lopFraction > 0) {
-    addLopEntry(empId, date, res.lopFraction, "short-leave", _earlyOutLopRef(empId, date));
-  }
-  if (res.consumePLHalf) {
-    _ensureEarlyOutHalfDayLeave(empId, date, res.reason);
+    addLopEntry(empId, date, 1, "short-hours", null);
   }
 
   rec.dayClassification = res.classification;
   rec.workedHours = res.worked;
-  rec.shortLeaveReason = res.reason || "";
   setStore(STORAGE_KEYS.RECORDS, records);
 
   return rec;
+}
+
+// Reverse the auto short-hours LOP for a day (idempotent, no ref id).
+function _cancelShortHoursLop(empId, date) {
+  const list = getLopEntries();
+  let changed = false;
+  list.forEach(e => {
+    if (e.employeeId === empId && e.date === date && e.source === "short-hours" && e.status === "active") {
+      e.status = "cancelled"; e.cancelledAt = new Date().toISOString(); changed = true;
+    }
+  });
+  if (changed) setStore(STORAGE_KEYS.LOP_ENTRIES, list);
 }
 
 // Convenience for views: the classification to show for a record.
@@ -1206,10 +1099,10 @@ function getEffectiveStatus(rec, settings) {
     short = { isShort: true, hours: Number((s.requiredHours - worked).toFixed(2)), label: `Short by ${formatMinutesHM(shortMin)}` };
   }
 
-  // Approved early-out / short-leave / override / regularisation tags + reason.
+  // Short-hours / override / regularisation tags + reason.
   const tags = [];
   if (classification && classification !== "Present" && classification !== "In Progress") {
-    tags.push({ label: classification, reason: rec.shortLeaveReason || (cls && cls.reason) || "" });
+    tags.push({ label: classification, reason: (cls && cls.reason) || "" });
   }
   if (rec.overridePresent) tags.push({ label: "Admin Override", reason: rec.overrideReason || "" });
 
@@ -1375,8 +1268,8 @@ function finalizeStaleOpenPunches() {
 }
 
 // Recalculate the current + previous month (bounded) so "Short hours - review"
-// days flip to half-day LOP once past the payroll cut-off. Runs lazily on load.
-function recalcShortLeaveDays() {
+// days flip to a full-day LOP once past the payroll cut-off. Runs lazily on load.
+function recalcShortHoursDays() {
   try {
     const records = getStore(STORAGE_KEYS.RECORDS, {});
     const curMonth = formatDateKey(getNowIST()).slice(0, 7);
@@ -1405,8 +1298,7 @@ function applyAdminOverride(empId, date, reason, actor) {
   rec.overridePresent = true;
   rec.overrideReason = String(reason).trim();
   rec.dayClassification = "Present (Override)";
-  cancelLopEntriesByRef(_earlyOutLopRef(empId, date));
-  releaseEarlyOutHalfDayLeave(empId, date);
+  _cancelShortHoursLop(empId, date);
   setStore(STORAGE_KEYS.RECORDS, records);
   return rec;
 }
@@ -2402,19 +2294,16 @@ function initializeDatabase() {
   if (!getStore(STORAGE_KEYS.SHORT_LEAVE_SETTINGS, null)) {
     setStore(STORAGE_KEYS.SHORT_LEAVE_SETTINGS, DEFAULT_SHORT_LEAVE_SETTINGS);
   }
-  if (!getStore(STORAGE_KEYS.EARLY_OUTS, null)) {
-    setStore(STORAGE_KEYS.EARLY_OUTS, []);
-  }
   if (!getStore(STORAGE_KEYS.HOLIDAY_WORK, null)) {
     setStore(STORAGE_KEYS.HOLIDAY_WORK, {});
   }
 
   cleanExpiredPhotos();
   // Finalize any past-day punch that was never closed out (in but no out) to
-  // Absent, then lazily derive day classifications / auto half-day-LOP for the
+  // Absent, then lazily derive day classifications / auto full-day-LOP for the
   // current and previous month (no server scheduler, so this runs on load/view).
   finalizeStaleOpenPunches();
-  recalcShortLeaveDays();
+  recalcShortHoursDays();
 }
 
 // ============================================================================

@@ -21,7 +21,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="styles.css?v=20261024_rm2">
+  <link rel="stylesheet" href="styles.css?v=20261024_rm4">
 </head>
 <body class="light-theme">
   
@@ -280,19 +280,6 @@
             </div>
             <i class="fa-solid fa-arrow-up-right-from-square open-card-icon" id="arrowWfh"></i>
           </button>
-
-          <!-- Request Early Out entry point hidden by product decision; the
-               Early Out / Short Leave engine and admin approvals remain intact. -->
-          <button type="button" id="btnToggleEarlyOut" class="btn-sub-action btn-sub-earlyout" style="display: none;">
-            <div class="sub-btn-content">
-              <i class="fa-solid fa-person-walking-arrow-right"></i>
-              <div class="sub-btn-texts">
-                <span class="sub-title">Request Early Out</span>
-                <span class="sub-meta" id="earlyOutBtnSubMeta">Short leave &bull; Balance: 0 / 2</span>
-              </div>
-            </div>
-            <i class="fa-solid fa-arrow-up-right-from-square open-card-icon" id="arrowEarlyOut"></i>
-          </button>
         </div>
 
       </section>
@@ -330,14 +317,6 @@
               <span class="dash-stat-value" id="dashStatHours">0</span>
               <span class="dash-stat-label">Hours Logged</span>
               <span class="dash-stat-sub" id="dashStatHoursSub">This month</span>
-            </div>
-          </div>
-          <div class="dash-stat-card stat-shortleave">
-            <div class="dash-stat-icon"><i class="fa-solid fa-person-walking-arrow-right"></i></div>
-            <div class="dash-stat-body">
-              <span class="dash-stat-value" id="dashStatShortLeave">0 / 2</span>
-              <span class="dash-stat-label">Short Leave This Month</span>
-              <span class="dash-stat-sub" id="dashStatShortLeaveSub">0 of 2 used</span>
             </div>
           </div>
         </div>
@@ -473,15 +452,6 @@
                   <option value="Restricted">Restricted Leave</option>
                   <option value="LossOfPay">Loss of Pay (Unpaid)</option>
                 </select>
-              </div>
-
-              <!-- Half-day Loss of Pay (shown only when Loss of Pay is selected) -->
-              <div class="form-group" id="lopHalfDayGroup" style="display: none;">
-                <label class="lop-halfday-label" for="lopHalfDay">
-                  <input type="checkbox" id="lopHalfDay" class="form-checkbox">
-                  <span>Half-day Loss of Pay (0.5 day)</span>
-                </label>
-                <span class="form-hint"><i class="fa-solid fa-circle-info text-primary"></i> Applies to a single day; the estimated unpaid deduction updates below.</span>
               </div>
 
               <!-- Dedicated Restricted Holiday Selector (Only shown when Restricted Leave selected) -->
@@ -632,83 +602,6 @@
         </div>
       </div>
       
-      <!-- ================= MODAL CARD 4: REQUEST EARLY OUT / SHORT LEAVE ================= -->
-      <div class="modal-backdrop" id="modalCardEarlyOut" role="dialog" aria-modal="true" aria-hidden="true">
-        <div class="modal-dialog glass-panel action-card-dialog">
-          <div class="modal-header">
-            <div class="modal-title-group">
-              <div class="box-icon icon-earlyout"><i class="fa-solid fa-person-walking-arrow-right"></i></div>
-              <div>
-                <h3>Request Early Out / Short Leave</h3>
-                <span class="box-policy-tag tag-earlyout">Requires Manager Approval to Apply</span>
-              </div>
-            </div>
-            <button type="button" class="modal-close-btn" id="closeCardEarlyOutBtn" aria-label="Close card">&times;</button>
-          </div>
-
-          <div class="modal-body">
-            <div class="quota-pill-display">
-              <div class="quota-col">
-                <span class="q-title">Monthly Balance</span>
-                <span class="q-val text-primary font-bold" id="earlyOutBalanceText">0 / 2 used</span>
-              </div>
-              <div class="quota-col">
-                <span class="q-title">Max Per Request</span>
-                <span class="q-val font-bold" id="earlyOutMaxEachText">2 hrs</span>
-              </div>
-              <div class="quota-col">
-                <span class="q-title">Beyond Limit</span>
-                <span class="q-val font-bold" id="earlyOutTreatmentNoteText">Half-day / LOP</span>
-              </div>
-            </div>
-
-            <form id="earlyOutRequestForm" class="box-form">
-              <div class="form-group">
-                <label for="earlyOutDateInput">Date of Early Out <span class="req">*</span></label>
-                <input type="date" id="earlyOutDateInput" required class="form-control">
-                <span class="form-hint"><i class="fa-solid fa-circle-info text-primary"></i> Planned early-outs are for today or a future day. Emergency (after-the-fact) requests are allowed within 24 hours.</span>
-              </div>
-
-              <div class="form-group">
-                <label for="earlyOutTimeInput">Planned Leave Time <span class="req">*</span></label>
-                <input type="time" id="earlyOutTimeInput" required class="form-control" value="16:00">
-                <span class="form-hint"><i class="fa-solid fa-clock text-primary"></i> The time you expect to leave early.</span>
-              </div>
-
-              <div class="form-group">
-                <label for="earlyOutReasonInput">Reason <span class="req">*</span></label>
-                <textarea id="earlyOutReasonInput" required class="form-control" rows="2" placeholder="e.g. Doctor appointment, personal errand"></textarea>
-              </div>
-
-              <div class="form-group">
-                <label for="earlyOutTreatment">If over my short-leave limit, treat as <span class="req">*</span></label>
-                <select id="earlyOutTreatment" class="form-control">
-                  <option value="half-day-leave">Half-day Personal Leave</option>
-                  <option value="lop">Loss of Pay (LOP)</option>
-                </select>
-              </div>
-
-              <label class="checkbox-row" for="earlyOutEmergency">
-                <input type="checkbox" id="earlyOutEmergency">
-                <span>This was an emergency (raise after the fact, within 24 hours)</span>
-              </label>
-
-              <button type="submit" id="submitEarlyOutBtn" class="btn btn-primary btn-block">
-                <i class="fa-solid fa-paper-plane"></i> Submit Early Out for Approval
-              </button>
-            </form>
-
-            <div class="my-leaves-tracker-box">
-              <div class="my-leaves-tracker-header">
-                <h4><i class="fa-solid fa-person-walking-arrow-right text-primary"></i> My Early Out Requests</h4>
-                <span class="badge-mini" id="myEarlyOutCountBadge">0 Requests</span>
-              </div>
-              <div class="my-leaves-status-list" id="myEarlyOutStatusList"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <!-- ================= SECTION 1: MONTHLY CALENDAR ================= -->
       <section class="calendar-section glass-panel portal-view" id="sectionCalendar" data-portal-view="attendance">
         
@@ -1147,10 +1040,10 @@
   <div class="toast-container" id="toastContainer"></div>
 
   <!-- Shared Engine & App Controller -->
-  <script src="shared.js?v=20261024_rm1"></script>
+  <script src="shared.js?v=20261024_rm3"></script>
   <script src="js/confirm-decision-modal.js?v=20261023_apr1"></script>
   <script src="js/day-popover.js?v=20261023_apr1"></script>
-  <script src="app.js?v=20261024_rm1"></script>
+  <script src="app.js?v=20261024_rm3"></script>
   <script src="js/password-toggle.js?v=20261019_ui1"></script>
   <script src="js/data-transfer.js?v=20261023_apr2"></script>
 

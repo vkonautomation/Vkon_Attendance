@@ -37,11 +37,12 @@ def verify_all():
     need("pay-salary-input" in admin and "setEmployeeMonthlySalary(" in admin, "salary not editable in admin console")
     print("  PASS")
 
-    # Req 2: LOP leave type + half-day (0.5).
-    print("\n[Req 2] LOP leave type + half-day:")
+    # Req 2: LOP leave type (whole-day only; the half-day / 0.5 LOP was removed).
+    print("\n[Req 2] LOP leave type (whole-day only):")
     need("LossOfPay" in index_html and "Loss of Pay" in index_html, "LOP option missing on leave form")
-    need("lopHalfDay" in index_html and "lopHalfDay" in app, "half-day control missing in portal")
-    need("0.5" in shared and "halfDay" in shared, "half-day handling missing in shared.js")
+    need("lopHalfDay" not in index_html and "lopHalfDay" not in app, "half-day control should be removed from the portal")
+    need("halfDay" not in shared, "half-day (0.5) LOP handling should be removed from shared.js")
+    need("fraction: 1" in shared, "LOP entries should always be whole-day (fraction 1)")
     print("  PASS")
 
     # Req 3: per_day = monthly_salary / 30; deduction; net; round 2 dp.
