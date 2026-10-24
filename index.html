@@ -21,7 +21,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="styles.css?v=20261024_rm4">
+  <link rel="stylesheet" href="styles.css?v=20261024_rm6">
 </head>
 <body class="light-theme">
   
@@ -180,6 +180,7 @@
             <span class="notif-title"><i class="fa-solid fa-bell"></i> Notifications</span>
             <button type="button" class="btn btn-ghost btn-sm" id="notifMarkReadBtn">Mark all read</button>
           </div>
+          <div class="notif-alerts" id="notifAlerts"></div>
           <div class="notif-list" id="notifList"></div>
           <p class="notif-empty" id="notifEmpty" style="display: none;"><i class="fa-regular fa-bell-slash"></i> No notifications yet &mdash; admin approvals and task assignments will appear here.</p>
         </div>
@@ -216,6 +217,19 @@
 
     <!-- Main Content: Single Unified Window -->
     <main class="main-content" id="portalTop">
+
+      <!-- ================= REGULARISATION WARNING BANNER (top of Dashboard) ================= -->
+      <section class="portal-view reg-alert-banner rab-hidden" id="sectionRegAlertBanner" data-portal-view="dashboard" aria-live="polite">
+        <div class="rab-head">
+          <span class="rab-icon"><i class="fa-solid fa-triangle-exclamation"></i></span>
+          <div class="rab-titles">
+            <strong class="rab-title" id="regAlertBannerTitle">Days need regularisation</strong>
+            <span class="rab-sub" id="regAlertBannerSub">Unresolved absences count as a full day of LOP once the payroll cut-off passes.</span>
+          </div>
+        </div>
+        <div class="rab-list" id="regAlertBannerList"></div>
+        <button type="button" class="rab-expand" id="regAlertBannerExpand" style="display: none;"><i class="fa-solid fa-chevron-down"></i> <span>Show all</span></button>
+      </section>
       
       <!-- ================= TOP SECTION: EMPLOYEE ACTION HUB (BEFORE CALENDAR) ================= -->
       <section class="employee-action-hub portal-view" id="sectionActions" data-portal-view="dashboard">
@@ -621,6 +635,7 @@
             <div class="calendar-today-row">
               <span class="calendar-subtitle">Attendance history & records for <strong id="calendarEmpNameDisplay" class="text-primary">Mukesh Sharma</strong></span>
               <span id="calendarTodayHeaderDate" class="today-header-pill"><i class="fa-solid fa-calendar-day"></i> Present Day: Loading IST...</span>
+              <span id="calendarNeedsActionPill" class="needs-action-pill" style="display: none;"><i class="fa-solid fa-circle-exclamation"></i> <span id="calendarNeedsActionCount">0</span> need action</span>
             </div>
           </div>
 
@@ -716,6 +731,7 @@
           </div>
         </div>
         <p class="subtitle" style="margin-bottom: 1.25rem;">Requests from your direct reports awaiting your decision. A manager never sees or acts on their own requests.</p>
+        <div class="team-attention-banner" id="teamNeedsAttention" style="display: none;"><i class="fa-solid fa-circle-exclamation"></i> <span id="teamNeedsAttentionText"></span></div>
         <div class="team-requests-list" id="teamRequestsList"></div>
         <div class="empty-state-card" id="emptyTeamRequestsMsg" style="display: none;">
           <i class="fa-regular fa-circle-check"></i>
@@ -1040,10 +1056,10 @@
   <div class="toast-container" id="toastContainer"></div>
 
   <!-- Shared Engine & App Controller -->
-  <script src="shared.js?v=20261024_rm3"></script>
+  <script src="shared.js?v=20261024_rm5"></script>
   <script src="js/confirm-decision-modal.js?v=20261023_apr1"></script>
   <script src="js/day-popover.js?v=20261023_apr1"></script>
-  <script src="app.js?v=20261024_rm3"></script>
+  <script src="app.js?v=20261024_rm5"></script>
   <script src="js/password-toggle.js?v=20261019_ui1"></script>
   <script src="js/data-transfer.js?v=20261023_apr2"></script>
 

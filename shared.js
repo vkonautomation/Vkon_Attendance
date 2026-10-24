@@ -26,7 +26,10 @@ const STORAGE_KEYS = {
   // --- Attendance policy (shift timing, short hours, holidays) ---
   SHORT_LEAVE_SETTINGS: "vkon_short_leave_settings_v1",
   // --- Worked-on-holiday overrides (Admin/Manager exception) ---
-  HOLIDAY_WORK: "vkon_holiday_work_v1"
+  HOLIDAY_WORK: "vkon_holiday_work_v1",
+  // --- Regularisation alerts: only a per-employee "last seen" timestamp is
+  //     stored; the alerts themselves are always recomputed, never persisted. ---
+  REG_ALERT_LAST_SEEN: "vkon_regalert_seen_v1"
 };
 
 // Default Company Geofence Coordinates
@@ -1055,6 +1058,160 @@ function _cancelShortHoursLop(empId, date) {
 function displayStatusForRecord(rec) {
   if (!rec) return "";
   return rec.dayClassification || rec.status || "";
+}
+
+// ============================================================================
+// REGULARISATION ALERTS (computed, never stored)
+// ----------------------------------------------------------------------------
+// getRegularisationAlerts(employee, now, settings) is the single, PURE source of
+// the "you missed a workday" warnings. It is derived on every portal load (and
+// when the day rolls over) so an alert disappears the instant the underlying day
+// is resolved (a punch, approved leave/WFH, or an approved regularisation).
+// It takes `now` and `settings` as arguments and only READS policy state, so a
+// backend job can later reuse the exact same function for email or push.
+// ============================================================================
+
+// The payroll close calendar-date (YYYY-MM-DD) for the month that CONTAINS
+// `dateStr`. This mirrors _isPastPayrollCutOff: payroll closes on `cutOffDay` of
+// the FOLLOWING month, so the alert deadline and the auto-LOP conversion agree.
+function _payrollCutOffKeyFor(dateStr, cutOffDay) {
+  const parts = String(dateStr).split("-");
+  const y = Number(parts[0]), m = Number(parts[1]); // m is 1..12
+  if (!y || !m) return null;
+  const day = Math.max(1, Math.min(28, Number(cutOffDay) || 1));
+  // Month index m (= original month 1..12) is the NEXT month in 0-based terms.
+  const d = new Date(y, m, day);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// Whole days from `fromKey` to `toKey` (both YYYY-MM-DD); negative if toKey is
+// in the past. UTC-anchored so DST never shifts the count.
+function _diffDays(fromKey, toKey) {
+  const a = Date.parse(fromKey + "T00:00:00Z");
+  const b = Date.parse(toKey + "T00:00:00Z");
+  if (isNaN(a) || isNaN(b)) return 0;
+  return Math.round((b - a) / 86400000);
+}
+
+// "Oct 12" for an alert sentence.
+function _prettyDateKey(key) {
+  const d = new Date(key + "T00:00:00Z");
+  if (isNaN(d.getTime())) return key;
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+}
+
+// The set of YYYY-MM-DD dates an APPROVED request (leave or WFH) covers, so
+// those days are never flagged. Handles both single-date and start/end ranges.
+function _approvedCoverageDates(list, empId) {
+  const set = new Set();
+  (Array.isArray(list) ? list : []).forEach(r => {
+    if (!r || r.employeeId !== empId || r.status !== "Approved") return;
+    if (r.date) { set.add(r.date); return; }
+    if (r.startDate && r.endDate) {
+      const cur = new Date(r.startDate + "T00:00:00");
+      const end = new Date(r.endDate + "T00:00:00");
+      while (cur <= end) { set.add(formatDateKey(cur)); cur.setDate(cur.getDate() + 1); }
+    } else if (r.startDate) {
+      set.add(r.startDate);
+    }
+  });
+  return set;
+}
+
+// THE alert calculator. Returns one object per unresolved past workday, most
+// urgent first. Pure read: writes nothing.
+function getRegularisationAlerts(employee, now, settings) {
+  const emp = employee || null;
+  if (!emp || !emp.id) return [];
+  const s = settings || getAttendanceSettings();
+  const n = now || getNowIST();
+  const todayKey = formatDateKey(n);
+
+  const records = getStore(STORAGE_KEYS.RECORDS, {});
+  const leaves  = getStore(STORAGE_KEYS.LEAVES, []);
+  const wfhList = getStore(STORAGE_KEYS.WFH, []);
+  const regs    = getStore(STORAGE_KEYS.REGULARISATIONS, []);
+
+  // Index this employee's regularisation requests by date.
+  const regByDate = {};
+  regs.forEach(r => { if (r.employeeId === emp.id) (regByDate[r.date] = regByDate[r.date] || []).push(r); });
+  const leaveDates = _approvedCoverageDates(leaves, emp.id);
+  const wfhDates   = _approvedCoverageDates(wfhList, emp.id);
+
+  // Scan window: ~3 months back (two months before the current one) through
+  // yesterday. A ~3-month reach keeps a day visible as "critical" after its
+  // next-month payroll close, while staying bounded (no unbounded history).
+  const ist = getISTDate(n);
+  const windowStart = new Date(ist.getFullYear(), ist.getMonth() - 2, 1);
+  const enrolledKey = emp.enrolledAt || null;
+  const alerts = [];
+
+  for (let cur = new Date(windowStart); ; cur.setDate(cur.getDate() + 1)) {
+    const dateStr = formatDateKey(cur);
+    if (dateStr >= todayKey) break;                       // exclude today & future
+    if (enrolledKey && dateStr < enrolledKey) continue;   // before enrollment
+    const dow = cur.getDay();
+    if (dow === 0 || dow === 6) continue;                 // weekends always excluded
+    if (isNonWorkingDay(dateStr, emp.id)) continue;       // declared/RH holidays off
+    if (leaveDates.has(dateStr) || wfhDates.has(dateStr)) continue; // approved leave/WFH
+
+    const rec = records[`${emp.id}_${dateStr}`];
+    let statusLabel = null;
+    if (rec) {
+      const st = rec.status;
+      if (st === "Absent") statusLabel = "Absent";
+      else if ((st === "Present" || st === "WFH") && isOpenPunch(rec)) statusLabel = "Absent";
+      // completed Present/WFH, Leave, Holiday, Loss of Pay => resolved, skip.
+    } else {
+      statusLabel = "Not Marked";
+    }
+    if (!statusLabel) continue;
+
+    // A live (not rejected/cancelled) request pending or approved resolves the day.
+    const dayRegs = regByDate[dateStr] || [];
+    if (dayRegs.some(r => r.status !== "Rejected" && r.status !== "Cancelled")) continue;
+    const rejected = dayRegs.some(r => r.status === "Rejected");
+
+    const deadlineKey = _payrollCutOffKeyFor(dateStr, s.payrollCutOffDay);
+    const daysLeft = deadlineKey ? _diffDays(todayKey, deadlineKey) : 0;
+    const pastCutOff = !deadlineKey || daysLeft < 0;
+    const urgency = pastCutOff ? "critical" : (daysLeft <= 3 ? "warning" : "info");
+
+    const when = _prettyDateKey(dateStr);
+    let message;
+    if (pastCutOff) {
+      message = `${when} was not regularised and is counted as a full day of LOP.`;
+    } else if (rejected) {
+      message = `${when} \u2014 regularisation request rejected, you can resubmit. Regularise by ${_prettyDateKey(deadlineKey)} or it will count as a full day of LOP.`;
+    } else {
+      message = `${when} is marked ${statusLabel}. Regularise by ${_prettyDateKey(deadlineKey)} or it will count as a full day of LOP.`;
+    }
+
+    alerts.push({
+      empId: emp.id, dateStr, statusLabel, daysLeft, pastCutOff, urgency,
+      rejected, deadlineKey, message,
+      occurredAt: `${dateStr}T23:59:59`
+    });
+  }
+
+  const RANK = { critical: 0, warning: 1, info: 2 };
+  alerts.sort((a, b) => (RANK[a.urgency] - RANK[b.urgency]) || (a.dateStr < b.dateStr ? -1 : a.dateStr > b.dateStr ? 1 : 0));
+  return alerts;
+}
+
+// Only a timestamp is stored per employee (never the alerts themselves). An
+// alert counts as unread if it became actionable after this time; it still
+// remains in the banner until the underlying day is resolved.
+function getRegAlertLastSeen(empId) {
+  const m = getStore(STORAGE_KEYS.REG_ALERT_LAST_SEEN, {}) || {};
+  return empId ? (m[empId] || null) : null;
+}
+
+function markRegAlertsSeen(empId) {
+  if (!empId) return;
+  const m = getStore(STORAGE_KEYS.REG_ALERT_LAST_SEEN, {}) || {};
+  m[empId] = new Date().toISOString();
+  setStore(STORAGE_KEYS.REG_ALERT_LAST_SEEN, m);
 }
 
 // Format a minute span as "Xh YYm" (always positive; caller adds the sign/word).

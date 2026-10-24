@@ -143,11 +143,11 @@ def verify_all():
     # shared rule used by every JS screen
     for f in [app, admin]:
         need("isNonWorkingDay" in f, "a screen does not use the shared isNonWorkingDay rule")
-    need("shared.js?v=20261024_rm3" in index_html and "shared.js?v=20261024_rm3" in admin_html,
+    need("shared.js?v=20261024_rm5" in index_html and "shared.js?v=20261024_rm5" in admin_html,
          "shared.js token not bumped")
-    need("app.js?v=20261024_rm3" in index_html, "app.js token not bumped")
-    need("admin.js?v=20261024_rm3" in admin_html, "admin.js token not bumped")
-    need("styles.css?v=20261024_rm4" in index_html and "styles.css?v=20261024_rm4" in admin_html,
+    need("app.js?v=20261024_rm5" in index_html, "app.js token not bumped")
+    need("admin.js?v=20261024_rm5" in admin_html, "admin.js token not bumped")
+    need("styles.css?v=20261024_rm6" in index_html and "styles.css?v=20261024_rm6" in admin_html,
          "styles.css token not bumped")
     # text + icon holiday states, not colour alone
     for cls in [".holiday-today-card", ".pill-holiday", ".badge-holidaywork", ".cell-holiday-work"]:

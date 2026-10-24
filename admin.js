@@ -3117,6 +3117,18 @@ function renderDashboard() {
   setTextSafe("dashStatLeave", onLeave);
   setTextSafe("dashStatPending", pending);
 
+  // How many employees still have an actionable absence BEFORE the payroll
+  // cut-off (days already past the cut-off are counted as LOP, not "unresolved").
+  let unresolvedEmployees = 0;
+  const dashSettings = (typeof getAttendanceSettings === "function") ? getAttendanceSettings() : null;
+  employees.forEach(emp => {
+    try {
+      const al = (typeof getRegularisationAlerts === "function") ? getRegularisationAlerts(emp, now, dashSettings) : [];
+      if (al && al.some(a => !a.pastCutOff)) unresolvedEmployees++;
+    } catch (e) { /* non-fatal */ }
+  });
+  setTextSafe("dashStatUnresolved", unresolvedEmployees);
+
   const tbody = document.getElementById("dashTodayTableBody");
   if (tbody) {
     tbody.innerHTML = rows.join("");

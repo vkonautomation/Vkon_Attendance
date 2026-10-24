@@ -10408,6 +10408,81 @@ body:not(.light-theme) .notif-dropdown { background: #101725; border-color: var(
 .ni-when { font-size: 0.68rem; color: var(--text-muted, #94a3b8); }
 .notif-empty { padding: 1rem 1.1rem; font-size: 0.78rem; color: var(--text-muted, #64748b); line-height: 1.55; margin: 0; }
 
+/* ==========================================================================
+   REGULARISATION ALERTS — dashboard warning banner, notification-panel rows,
+   calendar "needs action" pill and the manager "team needs attention" chip.
+   Urgency is carried by icon + text, never colour alone. Light is the default;
+   dark overrides via body:not(.light-theme).
+   ========================================================================== */
+.reg-alert-banner.rab-hidden { display: none !important; }
+.reg-alert-banner { margin: 0 0 1.25rem; padding: 1rem 1.1rem; border-radius: 16px; border: 1px solid #fcd34d; background: #fffbeb; }
+body:not(.light-theme) .reg-alert-banner { background: rgba(245, 158, 11, 0.08); border-color: rgba(245, 158, 11, 0.32); }
+.rab-head { display: flex; align-items: flex-start; gap: 0.7rem; margin-bottom: 0.75rem; }
+.rab-icon { flex: 0 0 auto; width: 2rem; height: 2rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(217, 119, 6, 0.16); color: #b45309; font-size: 0.95rem; }
+body:not(.light-theme) .rab-icon { background: rgba(251, 191, 36, 0.16); color: #fbbf24; }
+.rab-titles { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+.rab-title { font-size: 0.98rem; font-weight: 800; color: #92400e; }
+body:not(.light-theme) .rab-title { color: #fcd34d; }
+.rab-sub { font-size: 0.78rem; color: #a16207; line-height: 1.45; }
+body:not(.light-theme) .rab-sub { color: #d6b98a; }
+.rab-list { display: flex; flex-direction: column; gap: 0.55rem; }
+.rab-item { display: flex; align-items: flex-start; gap: 0.65rem; padding: 0.7rem 0.8rem; border-radius: 12px; background: #fff; border: 1px solid #e2e8f0; border-left-width: 4px; }
+body:not(.light-theme) .rab-item { background: rgba(148, 163, 184, 0.07); border-color: var(--border-glass, rgba(148, 163, 184, 0.2)); }
+.rab-item.rab-info { border-left-color: #3b82f6; }
+.rab-item.rab-warning { border-left-color: #f59e0b; }
+.rab-item.rab-critical { border-left-color: #dc2626; }
+.rab-item-icon { flex: 0 0 auto; margin-top: 0.1rem; font-size: 0.95rem; }
+.rab-info .rab-item-icon { color: #2563eb; }
+.rab-warning .rab-item-icon { color: #d97706; }
+.rab-critical .rab-item-icon { color: #dc2626; }
+.rab-item-main { display: flex; flex-direction: column; gap: 0.3rem; flex: 1 1 auto; min-width: 0; }
+.rab-item-msg { font-size: 0.82rem; line-height: 1.45; color: var(--text-strong, #1e293b); }
+body:not(.light-theme) .rab-item-msg { color: #e2e8f0; }
+.rab-item-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
+.rab-chip { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.68rem; font-weight: 700; padding: 0.14rem 0.5rem; border-radius: 999px; }
+.rab-chip-info { background: rgba(59, 130, 246, 0.14); color: #1d4ed8; }
+.rab-chip-warning { background: rgba(245, 158, 11, 0.16); color: #b45309; }
+.rab-chip-critical { background: rgba(220, 38, 38, 0.14); color: #b91c1c; }
+body:not(.light-theme) .rab-chip-info { color: #93c5fd; }
+body:not(.light-theme) .rab-chip-warning { color: #fcd34d; }
+body:not(.light-theme) .rab-chip-critical { color: #fca5a5; }
+.rab-status { font-size: 0.7rem; font-weight: 700; color: var(--text-muted, #64748b); text-transform: uppercase; letter-spacing: 0.02em; }
+.rab-reg-btn { flex: 0 0 auto; align-self: center; }
+.rab-expand { display: inline-flex; align-items: center; gap: 0.4rem; margin-top: 0.6rem; background: none; border: 0; cursor: pointer; font: inherit; font-size: 0.78rem; font-weight: 700; color: #b45309; padding: 0.2rem 0; }
+body:not(.light-theme) .rab-expand { color: #fbbf24; }
+
+/* --- Notification-panel alert rows (above the stored notifications) --- */
+.notif-alerts { border-bottom: 1px solid rgba(100, 116, 139, 0.16); }
+.notif-alerts:empty { display: none; }
+.na-group-head { display: flex; align-items: center; gap: 0.4rem; padding: 0.55rem 0.9rem; font-size: 0.72rem; font-weight: 800; color: #b45309; background: rgba(245, 158, 11, 0.08); }
+body:not(.light-theme) .na-group-head { color: #fbbf24; }
+.na-item { display: flex; gap: 0.6rem; align-items: flex-start; width: 100%; text-align: left; background: none; border: 0; border-bottom: 1px solid rgba(100, 116, 139, 0.12); padding: 0.6rem 0.9rem; color: inherit; cursor: pointer; font: inherit; }
+.na-item:last-child { border-bottom: 0; }
+.na-item:hover { background: rgba(99, 102, 241, 0.06); }
+.na-item > i { margin-top: 0.2rem; font-size: 0.85rem; flex: 0 0 auto; }
+.na-info > i { color: #2563eb; }
+.na-warning > i { color: #d97706; }
+.na-critical > i { color: #dc2626; }
+.na-item.unread { background: rgba(99, 102, 241, 0.05); }
+.na-item.unread .ni-title::after { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #f43f5e; margin-left: 0.4rem; vertical-align: middle; }
+.na-item .ni-title { font-size: 0.72rem; color: var(--text-muted, #64748b); font-family: var(--font-mono, monospace); }
+.na-item .rab-chip { margin-top: 0.25rem; }
+
+/* --- Calendar header "needs action" pill --- */
+.needs-action-pill { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.72rem; font-weight: 800; padding: 0.28rem 0.6rem; border-radius: 999px; background: rgba(220, 38, 38, 0.12); color: #b91c1c; }
+body:not(.light-theme) .needs-action-pill { background: rgba(248, 113, 113, 0.16); color: #fca5a5; }
+
+/* --- Manager "team needs attention" chip in Team Requests --- */
+.team-attention-banner { display: flex; align-items: center; gap: 0.5rem; margin: -0.5rem 0 1rem; padding: 0.6rem 0.8rem; border-radius: 12px; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); color: #92400e; font-size: 0.8rem; font-weight: 700; }
+body:not(.light-theme) .team-attention-banner { background: rgba(245, 158, 11, 0.08); color: #fcd34d; }
+
+@media (max-width: 640px) {
+  .rab-item { flex-wrap: wrap; }
+  .rab-item-main { flex-basis: 100%; }
+  .rab-reg-btn { width: 100%; justify-content: center; }
+  .calendar-today-row { flex-wrap: wrap; }
+}
+
 /* --- My Tasks (portal view) --- */
 .my-tasks-summary { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.9rem; }
 .my-tasks-list { display: flex; flex-direction: column; gap: 0.55rem; }

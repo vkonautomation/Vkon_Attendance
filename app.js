@@ -300,6 +300,8 @@ function loadEmployeeSession(emp) {
   try { renderMyTasks(); } catch (e) { console.error("renderMyTasks err:", e); }
   // Surface admin decisions (approvals, task assignments) as notifications.
   try { syncAdminUpdates(emp.id); renderNotifications(emp.id); } catch (e) { console.error("notifications err:", e); }
+  // Dashboard warning banner for unresolved past workdays (recomputed, not stored).
+  try { renderRegAlertBanner(); } catch (e) { console.error("reg banner err:", e); }
   // Reveal the Team Requests manager surface only for employees with reports.
   try { initTeamRequestsNav(emp); } catch (e) { console.error("initTeamRequestsNav err:", e); }
 }
@@ -311,6 +313,7 @@ function loadEmployeeSession(emp) {
 function initClock() {
   const clockTime = document.getElementById("clockTime");
   const clockDate = document.getElementById("clockDate");
+  let lastDayKey = (typeof getPresentDate === "function") ? formatDateKey(getPresentDate()) : formatDateKey(new Date());
 
   function update() {
     const istNow = (typeof getNowIST === "function") ? getNowIST() : new Date();
@@ -327,6 +330,16 @@ function initClock() {
       year: "numeric"
     });
     clockDate.textContent = `${dateFormatted} • IST`;
+
+    // Day-rollover: recompute the derived alerts when the date changes while the
+    // tab stays open (a day moves from "before cut-off" to "Counted as LOP").
+    const dayKey = formatDateKey(pDate);
+    if (dayKey !== lastDayKey) {
+      lastDayKey = dayKey;
+      try { renderMonthlyCalendar(); } catch (e) { /* non-fatal */ }
+      try { renderRegAlertBanner(); } catch (e) { /* non-fatal */ }
+      try { if (employeeState.currentEmployee) renderNotifications(employeeState.currentEmployee.id); } catch (e) { /* non-fatal */ }
+    }
   }
   update();
   setInterval(update, 1000);
@@ -628,6 +641,17 @@ function renderMonthlyCalendar() {
   if (statA) statA.textContent = countAbsent;
   const statNM = document.getElementById("statsNotMarkedCount");
   if (statNM) statNM.textContent = countNotMarked;
+
+  // Calendar header: how many past workdays still need a regularisation action.
+  const naPill = document.getElementById("calendarNeedsActionPill");
+  const naCount = document.getElementById("calendarNeedsActionCount");
+  if (naPill && naCount && employeeState.currentEmployee) {
+    const needAction = _regAlertsFor(employeeState.currentEmployee.id).length;
+    naCount.textContent = String(needAction);
+    naPill.style.display = needAction ? "" : "none";
+  } else if (naPill) {
+    naPill.style.display = "none";
+  }
 }
 
 function openDayDetailsModal(dateStr, record, isWeekend, declaredHoliday) {
@@ -3206,7 +3230,7 @@ function syncAdminUpdates(empId) {
     const last = trail.length ? trail[trail.length - 1] : null;
     const reason = r.rejectionReason || (last && last.decision === "rejected" ? last.comment : "");
     const dates = r.date || (r.startDate ? (r.startDate === r.endDate ? r.startDate : `${r.startDate} \u2192 ${r.endDate}`) : "");
-    if (st === "Approved") return { kind: "approved", title: `${typeLabel} Approved`, text: `Your ${typeLabel} request (${dates}) was approved${last && last.approverName ? " by " + last.approverName : ""}.` };
+    if (st === "Approved") return { kind: "approved", title: `${typeLabel} Approved`, text: `Your ${typeLabel} request (${dates}) was approved${last && last.approverName ? " by " + last.approverName : ""}${last && last.comment ? ". Note: " + last.comment : ""}.` };
     if (st === "Rejected") return { kind: "rejected", title: `${typeLabel} Rejected`, text: `Your ${typeLabel} request (${dates}) was rejected${reason ? ". Reason: " + reason : ""}.` };
     if (st === "Cancelled") return { kind: "cancelled", title: `${typeLabel} Cancelled`, text: `Your ${typeLabel} request (${dates}) was cancelled.` };
     if (st === "Cancellation Requested") return { kind: "info", title: `${typeLabel} cancellation sent`, text: `Your cancellation for (${dates}) was sent to Admin.` };
@@ -3268,10 +3292,12 @@ function renderNotifications(empId) {
   if (!empId) return;
 
   const items = getNotificationsFor(empId).slice().reverse(); // newest first
-  const unread = items.filter(n => !n.read).length;
+  const notifUnread = items.filter(n => !n.read).length;
+  const alertInfo = renderNotifAlerts(empId);
+  const unread = notifUnread + alertInfo.unread;
   badge.textContent = unread > 9 ? "9+" : String(unread);
   badge.style.display = unread ? "" : "none";
-  if (emptyEl) emptyEl.style.display = items.length ? "none" : "";
+  if (emptyEl) emptyEl.style.display = (items.length || alertInfo.total) ? "none" : "";
 
   const ICONS = { task: "fa-list-check", approved: "fa-circle-check", rejected: "fa-circle-xmark", cancelled: "fa-rotate-left", info: "fa-circle-info" };
   listEl.innerHTML = items.map(n => `
@@ -3297,6 +3323,12 @@ function initNotifications() {
     const open = dd.style.display !== "none";
     dd.style.display = open ? "none" : "";
     bell.setAttribute("aria-expanded", String(!open));
+    // Opening the panel marks the regularisation alerts as seen (their unread
+    // dots clear); the alert itself stays in the banner until the day resolves.
+    if (!open && employeeState.currentEmployee && typeof markRegAlertsSeen === "function") {
+      markRegAlertsSeen(employeeState.currentEmployee.id);
+      renderNotifications(employeeState.currentEmployee.id);
+    }
   });
   document.addEventListener("click", (e) => {
     if (dd.style.display === "none") return;
@@ -3306,6 +3338,7 @@ function initNotifications() {
     markBtn.addEventListener("click", () => {
       if (employeeState.currentEmployee) {
         markNotificationsRead(employeeState.currentEmployee.id);
+        if (typeof markRegAlertsSeen === "function") markRegAlertsSeen(employeeState.currentEmployee.id);
         renderNotifications(employeeState.currentEmployee.id);
       }
     });
@@ -3321,6 +3354,159 @@ function initNotifications() {
     });
   }
 }
+
+// ============================================================================
+// 7c. REGULARISATION ALERTS (UI) — banner, notification panel, calendar pill.
+// The alerts themselves are computed by the pure shared function; nothing here
+// persists them. Only a per-employee "last seen" timestamp is stored.
+// ============================================================================
+const REG_ALERT_COLLAPSED = 3;   // banner shows this many, then "Show all"
+let regAlertsExpanded = false;
+
+function _regAlertsFor(empId) {
+  if (!empId || typeof getRegularisationAlerts !== "function") return [];
+  try {
+    const emp = (getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES).find(e => e.id === empId))
+      || (employeeState.currentEmployee && employeeState.currentEmployee.id === empId ? employeeState.currentEmployee : null);
+    if (!emp) return [];
+    const now = (typeof getPresentDate === "function") ? getPresentDate() : new Date();
+    return getRegularisationAlerts(emp, now, getAttendanceSettings()) || [];
+  } catch (e) { console.warn("reg alerts err:", e); return []; }
+}
+
+// Icon + text per urgency (never colour alone).
+function _regAlertUrgency(urgency) {
+  if (urgency === "critical") return { icon: "fa-circle-xmark", word: "Counted as LOP" };
+  if (urgency === "warning") return { icon: "fa-hourglass-half", word: "days left" };
+  return { icon: "fa-circle-info", word: "Open" };
+}
+
+function _regAlertChip(a) {
+  if (a.pastCutOff) return `<i class="fa-solid fa-circle-xmark"></i> Counted as LOP`;
+  const d = Math.max(0, a.daysLeft);
+  if (d <= 0) return `<i class="fa-solid fa-hourglass-half"></i> Due today`;
+  return `<i class="fa-solid fa-hourglass-half"></i> ${d} day${d === 1 ? "" : "s"} left`;
+}
+
+function _regAlertRowHtml(a, withButton) {
+  const u = _regAlertUrgency(a.urgency);
+  return `
+    <div class="rab-item rab-${a.urgency}">
+      <span class="rab-item-icon"><i class="fa-solid ${u.icon}"></i></span>
+      <div class="rab-item-main">
+        <span class="rab-item-msg">${a.message}</span>
+        <span class="rab-item-meta">
+          <span class="rab-chip rab-chip-${a.urgency}">${_regAlertChip(a)}</span>
+          <span class="rab-status">${a.statusLabel}</span>
+        </span>
+      </div>
+      ${withButton ? `<button type="button" class="btn btn-xs btn-primary rab-reg-btn" data-reg-date="${a.dateStr}"><i class="fa-solid fa-wand-magic-sparkles"></i> Regularise</button>` : ""}
+    </div>`;
+}
+
+// Dashboard warning banner (top of the Dashboard). Grouping + expandable list,
+// most urgent first (the shared function already sorts by urgency then date).
+function renderRegAlertBanner() {
+  const section = document.getElementById("sectionRegAlertBanner");
+  if (!section) return;
+  const emp = employeeState.currentEmployee;
+  const alerts = emp ? _regAlertsFor(emp.id) : [];
+  if (!alerts.length) {
+    section.classList.add("rab-hidden");
+    const listEl = document.getElementById("regAlertBannerList");
+    if (listEl) listEl.innerHTML = "";
+    return;
+  }
+  section.classList.remove("rab-hidden");
+
+  const crit = alerts.filter(a => a.pastCutOff).length;
+  const title = document.getElementById("regAlertBannerTitle");
+  const sub = document.getElementById("regAlertBannerSub");
+  if (title) {
+    title.textContent = alerts.length === 1
+      ? "1 day needs regularisation"
+      : `${alerts.length} days need regularisation`;
+  }
+  if (sub) {
+    sub.textContent = crit
+      ? `${crit} of ${alerts.length} ${crit === 1 ? "day has" : "days have"} passed the payroll cut-off and are already counted as LOP.`
+      : "Regularise before the payroll cut-off to avoid a full day of LOP.";
+  }
+
+  const listEl = document.getElementById("regAlertBannerList");
+  const expand = document.getElementById("regAlertBannerExpand");
+  if (listEl) {
+    const shown = regAlertsExpanded ? alerts : alerts.slice(0, REG_ALERT_COLLAPSED);
+    listEl.innerHTML = shown.map(a => _regAlertRowHtml(a, true)).join("");
+    if (expand) {
+      if (alerts.length > REG_ALERT_COLLAPSED) {
+        expand.style.display = "";
+        expand.innerHTML = regAlertsExpanded
+          ? `<i class="fa-solid fa-chevron-up"></i> <span>Show less</span>`
+          : `<i class="fa-solid fa-chevron-down"></i> <span>Show all ${alerts.length} days</span>`;
+      } else { expand.style.display = "none"; }
+    }
+  }
+}
+
+// Compact alert rows inside the notifications dropdown; returns the unread
+// count (alerts that became actionable after the stored "last seen" time).
+function renderNotifAlerts(empId) {
+  const box = document.getElementById("notifAlerts");
+  if (!box) return { unread: 0, total: 0 };
+  const alerts = _regAlertsFor(empId);
+  if (!alerts.length) { box.innerHTML = ""; box.style.display = "none"; return { unread: 0, total: 0 }; }
+  box.style.display = "";
+  const lastSeen = (typeof getRegAlertLastSeen === "function") ? getRegAlertLastSeen(empId) : null;
+  const seenT = lastSeen ? new Date(lastSeen).getTime() : 0;
+  const isUnread = a => !seenT || new Date(a.occurredAt).getTime() > seenT;
+  box.innerHTML = `<div class="na-group-head"><i class="fa-solid fa-triangle-exclamation"></i> ${alerts.length} day${alerts.length === 1 ? "" : "s"} need regularisation</div>` +
+    alerts.map(a => {
+      const u = _regAlertUrgency(a.urgency);
+      return `
+        <button type="button" class="na-item na-${a.urgency}${isUnread(a) ? " unread" : ""}" data-reg-date="${a.dateStr}">
+          <i class="fa-solid ${u.icon}"></i>
+          <span class="ni-body">
+            <span class="ni-title">${a.dateStr}</span>
+            <span class="ni-text">${a.message}</span>
+            <span class="rab-chip rab-chip-${a.urgency}">${_regAlertChip(a)}</span>
+          </span>
+        </button>`;
+    }).join("");
+  return { unread: alerts.filter(isUnread).length, total: alerts.length };
+}
+
+function initRegAlertBanner() {
+  const expand = document.getElementById("regAlertBannerExpand");
+  if (expand && !expand.dataset.bound) {
+    expand.dataset.bound = "1";
+    expand.addEventListener("click", () => { regAlertsExpanded = !regAlertsExpanded; renderRegAlertBanner(); });
+  }
+  const listEl = document.getElementById("regAlertBannerList");
+  if (listEl && !listEl.dataset.bound) {
+    listEl.dataset.bound = "1";
+    listEl.addEventListener("click", (e) => {
+      const btn = e.target.closest(".rab-reg-btn");
+      if (!btn) return;
+      quickRegulariseDate(btn.getAttribute("data-reg-date"));
+    });
+  }
+  // Dropdown alert rows open the Regularisation view for that date.
+  const box = document.getElementById("notifAlerts");
+  if (box && !box.dataset.bound) {
+    box.dataset.bound = "1";
+    box.addEventListener("click", (e) => {
+      const row = e.target.closest(".na-item");
+      if (!row) return;
+      const dd = document.getElementById("notifDropdown");
+      const bell = document.getElementById("notifBellBtn");
+      if (dd) dd.style.display = "none";
+      if (bell) bell.setAttribute("aria-expanded", "false");
+      quickRegulariseDate(row.getAttribute("data-reg-date"));
+    });
+  }
+}
+
 
 // My Tasks — the employee's own view of the Admin Task Board. Read the items
 // and act on them (Start / Mark Done); the admin's board reflects it instantly.
@@ -3586,6 +3772,21 @@ function renderTeamRequests() {
     const n = getDirectReports(emp.id).length;
     heading.textContent = `${n} direct report${n === 1 ? "" : "s"}`;
   }
+  // View-only "Team needs attention" count: unresolved past workdays across all
+  // direct reports (a manager never regularises for them, just sees the pressure).
+  const attnEl = document.getElementById("teamNeedsAttention");
+  const attnText = document.getElementById("teamNeedsAttentionText");
+  if (attnEl && attnText && typeof getDirectReports === "function") {
+    let needDays = 0, needPeople = 0;
+    getDirectReports(emp.id).forEach(r => {
+      const c = _regAlertsFor(r.id).length;
+      if (c > 0) { needPeople++; needDays += c; }
+    });
+    if (needDays > 0) {
+      attnEl.style.display = "";
+      attnText.textContent = `${needPeople} team member${needPeople === 1 ? " has" : " have"} ${needDays} day${needDays === 1 ? "" : "s"} that need${needDays === 1 ? "s" : ""} regularisation`;
+    } else { attnEl.style.display = "none"; attnText.textContent = ""; }
+  }
   const items = (typeof getTeamRequests === "function") ? getTeamRequests(emp.id, ["Pending Manager"]) : [];
   if (emptyEl) emptyEl.style.display = items.length ? "none" : "block";
   listEl.innerHTML = items.map(it => teamReqCardHtml(it.type, it.request)).join("");
@@ -3763,6 +3964,7 @@ window.addEventListener("DOMContentLoaded", () => {
   try { initAuthSystem(); } catch (e) { console.error("Error in initAuthSystem:", e); }
   try { initPortalSideNav(); } catch (e) { console.error("Error in initPortalSideNav:", e); }
     try { initNotifications(); } catch (e) { console.error("Error in initNotifications:", e); }
+    try { initRegAlertBanner(); } catch (e) { console.error("Error in initRegAlertBanner:", e); }
   try { initActionHubToggles(); } catch (e) { console.error("Error in initActionHubToggles:", e); }
   try { initCalendarNav(); } catch (e) { console.error("Error in initCalendarNav:", e); }
   try { initLeaveBox(); } catch (e) { console.error("Error in initLeaveBox:", e); }
