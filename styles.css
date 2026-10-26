@@ -4317,6 +4317,12 @@ body.light-theme .reg-calendar-box {
   border: 1px solid rgba(239, 68, 68, 0.25);
 }
 
+.reg-legend-chip.legend-lop {
+  background: rgba(220, 38, 38, 0.10);
+  color: #dc2626;
+  border: 1px dashed rgba(220, 38, 38, 0.35);
+}
+
 .reg-legend-chip.legend-present {
   background: rgba(16, 185, 129, 0.12);
   color: #10b981;
@@ -4488,6 +4494,19 @@ body.light-theme .reg-calendar-box {
 .reg-cal-cell.reg-restricted.reg-already-applied .cell-mini-pill {
   background: rgba(234, 88, 12, 0.15);
   color: var(--color-primary, #ea580c);
+}
+
+/* Past that month's payroll cut-off: already a whole-day LOP, not regularisable */
+.reg-cal-cell.reg-restricted.reg-cutoff {
+  background: rgba(220, 38, 38, 0.10);
+  border-color: rgba(220, 38, 38, 0.28);
+}
+.reg-cal-cell.reg-restricted.reg-cutoff .cell-day-num {
+  color: #dc2626;
+}
+.reg-cal-cell.reg-restricted.reg-cutoff .cell-mini-pill {
+  background: rgba(220, 38, 38, 0.18);
+  color: #dc2626;
 }
 
 /* Eligible Missed Working Days */
@@ -6691,6 +6710,7 @@ body.light-theme .req {
 
 /* Darker legend chip text for readability on light surfaces */
 body.light-theme .reg-legend-chip.legend-missed { color: #b91c1c; }
+body.light-theme .reg-legend-chip.legend-lop { color: #b91c1c; }
 body.light-theme .reg-legend-chip.legend-present { color: #0c8a5d; }
 body.light-theme .reg-legend-chip.legend-wfh { color: #6d28d9; }
 body.light-theme .reg-legend-chip.legend-leave { color: #b45309; }
@@ -10254,6 +10274,16 @@ body:not(.light-theme) .cell-reg-view { background: var(--bg-card); border-color
 .cell-reg-quick:hover { background: #fff4ec; border-color: #f0b98a; color: #b1440c; transform: none; }
 body.light-theme .cell-reg-quick { background: #f8fafc; border-color: #d7deea; color: #475569; }
 body.light-theme .cell-reg-quick:hover { background: #fff4ec; border-color: #f0b98a; color: #b1440c; }
+/* "Not Marked" whose payroll cut-off has closed: the day is a whole-day LOP,
+   so it shows a locked, non-clickable note instead of a Regularise action. */
+.cell-lop-note {
+  display: inline-flex; align-items: center; gap: 0.3rem; margin-top: 0.35rem;
+  padding: 0.4rem 0.68rem; min-height: 38px; border-radius: var(--radius-sm, 8px);
+  border: 1px dashed #e4bcbc; background: #fdf6f6; color: #b91c1c;
+  font-size: 0.7rem; font-weight: 700;
+}
+.cell-lop-note i { font-size: 0.7rem; }
+body:not(.light-theme) .cell-lop-note { background: rgba(220, 38, 38, 0.10); border-color: rgba(248, 113, 113, 0.40); color: #fca5a5; }
 /* lighter, less repetitive "Not Marked" chip + cell fill */
 body.light-theme .day-badge-pill.badge-notmarked { background: #f8fafc; color: #64748b; border: 1px dashed #cbd5e1; }
 body.light-theme .calendar-day-cell:has(.badge-notmarked) { background: #fcfdff; border-color: #eef1f6; }
@@ -10448,6 +10478,15 @@ body:not(.light-theme) .rab-chip-warning { color: #fcd34d; }
 body:not(.light-theme) .rab-chip-critical { color: #fca5a5; }
 .rab-status { font-size: 0.7rem; font-weight: 700; color: var(--text-muted, #64748b); text-transform: uppercase; letter-spacing: 0.02em; }
 .rab-reg-btn { flex: 0 0 auto; align-self: center; }
+/* Past the payroll cut-off the day is already counted as LOP: no action. */
+.rab-locked {
+  flex: 0 0 auto; align-self: center; display: inline-flex; align-items: center; gap: 0.35rem;
+  font-size: 0.7rem; font-weight: 700; padding: 0.22rem 0.6rem; border-radius: 999px;
+  background: rgba(220, 38, 38, 0.10); color: #b91c1c;
+}
+body:not(.light-theme) .rab-locked { background: rgba(220, 38, 38, 0.16); color: #fca5a5; }
+.na-item.na-locked { cursor: default; }
+.na-item.na-locked:hover { background: none; }
 .rab-expand { display: inline-flex; align-items: center; gap: 0.4rem; margin-top: 0.6rem; background: none; border: 0; cursor: pointer; font: inherit; font-size: 0.78rem; font-weight: 700; color: #b45309; padding: 0.2rem 0; }
 body:not(.light-theme) .rab-expand { color: #fbbf24; }
 

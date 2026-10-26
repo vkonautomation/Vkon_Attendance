@@ -563,13 +563,25 @@ function renderMonthlyCalendar() {
             `;
             popData = { dateStr, punch: false, statusLabel: "Reg. Pending", chipClass: "badge-regpending", icon: "fa-hourglass-half", detail: "Regularisation awaiting admin review" };
           } else {
-            // No punch, no leave, no WFH, no pending request — needs regularisation
+            // No punch, no leave, no WFH, no pending request. If that month's
+            // payroll has already closed the day is a whole-day LOP and can no
+            // longer be regularised, so no action is offered.
             countNotMarked++;
-            badgeHtml = `
+            const cellCutOffDay = (typeof getAttendanceSettings === "function") ? (getAttendanceSettings() || {}).payrollCutOffDay : 1;
+            const cellPastCutOff = (typeof _isPastPayrollCutOff === "function") && _isPastPayrollCutOff(dateStr, cellCutOffDay);
+            if (cellPastCutOff) {
+              badgeHtml = `
+              <span class="day-badge-pill badge-notmarked" title="Day closed with no record and past the payroll cut-off &mdash; counted as a whole day of LOP"><i class="fa-solid fa-circle-half-stroke"></i> Not Marked</span>
+              <span class="cell-lop-note" title="Payroll for that month has closed &mdash; the day is already counted as a whole day of LOP"><i class="fa-solid fa-circle-xmark"></i> Counted as LOP</span>
+            `;
+              popData = { dateStr, punch: false, statusLabel: "Not Marked", chipClass: "badge-notmarked", icon: "fa-circle-half-stroke", detail: "Payroll closed \u2014 counted as a whole day of LOP" };
+            } else {
+              badgeHtml = `
               <span class="day-badge-pill badge-notmarked" title="Day closed with no record and no leave &mdash; raise a regularisation if you were working"><i class="fa-solid fa-circle-half-stroke"></i> Not Marked</span>
               <button type="button" class="cell-reg-quick" data-reg-date="${dateStr}" title="Request regularisation for ${dateStr}"><i class="fa-solid fa-wand-magic-sparkles"></i> Regularise</button>
             `;
-            popData = { dateStr, punch: false, statusLabel: "Not Marked", chipClass: "badge-notmarked", icon: "fa-circle-half-stroke", detail: "No punch or leave recorded" };
+              popData = { dateStr, punch: false, statusLabel: "Not Marked", chipClass: "badge-notmarked", icon: "fa-circle-half-stroke", detail: "No punch or leave recorded" };
+            }
           }
         } else if (isToday && !declaredHoliday && !isWeekend) {
           badgeHtml = `
@@ -2621,6 +2633,11 @@ function renderRegularisationCalendar() {
     const isFuture = dayDateZero > nowZero;
     const isTodayReg = dayDateZero.getTime() === nowZero.getTime();
     const isAlreadyReg = empRegs.some(r => r.date === dateStr);
+    // Once that month's payroll has closed an unresolved day is already a
+    // whole-day LOP, so it can no longer be regularised (same rule as the
+    // attendance calendar and the cut-off alerts).
+    const regCutOffDay = (typeof getAttendanceSettings === "function") ? (getAttendanceSettings() || {}).payrollCutOffDay : 1;
+    const isPastCutOff = !isFuture && (typeof _isPastPayrollCutOff === "function") && _isPastPayrollCutOff(dateStr, regCutOffDay);
 
     let isRestricted = false;
     let restrictionType = "";
@@ -2637,6 +2654,13 @@ function renderRegularisationCalendar() {
       restrictionType = "reg-future";
       badgeText = "Today";
       restrictionReason = "Today is still open \u2014 you can regularise from the next day";
+    } else if (isPastCutOff) {
+      isRestricted = true;
+      restrictionType = "reg-cutoff";
+      badgeText = "LOP";
+      restrictionReason = "Payroll for that month has closed \u2014 counted as a whole day of LOP";
+      // A closed day must never stay selected as if it were regularisable.
+      if (regCalendarState.selectedDateStr === dateStr) regCalendarState.selectedDateStr = "";
     } else if (isWeekend) {
       isRestricted = true;
       restrictionType = "reg-weekend";
@@ -2748,6 +2772,7 @@ function populateRegularisationEligibleDates() {
 
   const baseDate = new Date(employeeState.calendarCurrentDate || CURRENT_DATE);
   const eligibleDates = [];
+  const cutOffDay = (typeof getAttendanceSettings === "function") ? (getAttendanceSettings() || {}).payrollCutOffDay : 1;
 
   // Scan the past 30 days up to the day BEFORE today (today is still open).
   for (let i = 1; i <= 31; i++) {
@@ -2755,6 +2780,10 @@ function populateRegularisationEligibleDates() {
     d.setDate(baseDate.getDate() - i);
     const dayOfWeek = d.getDay();
     const dateStr = formatDateKey(d);
+
+    // Rule: Exclude dates past that month's payroll cut-off \u2014 already
+    // counted as a whole day of LOP, so not regularisable
+    if (typeof _isPastPayrollCutOff === "function" && _isPastPayrollCutOff(dateStr, cutOffDay)) continue;
 
     // Rule: Exclude weekends (0 = Sunday, 6 = Saturday)
     if (dayOfWeek === 0 || dayOfWeek === 6) continue;
@@ -3003,6 +3032,14 @@ function initAttendanceRegularisation() {
 
     if (!dateVal) {
       showToast("Please select an eligible working date for regularisation.", "warning");
+      return;
+    }
+
+    // A day can only be regularised until that month's payroll closes. Past the
+    // cut-off it is already counted as a whole day of LOP.
+    const submitCutOffDay = (typeof getAttendanceSettings === "function") ? (getAttendanceSettings() || {}).payrollCutOffDay : 1;
+    if (typeof _isPastPayrollCutOff === "function" && _isPastPayrollCutOff(dateVal, submitCutOffDay)) {
+      showToast(`Payroll for ${dateVal} has closed \u2014 that day is already counted as a whole day of LOP and can no longer be regularised.`, "warning");
       return;
     }
 
@@ -3400,7 +3437,7 @@ function _regAlertRowHtml(a, withButton) {
           <span class="rab-status">${a.statusLabel}</span>
         </span>
       </div>
-      ${withButton ? `<button type="button" class="btn btn-xs btn-primary rab-reg-btn" data-reg-date="${a.dateStr}"><i class="fa-solid fa-wand-magic-sparkles"></i> Regularise</button>` : ""}
+      ${withButton && !a.pastCutOff ? `<button type="button" class="btn btn-xs btn-primary rab-reg-btn" data-reg-date="${a.dateStr}"><i class="fa-solid fa-wand-magic-sparkles"></i> Regularise</button>` : (withButton && a.pastCutOff ? `<span class="rab-locked" title="Payroll for that month has closed &mdash; the day is already counted as LOP, so it can no longer be regularised"><i class="fa-solid fa-lock"></i> Cut-off passed</span>` : "")}
     </div>`;
 }
 
@@ -3463,15 +3500,18 @@ function renderNotifAlerts(empId) {
   box.innerHTML = `<div class="na-group-head"><i class="fa-solid fa-triangle-exclamation"></i> ${alerts.length} day${alerts.length === 1 ? "" : "s"} need regularisation</div>` +
     alerts.map(a => {
       const u = _regAlertUrgency(a.urgency);
-      return `
-        <button type="button" class="na-item na-${a.urgency}${isUnread(a) ? " unread" : ""}" data-reg-date="${a.dateStr}">
+      const inner = `
           <i class="fa-solid ${u.icon}"></i>
           <span class="ni-body">
             <span class="ni-title">${a.dateStr}</span>
             <span class="ni-text">${a.message}</span>
             <span class="rab-chip rab-chip-${a.urgency}">${_regAlertChip(a)}</span>
-          </span>
-        </button>`;
+          </span>`;
+      // Past the cut-off the day is already counted as LOP: show it for
+      // information only and never open the regularisation form from it.
+      return a.pastCutOff
+        ? `<div class="na-item na-${a.urgency} na-locked" title="Payroll closed \u2014 already counted as LOP">${inner}</div>`
+        : `<button type="button" class="na-item na-${a.urgency}${isUnread(a) ? " unread" : ""}" data-reg-date="${a.dateStr}">${inner}</button>`;
     }).join("");
   return { unread: alerts.filter(isUnread).length, total: alerts.length };
 }
@@ -3498,6 +3538,8 @@ function initRegAlertBanner() {
     box.addEventListener("click", (e) => {
       const row = e.target.closest(".na-item");
       if (!row) return;
+      // Past-cut-off rows are informational only (no date to regularise).
+      if (!row.getAttribute("data-reg-date")) return;
       const dd = document.getElementById("notifDropdown");
       const bell = document.getElementById("notifBellBtn");
       if (dd) dd.style.display = "none";
