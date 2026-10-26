@@ -1,0 +1,41 @@
+# Nothing below may ever enter the image. The container serves the public
+# front-end only, so repository history, secrets, runtime data and the test
+# suite are excluded here as well as by the explicit COPY list in the Dockerfile.
+
+# Version control history (source + secret disclosure if it were ever served)
+.git/
+.gitignore
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+
+# Runtime data: SQLite database, WAL sidecars, captured photos/selfies
+data/
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+photos/
+
+# Local tooling / dependencies
+.venv/
+venv/
+node_modules/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Backend source (must never be reachable as a static file)
+server/
+
+# Tests and docs are not part of the served site
+test_*.py
+test_*.js
+verify_*.py
+README.md
+Dockerfile
+docker-compose.yml
+.dockerignore

@@ -79,13 +79,14 @@ function makeDefaultAvatarSvg(name, skinHex, hairHex, shirtHex, initials) {
   return "data:image/svg+xml;utf8," + encodeURIComponent(svg);
 }
 
-// Initial Company Staff Roster with Passwords, Leave Quotas, Geofence Enforcement, and Master Photos
+// Initial Company Staff Roster: Leave Quotas, Geofence Enforcement, and Master Photos.
+// No credentials ship with this roster -- see the demo-authentication note below
+// for how sign-in works now that every password field is gone.
 const DEFAULT_EMPLOYEES = [
   {
     id: "EMP001",
     name: "Mukesh Sharma",
     username: "mukesh",
-    password: "mukesh123",
     role: "Senior Full-Stack Engineer",
     department: "Engineering",
     avatar: makeDefaultAvatarSvg("Mukesh Sharma", "#d49b6a", "#1c1917", "#2563eb", "MS"),
@@ -99,7 +100,6 @@ const DEFAULT_EMPLOYEES = [
     id: "EMP002",
     name: "Priya Patel",
     username: "priya",
-    password: "priya123",
     role: "UI/UX Product Designer",
     department: "Product",
     avatar: makeDefaultAvatarSvg("Priya Patel", "#e0a97a", "#292524", "#7c3aed", "PP"),
@@ -113,7 +113,6 @@ const DEFAULT_EMPLOYEES = [
     id: "EMP003",
     name: "Chiranth Gowda",
     username: "chiranth",
-    password: "chiranth123",
     role: "Engineering Manager",
     department: "Operations",
     avatar: makeDefaultAvatarSvg("Chiranth Gowda", "#c68b59", "#0f172a", "#059669", "CG"),
@@ -127,7 +126,6 @@ const DEFAULT_EMPLOYEES = [
     id: "EMP004",
     name: "Alex Chen",
     username: "alex",
-    password: "alex123",
     role: "DevOps & Cloud Architect",
     department: "Infrastructure",
     avatar: makeDefaultAvatarSvg("Alex Chen", "#f0c29a", "#1e1b4b", "#0891b2", "AC"),
@@ -139,10 +137,10 @@ const DEFAULT_EMPLOYEES = [
   }
 ];
 
-// Default Administrator Credentials (Editable by Admin in Settings)
+// Default Administrator Identity (username is editable by Admin in Settings).
+// No password is shipped: one exists only if it was created in this browser.
 const DEFAULT_ADMIN_CREDENTIALS = {
   username: "admin",
-  password: "admin123",
   name: "VKON Executive Administrator",
   role: "System Administrator",
   updatedAt: "2026-10-08"
@@ -150,7 +148,7 @@ const DEFAULT_ADMIN_CREDENTIALS = {
 
 function getAdminCredentials() {
   const creds = getStore(STORAGE_KEYS.ADMIN_CREDENTIALS, DEFAULT_ADMIN_CREDENTIALS);
-  if (!creds || !creds.username || !creds.password) {
+  if (!creds || !creds.username) {
     return DEFAULT_ADMIN_CREDENTIALS;
   }
   return creds;
@@ -162,6 +160,98 @@ function setAdminCredentials(newCreds) {
 
 // For legacy references
 const ADMIN_CREDENTIALS = getAdminCredentials();
+
+// ============================================================================
+//  TEMPORARY DEMO AUTHENTICATION -- THIS IS *NOT* A SECURITY CONTROL
+// ============================================================================
+// Everything in this block exists so the offline demo can be clicked through
+// without a backend. It is not authentication: the browser holds both sides of
+// the check, so anything here can be read, replayed or rewritten with developer
+// tools. Real sign-in must be done by the server (a login endpoint that verifies
+// a salted hash and issues an httpOnly session cookie). Delete this block once
+// that endpoint exists.
+//
+//  * No credential is shipped anywhere in this repository or in the image.
+//  * A password is enforced only when one exists on the local record (Admin
+//    Settings -> master password, or a roster entry that has one). With no local
+//    password the check falls back to the identity alone.
+//  * It never echoes, prints, stores in a message, or logs a credential.
+//  * It is OFF unless the app is served from a local origin, so a deployed build
+//    fails closed instead of pretending to authenticate.
+// ============================================================================
+const DEMO_AUTH_FLAG_KEY = "vkon_demo_auth_v1"; // local override: "on" | "off"
+
+// Shown whenever sign-in cannot be offered at all. Generic on purpose: it names
+// no account, no password and no internal detail.
+const DEMO_AUTH_UNAVAILABLE_MSG = "Sign-in is unavailable in this build: demo authentication is disabled outside a local environment and no authentication server is configured.";
+
+function _isLocalOrigin() {
+  try {
+    if (window.location.protocol === "file:") return true;
+    const h = String(window.location.hostname || "").toLowerCase();
+    return h === "localhost" || h === "127.0.0.1" || h === "::1" || h === "[::1]";
+  } catch (e) {
+    // No window (node test harness) or a blocked location: treat as not local.
+    return false;
+  }
+}
+
+// Defaults to OFF in production. Only a local origin turns it on, and an
+// explicit stored override can force either state while testing.
+function demoAuthEnabled() {
+  let forced = null;
+  try { forced = localStorage.getItem(DEMO_AUTH_FLAG_KEY); } catch (e) { /* private mode */ }
+  if (forced === "on") return true;
+  if (forced === "off") return false;
+  return _isLocalOrigin();
+}
+
+function setDemoAuthFlag(state) {
+  try {
+    if (state === "on" || state === "off") localStorage.setItem(DEMO_AUTH_FLAG_KEY, state);
+    else localStorage.removeItem(DEMO_AUTH_FLAG_KEY);
+  } catch (e) { /* ignore */ }
+}
+
+// Resolve a roster entry from whatever the user typed: username, Employee ID or
+// work email. Returns null when nothing matches.
+function _findEmployeeByIdentifier(list, identifier) {
+  const id = String(identifier || "").trim().toLowerCase();
+  if (!id) return null;
+  return list.find(e =>
+    String(e.username || "").toLowerCase() === id ||
+    String(e.id || "").toLowerCase() === id ||
+    String(e.email || "").toLowerCase() === id
+  ) || null;
+}
+
+// The single client-side sign-in check. Returns one of:
+//   { code: "unconfigured" }               demo auth is off -> the caller must deny
+//   { code: "invalid" }                    unknown identity, or wrong password
+//   { code: "admin" }                      administrator identity accepted
+//   { code: "employee", employee: row }    roster identity accepted
+// Every outcome is a code: no message built here can carry a credential.
+function demoAuthenticate(identifier, password) {
+  if (!demoAuthEnabled()) return { code: "unconfigured" };
+
+  const id = String(identifier || "").trim().toLowerCase();
+  if (!id) return { code: "invalid" };
+
+  const adminCreds = getAdminCredentials();
+  if (id === String(adminCreds.username || "").toLowerCase() || id === "admin") {
+    const secret = adminCreds.password || "";
+    if (secret && secret !== password) return { code: "invalid" };
+    return { code: "admin" };
+  }
+
+  const roster = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
+  const emp = _findEmployeeByIdentifier(roster, id) || _findEmployeeByIdentifier(DEFAULT_EMPLOYEES, id);
+  if (!emp) return { code: "invalid" };
+
+  const secret = emp.password || "";
+  if (secret && secret !== password) return { code: "invalid" };
+  return { code: "employee", employee: emp };
+}
 
 const DEFAULT_GLOBAL_LEAVE_QUOTAS = {
   personalLeave: 14,

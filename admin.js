@@ -43,25 +43,44 @@ function checkAdminAuth() {
 
       const quickBtn = document.getElementById("quickFillAdminBtn");
       if (quickBtn) {
+        // Identity only -- no credential is filled in, printed or stored.
         quickBtn.onclick = () => {
-          document.getElementById("adminOverlayUsername").value = "admin";
-          document.getElementById("adminOverlayPassword").value = "admin123";
+          const u = document.getElementById("adminOverlayUsername");
+          if (u) u.value = getAdminCredentials().username || "admin";
           loginForm.dispatchEvent(new Event("submit"));
         };
       }
 
+      function showOverlayAlert(title, message) {
+        if (!errorAlert) return;
+        const t = document.getElementById("adminLoginErrorTitle");
+        const m = document.getElementById("adminLoginErrorMessage");
+        if (t) t.textContent = title;
+        if (m) m.textContent = message;
+        errorAlert.style.display = "flex";
+        errorAlert.classList.remove("shake");
+        void errorAlert.offsetWidth;
+        errorAlert.classList.add("shake");
+      }
+
       loginForm.onsubmit = (e) => {
         e.preventDefault();
-        const enteredUser = document.getElementById("adminOverlayUsername").value.trim().toLowerCase();
-        const enteredPass = document.getElementById("adminOverlayPassword").value.trim();
-        const currentCreds = getAdminCredentials();
+        const enteredUser = document.getElementById("adminOverlayUsername").value;
+        const enteredPass = document.getElementById("adminOverlayPassword").value;
 
-        // 1. Verify Admin credentials (case-insensitive username, supports current or default password)
-        const isAdminMatch = (enteredUser === currentCreds.username.toLowerCase() || enteredUser === "admin") && 
-                             (enteredPass === currentCreds.password || enteredPass === DEFAULT_ADMIN_CREDENTIALS.password);
+        // TEMPORARY demo check only -- see the demo-auth note in shared.js. It
+        // returns a code, so nothing below can echo a credential back.
+        const result = demoAuthenticate(enteredUser, enteredPass);
 
-        if (isAdminMatch) {
+        if (result.code === "unconfigured") {
+          showOverlayAlert("Sign-In Unavailable", DEMO_AUTH_UNAVAILABLE_MSG);
+          showToast("Sign-in is unavailable in this build.", "error");
+          return;
+        }
+
+        if (result.code === "admin") {
           if (errorAlert) errorAlert.style.display = "none";
+          const currentCreds = getAdminCredentials();
           const adminSession = {
             username: currentCreds.username,
             name: currentCreds.name || "VKON Executive Administrator",
@@ -76,35 +95,25 @@ function checkAdminAuth() {
           return;
         }
 
-        // 2. Cross-login: Check if employee credentials were submitted
-        const employees = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
-        let empMatch = employees.find(emp => emp.username.toLowerCase() === enteredUser && emp.password === enteredPass);
-        if (!empMatch) {
-          empMatch = DEFAULT_EMPLOYEES.find(emp => emp.username.toLowerCase() === enteredUser && emp.password === enteredPass);
-        }
-
-        if (empMatch) {
+        if (result.code === "employee") {
+          // Cross-login: an employee identity was typed on the admin form.
           const sessionData = {
-            username: empMatch.username,
-            employeeId: empMatch.id,
+            username: result.employee.username,
+            employeeId: result.employee.id,
             role: "employee",
             loginTime: new Date().toISOString()
           };
           sessionStorage.setItem(STORAGE_KEYS.CURRENT_SESSION, JSON.stringify(sessionData));
           localStorage.setItem(STORAGE_KEYS.CURRENT_SESSION, JSON.stringify(sessionData));
-          showToast(`Welcome ${empMatch.name}! Opening Employee Portal...`, "info");
+          showToast(`Welcome ${result.employee.name}! Opening Employee Portal...`, "info");
           setTimeout(() => { window.location.href = "index.html"; }, 350);
           return;
         }
 
-        // If neither matched:
-        if (errorAlert) {
-          errorAlert.style.display = "flex";
-          errorAlert.classList.remove("shake");
-          void errorAlert.offsetWidth;
-          errorAlert.classList.add("shake");
-        }
-        showToast("Invalid credentials. Try admin / admin123", "error");
+        // Neither identity matched. Generic wording only: it never names an
+        // account and never suggests what would have worked.
+        showOverlayAlert("Access Denied: Invalid Credentials", "The username or password you entered is incorrect. Please verify your credentials and try again.");
+        showToast("Invalid credentials.", "error");
       };
     }
     return false;
@@ -1050,7 +1059,7 @@ function openEditEmployeeModal(empId) {
   document.getElementById("editEmpName").value = emp.name;
   document.getElementById("editEmpRole").value = emp.role;
   document.getElementById("editEmpUsername").value = emp.username;
-  document.getElementById("editEmpPassword").value = emp.password;
+  document.getElementById("editEmpPassword").value = emp.password || "";
   document.getElementById("editEmpGeofenceRule").value = emp.geofenceEnforcement || "required";
   const joinInput = document.getElementById("editEmpJoinDate");
   if (joinInput) joinInput.value = emp.enrolledAt || "";
@@ -1261,7 +1270,9 @@ function initEnrollmentForm() {
     const joinDateInput = document.getElementById("newEmpJoinDate");
     const newMgrSel = document.getElementById("newEmpManager");
 
-    if (!name || !role || !username || !password) return;
+    // A password is optional in this build: while none is stored, the temporary
+    // demo check accepts the identity alone (see shared.js).
+    if (!name || !role || !username) return;
 
     const employees = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
     if (employees.some(emp => emp.username === username)) {
@@ -2938,8 +2949,11 @@ function initAdminAccountForm() {
 
     const activeCreds = getAdminCredentials();
 
-    // 1. Verify current password
-    if (currentPass !== activeCreds.password) {
+    // 1. Verify the current password -- but only when one exists in this
+    // browser. No password ships with the app, so "no local secret" is the
+    // first-run state and must not lock this form out permanently.
+    const hasLocalSecret = Boolean(activeCreds.password);
+    if (hasLocalSecret && currentPass !== activeCreds.password) {
       showAccountError("The Current Master Password you entered is incorrect. Access denied.", "Verification Failed");
       showToast("Current password incorrect.", "error");
       return;
@@ -2994,7 +3008,7 @@ function initAdminAccountForm() {
   // Reset to factory defaults
   if (resetBtn) {
     resetBtn.addEventListener("click", () => {
-      if (confirm("Reset administrator credentials back to factory defaults (admin / admin123)?")) {
+      if (confirm("Reset the administrator username to the default and clear the password stored in this browser?")) {
         setAdminCredentials(DEFAULT_ADMIN_CREDENTIALS);
         const currentSession = getStore(STORAGE_KEYS.CURRENT_SESSION, {});
         if (currentSession && currentSession.role === "admin") {
@@ -3006,7 +3020,7 @@ function initAdminAccountForm() {
         document.getElementById("newAdminUsername").value = DEFAULT_ADMIN_CREDENTIALS.username;
         document.getElementById("newAdminPassword").value = "";
         document.getElementById("confirmAdminPassword").value = "";
-        showAccountSuccess("Reset to factory defaults: username 'admin', password 'admin123'.");
+        showAccountSuccess(`Administrator username reset to '${DEFAULT_ADMIN_CREDENTIALS.username}' and the password stored in this browser has been cleared.`);
         showToast("Admin credentials reset to defaults.", "info");
       }
     });

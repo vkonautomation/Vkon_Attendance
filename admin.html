@@ -66,10 +66,10 @@
         </div>
 
         <div class="form-group">
-          <label for="adminOverlayPassword">Master Password <span class="req">*</span></label>
+          <label for="adminOverlayPassword">Master Password</label>
           <div class="input-icon-wrap">
             <i class="fa-solid fa-key input-icon"></i>
-            <input type="password" id="adminOverlayPassword" required class="form-control" placeholder="Enter master password" autocomplete="current-password">
+            <input type="password" id="adminOverlayPassword" class="form-control" placeholder="Enter master password (only if one was set)" autocomplete="current-password">
             <button type="button" class="input-affix-btn toggle-password" aria-pressed="false" aria-label="Show password" tabindex="-1"><i class="fa-solid fa-eye" aria-hidden="true"></i></button>
           </div>
         </div>
@@ -78,7 +78,7 @@
           <span>Restricted area &mdash; administrator credentials required.</span>
           <div style="margin-top: 0.5rem;">
             <button type="button" id="quickFillAdminBtn" class="btn btn-ghost btn-xs" style="border: 1px solid var(--border-glass); padding: 5px 12px; border-radius: 6px; cursor: pointer; color: var(--text-muted); background: var(--bg-surface);">
-              <i class="fa-solid fa-key"></i> Auto-Fill Demo Credentials
+              <i class="fa-solid fa-user-shield"></i> Auto-Fill Administrator Username
             </button>
           </div>
         </div>
@@ -627,10 +627,10 @@
               </div>
 
               <div class="form-group">
-                <label for="newEmpPassword">Login Password <span class="req">*</span></label>
+                <label for="newEmpPassword">Login Password</label>
                 <div class="input-icon-wrap">
                   <i class="fa-solid fa-key input-icon"></i>
-                  <input type="password" id="newEmpPassword" required class="form-control" placeholder="Create password" autocomplete="new-password">
+                  <input type="password" id="newEmpPassword" class="form-control" placeholder="Optional &mdash; leave blank for demo sign-in" autocomplete="new-password">
                   <button type="button" class="input-affix-btn toggle-password" aria-pressed="false" aria-label="Show password" tabindex="-1"><i class="fa-solid fa-eye" aria-hidden="true"></i></button>
                 </div>
               </div>
@@ -1460,8 +1460,8 @@
               </div>
 
               <div style="margin-top: 1.5rem;">
-                <button type="button" id="resetAdminCredsBtn" class="btn btn-ghost btn-sm text-danger btn-block" title="Reset to default admin credentials">
-                  <i class="fa-solid fa-arrow-rotate-left"></i> Reset to Factory Default Credentials (admin / admin123)
+                <button type="button" id="resetAdminCredsBtn" class="btn btn-ghost btn-sm text-danger btn-block" title="Reset the administrator username and clear the password stored in this browser">
+                  <i class="fa-solid fa-arrow-rotate-left"></i> Reset Admin Username And Clear Local Password
                 </button>
               </div>
             </div>
@@ -1510,8 +1510,8 @@
               <input type="text" id="editEmpUsername" required class="form-control">
             </div>
             <div class="form-group">
-              <label for="editEmpPassword">Password <span class="req">*</span></label>
-              <input type="text" id="editEmpPassword" required class="form-control">
+              <label for="editEmpPassword">Password</label>
+              <input type="text" id="editEmpPassword" class="form-control" placeholder="Optional &mdash; blank means demo sign-in by username">
             </div>
           </div>
 
@@ -1681,10 +1681,10 @@
 
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <script src="shared.js?v=20261026_nm3"></script>
+  <script src="shared.js?v=20261026_sec1"></script>
   <script src="js/confirm-decision-modal.js?v=20261023_apr1"></script>
   <script src="js/day-popover.js?v=20261023_apr1"></script>
-  <script src="admin.js?v=20261026_nm1"></script>
+  <script src="admin.js?v=20261026_sec1"></script>
   <script src="js/password-toggle.js?v=20261019_ui1"></script>
   <script src="js/data-transfer.js?v=20261023_apr2"></script>
 </body>

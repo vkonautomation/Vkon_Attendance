@@ -88,42 +88,54 @@ function initAuthSystem() {
     }
   });
 
-  // Quick fill employee chips
+  // Quick fill chips carry an identity only -- never a credential. The button
+  // types the username into the form and submits it.
   document.querySelectorAll(".quick-fill-emp-btn").forEach(btn => {
     btn.addEventListener("click", () => {
       const u = btn.dataset.user;
-      const p = btn.dataset.pass;
-      if (u && p) {
-        document.getElementById("loginUsername").value = u;
-        document.getElementById("loginPassword").value = p;
-        if (empForm) empForm.dispatchEvent(new Event("submit"));
-      }
+      if (!u) return;
+      const unameInput = document.getElementById("loginUsername");
+      if (unameInput) unameInput.value = u;
+      if (empForm) empForm.dispatchEvent(new Event("submit"));
     });
   });
 
-  // Quick fill admin chip on index page (if admin form exists)
-  const indexAdminBtn = document.getElementById("quickFillIndexAdminBtn");
-  if (indexAdminBtn && adminForm) {
-    indexAdminBtn.addEventListener("click", () => {
-      const adminU = document.getElementById("adminUsername");
-      const adminP = document.getElementById("adminPassword");
-      if (adminU) adminU.value = "admin";
-      if (adminP) adminP.value = "admin123";
-      adminForm.dispatchEvent(new Event("submit"));
-    });
+  // Make it unmistakable that this build does not authenticate anyone while the
+  // temporary demo check is switched on (see the demo-auth note in shared.js).
+  const demoBadge = document.querySelector(".demo-mode-badge");
+  if (demoBadge && typeof demoAuthEnabled === "function") {
+    demoBadge.innerHTML = demoAuthEnabled()
+      ? '<i class="fa-solid fa-flask"></i> Demo mode &mdash; not authenticated'
+      : '<i class="fa-solid fa-lock"></i> Sign-in disabled';
+  }
+
+  // With the demo check switched off nothing here can sign anyone in, so the
+  // one-tap shortcut must not keep promising that it can.
+  const quickFillWrap = document.querySelector(".auth-quick-fill-wrap");
+  if (quickFillWrap && typeof demoAuthEnabled === "function" && !demoAuthEnabled()) {
+    quickFillWrap.style.display = "none";
   }
 
   // Employee Login Form
   empForm.addEventListener("submit", (e) => {
     e.preventDefault();
     clearLoginError();
-    const uname = document.getElementById("loginUsername").value.trim().toLowerCase();
-    const pwd = document.getElementById("loginPassword").value.trim();
+    const uname = document.getElementById("loginUsername").value;
+    const pwd = document.getElementById("loginPassword").value;
 
-    // 1. Cross-login: Check if Admin credentials were submitted on employee form
-    const adminCreds = getAdminCredentials();
-    if ((uname === adminCreds.username.toLowerCase() || uname === "admin") && 
-        (pwd === adminCreds.password || pwd === DEFAULT_ADMIN_CREDENTIALS.password)) {
+    // The ONE client-side check, and it is a temporary demo, not security.
+    // It answers with a code, so no branch below can print a credential.
+    const result = demoAuthenticate(uname, pwd);
+
+    if (result.code === "unconfigured") {
+      showLoginError(DEMO_AUTH_UNAVAILABLE_MSG, "Sign-In Unavailable");
+      showToast("Sign-in is unavailable in this build.", "error");
+      return;
+    }
+
+    if (result.code === "admin") {
+      // Cross-login: admin credentials were submitted on the employee form.
+      const adminCreds = getAdminCredentials();
       const adminSessionData = {
         username: adminCreds.username,
         name: adminCreds.name || "VKON Executive Administrator",
@@ -137,17 +149,10 @@ function initAuthSystem() {
       return;
     }
 
-    // 2. Check employee credentials
-    const employees = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
-    let found = employees.find(emp => emp.username.toLowerCase() === uname && emp.password === pwd);
-    if (!found) {
-      found = DEFAULT_EMPLOYEES.find(emp => emp.username.toLowerCase() === uname && emp.password === pwd);
-    }
-
-    if (found) {
+    if (result.code === "employee") {
       const sessionData = {
-        username: found.username,
-        employeeId: found.id,
+        username: result.employee.username,
+        employeeId: result.employee.id,
         role: "employee",
         loginTime: new Date().toISOString()
       };
@@ -155,12 +160,13 @@ function initAuthSystem() {
       localStorage.setItem(STORAGE_KEYS.CURRENT_SESSION, JSON.stringify(sessionData));
       authScreen.style.display = "none";
       mainAppWrapper.style.display = "flex";
-      loadEmployeeSession(found);
-      showToast(`Welcome back, ${found.name}!`, "success");
-    } else {
-      showLoginError("The employee username or password you entered is incorrect. Default accounts: mukesh / mukesh123, chiranth / chiranth123, priya / priya123", "Invalid Employee Credentials");
-      showToast("Invalid credentials. Try mukesh / mukesh123", "error");
+      loadEmployeeSession(result.employee);
+      showToast(`Welcome back, ${result.employee.name}!`, "success");
+      return;
     }
+
+    showLoginError("The username or password you entered is incorrect. Please verify your credentials and try again.", "Invalid Credentials");
+    showToast("Invalid credentials.", "error");
   });
 
   // Admin Login Form (if present)
@@ -168,14 +174,19 @@ function initAuthSystem() {
     adminForm.addEventListener("submit", (e) => {
       e.preventDefault();
       clearLoginError();
-      const uname = document.getElementById("adminUsername").value.trim().toLowerCase();
-      const pwd = document.getElementById("adminPassword").value.trim();
+      const uname = document.getElementById("adminUsername").value;
+      const pwd = document.getElementById("adminPassword").value;
 
-      const adminCreds = getAdminCredentials();
-      const isAdminMatch = (uname === adminCreds.username.toLowerCase() || uname === "admin") && 
-                           (pwd === adminCreds.password || pwd === DEFAULT_ADMIN_CREDENTIALS.password);
+      const result = demoAuthenticate(uname, pwd);
 
-      if (isAdminMatch) {
+      if (result.code === "unconfigured") {
+        showLoginError(DEMO_AUTH_UNAVAILABLE_MSG, "Sign-In Unavailable");
+        showToast("Sign-in is unavailable in this build.", "error");
+        return;
+      }
+
+      if (result.code === "admin") {
+        const adminCreds = getAdminCredentials();
         const adminSessionData = {
           username: adminCreds.username,
           name: adminCreds.name || "VKON Executive Administrator",
@@ -188,16 +199,11 @@ function initAuthSystem() {
         return;
       }
 
-      // Cross-check: If employee credentials were submitted on admin form
-      const employees = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
-      let found = employees.find(emp => emp.username.toLowerCase() === uname && emp.password === pwd);
-      if (!found) {
-        found = DEFAULT_EMPLOYEES.find(emp => emp.username.toLowerCase() === uname && emp.password === pwd);
-      }
-      if (found) {
+      if (result.code === "employee") {
+        // Cross-login: employee credentials were submitted on the admin form.
         const sessionData = {
-          username: found.username,
-          employeeId: found.id,
+          username: result.employee.username,
+          employeeId: result.employee.id,
           role: "employee",
           loginTime: new Date().toISOString()
         };
@@ -205,13 +211,13 @@ function initAuthSystem() {
         localStorage.setItem(STORAGE_KEYS.CURRENT_SESSION, JSON.stringify(sessionData));
         authScreen.style.display = "none";
         mainAppWrapper.style.display = "flex";
-        loadEmployeeSession(found);
-        showToast(`Welcome back, ${found.name}!`, "success");
+        loadEmployeeSession(result.employee);
+        showToast(`Welcome back, ${result.employee.name}!`, "success");
         return;
       }
 
-      showLoginError("The executive administrator username or password you entered is incorrect. Master credentials: admin / admin123", "Invalid Admin Credentials");
-      showToast("Invalid admin credentials. Use admin / admin123", "error");
+      showLoginError("The username or password you entered is incorrect. Please verify your credentials and try again.", "Invalid Credentials");
+      showToast("Invalid credentials.", "error");
     });
   }
 
