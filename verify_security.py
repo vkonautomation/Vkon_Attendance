@@ -43,12 +43,16 @@ check('adminP.value = "admin123"' not in src["app.js"]
 check("admin / admin123" not in src["admin.html"],
       "admin.html UI text reveals no credential")
 
-# 3. The client-side check is a marked demo, flagged, and off by default.
+# 3. The client-side check is a marked demo, flagged, and on by default.
 for needle in ["TEMPORARY DEMO AUTHENTICATION", "demoAuthEnabled()", "demoAuthenticate(",
-               "DEMO_AUTH_UNAVAILABLE_MSG", '"unconfigured"', "_isLocalOrigin()"]:
+               "DEMO_AUTH_UNAVAILABLE_MSG", '"unconfigured"', "DEMO_AUTH_FLAG_KEY"]:
     check(needle in src["shared.js"], f"shared.js contains {needle}")
-check('h === "localhost"' in src["shared.js"] and 'protocol === "file:"' in src["shared.js"],
-      "demo flag turns itself on only for local origins")
+# Demo sign-in is enabled by default; the only way to close it is the explicit
+# per-browser kill switch, which must keep working.
+check('return flag !== "off"' in src["shared.js"],
+      "demo authentication is on by default")
+check("function setDemoAuthFlag" in src["shared.js"],
+      "a kill switch exists to turn demo authentication off again")
 check("emp.password === pwd" not in src["app.js"] and "adminCreds.password ===" not in src["app.js"],
       "app.js no longer compares passwords inline")
 check("emp.password === enteredPass" not in src["admin.js"],

@@ -143,7 +143,7 @@ def verify_all():
     # shared rule used by every JS screen
     for f in [app, admin]:
         need("isNonWorkingDay" in f, "a screen does not use the shared isNonWorkingDay rule")
-    need("shared.js?v=20261026_sec1" in index_html and "shared.js?v=20261026_sec1" in admin_html,
+    need("shared.js?v=20261026_sec2" in index_html and "shared.js?v=20261026_sec2" in admin_html,
          "shared.js token not bumped")
     need("app.js?v=20261026_sec1" in index_html, "app.js token not bumped")
     need("admin.js?v=20261026_sec1" in admin_html, "admin.js token not bumped")

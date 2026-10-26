@@ -164,46 +164,37 @@ const ADMIN_CREDENTIALS = getAdminCredentials();
 // ============================================================================
 //  TEMPORARY DEMO AUTHENTICATION -- THIS IS *NOT* A SECURITY CONTROL
 // ============================================================================
-// Everything in this block exists so the offline demo can be clicked through
-// without a backend. It is not authentication: the browser holds both sides of
-// the check, so anything here can be read, replayed or rewritten with developer
-// tools. Real sign-in must be done by the server (a login endpoint that verifies
-// a salted hash and issues an httpOnly session cookie). Delete this block once
-// that endpoint exists.
+// Everything in this block exists so the demo can be clicked through without a
+// backend. It is not authentication: the browser holds both sides of the check,
+// so anything here can be read, replayed or rewritten with developer tools. Real
+// sign-in must come from the server (a login endpoint that verifies a salted
+// hash and issues an httpOnly session cookie). Delete this block once that
+// endpoint exists.
 //
 //  * No credential is shipped anywhere in this repository or in the image.
 //  * A password is enforced only when one exists on the local record (Admin
 //    Settings -> master password, or a roster entry that has one). With no local
 //    password the check falls back to the identity alone.
 //  * It never echoes, prints, stores in a message, or logs a credential.
-//  * It is OFF unless the app is served from a local origin, so a deployed build
-//    fails closed instead of pretending to authenticate.
+//  * It is ENABLED by default so every build stays usable. That is a deliberate
+//    product choice, not an access control: whoever reaches the site can open it
+//    as any known identity. What they can see is only that browser's own
+//    localStorage data -- there is no shared server data to reach.
+//  * Kill switch: setDemoAuthFlag("off"), or
+//    localStorage.setItem("vkon_demo_auth_v1", "off") in a browser, closes
+//    sign-in again and makes the build fail closed. "on" forces it back open.
 // ============================================================================
 const DEMO_AUTH_FLAG_KEY = "vkon_demo_auth_v1"; // local override: "on" | "off"
 
-// Shown whenever sign-in cannot be offered at all. Generic on purpose: it names
-// no account, no password and no internal detail.
-const DEMO_AUTH_UNAVAILABLE_MSG = "Sign-in is unavailable in this build: demo authentication is disabled outside a local environment and no authentication server is configured.";
+// Shown only when someone has switched the demo check off. Generic on purpose:
+// it names no account, no password and no internal detail.
+const DEMO_AUTH_UNAVAILABLE_MSG = "Sign-in is not available in this build: demo authentication has been switched off and no authentication server is configured.";
 
-function _isLocalOrigin() {
-  try {
-    if (window.location.protocol === "file:") return true;
-    const h = String(window.location.hostname || "").toLowerCase();
-    return h === "localhost" || h === "127.0.0.1" || h === "::1" || h === "[::1]";
-  } catch (e) {
-    // No window (node test harness) or a blocked location: treat as not local.
-    return false;
-  }
-}
-
-// Defaults to OFF in production. Only a local origin turns it on, and an
-// explicit stored override can force either state while testing.
+// Demo authentication is on unless it was explicitly turned off in this browser.
 function demoAuthEnabled() {
-  let forced = null;
-  try { forced = localStorage.getItem(DEMO_AUTH_FLAG_KEY); } catch (e) { /* private mode */ }
-  if (forced === "on") return true;
-  if (forced === "off") return false;
-  return _isLocalOrigin();
+  let flag = null;
+  try { flag = localStorage.getItem(DEMO_AUTH_FLAG_KEY); } catch (e) { /* private mode */ }
+  return flag !== "off";
 }
 
 function setDemoAuthFlag(state) {
