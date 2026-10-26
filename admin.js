@@ -2547,9 +2547,9 @@ function renderEmpCalendar() {
           popData = { dateStr, punch: false, statusLabel: "Reg. Pending", chipClass: "badge-regpending", icon: "fa-hourglass-half", detail: "Regularisation awaiting review" };
         } else {
           s.notmarked++;
-          badge = `<span class="day-badge-pill badge-notmarked" title="Closed with no record \u2014 needs regularisation"><i class="fa-solid fa-circle-question"></i> Not Marked</span>`;
+          badge = `<span class="day-badge-pill badge-notmarked" title="Closed with no record \u2014 needs regularisation"><i class="fa-solid fa-circle-half-stroke"></i> Not Marked</span>`;
           canOverride = true;
-          popData = { dateStr, punch: false, statusLabel: "Not Marked", chipClass: "badge-notmarked", icon: "fa-circle-question", detail: "No punch or leave recorded" };
+          popData = { dateStr, punch: false, statusLabel: "Not Marked", chipClass: "badge-notmarked", icon: "fa-circle-half-stroke", detail: "No punch or leave recorded" };
         }
       } else if (dateObj > nowZero) {
         badge = `<span class="day-badge-pill badge-upcoming"><i class="fa-solid fa-circle-dot"></i> Upcoming</span>`;
@@ -2594,7 +2594,7 @@ function renderEmpCalendar() {
       <span class="emp-cal-chip chip-w"><i class="fa-solid fa-house-laptop"></i> WFH ${s.wfh}</span>
       <span class="emp-cal-chip chip-l"><i class="fa-solid fa-umbrella-beach"></i> Leave ${s.leave}</span>
       <span class="emp-cal-chip chip-lop"><i class="fa-solid fa-hand-holding-dollar"></i> LoP ${s.lop}</span>
-      <span class="emp-cal-chip chip-n"><i class="fa-solid fa-circle-question"></i> Not marked ${s.notmarked}</span>
+      <span class="emp-cal-chip chip-n"><i class="fa-solid fa-circle-half-stroke"></i> Not marked ${s.notmarked}</span>
       <span class="emp-cal-chip chip-a"><i class="fa-solid fa-circle-xmark"></i> Absent ${s.absent}</span>
     `;
   }

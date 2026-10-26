@@ -566,10 +566,10 @@ function renderMonthlyCalendar() {
             // No punch, no leave, no WFH, no pending request — needs regularisation
             countNotMarked++;
             badgeHtml = `
-              <span class="day-badge-pill badge-notmarked" title="Day closed with no record and no leave &mdash; raise a regularisation if you were working"><i class="fa-solid fa-circle-question"></i> Not Marked</span>
+              <span class="day-badge-pill badge-notmarked" title="Day closed with no record and no leave &mdash; raise a regularisation if you were working"><i class="fa-solid fa-circle-half-stroke"></i> Not Marked</span>
               <button type="button" class="cell-reg-quick" data-reg-date="${dateStr}" title="Request regularisation for ${dateStr}"><i class="fa-solid fa-wand-magic-sparkles"></i> Regularise</button>
             `;
-            popData = { dateStr, punch: false, statusLabel: "Not Marked", chipClass: "badge-notmarked", icon: "fa-circle-question", detail: "No punch or leave recorded" };
+            popData = { dateStr, punch: false, statusLabel: "Not Marked", chipClass: "badge-notmarked", icon: "fa-circle-half-stroke", detail: "No punch or leave recorded" };
           }
         } else if (isToday && !declaredHoliday && !isWeekend) {
           badgeHtml = `

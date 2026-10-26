@@ -95,8 +95,8 @@ def verify_all():
         "admin.html script order wrong (expected shared -> day-popover -> admin)"
     need("shared.js?v=20261026_lop1" in index_html and "shared.js?v=20261026_lop1" in admin_html,
          "shared.js token not bumped")
-    need("app.js?v=20261024_rm5" in index_html, "app.js token not bumped")
-    need("admin.js?v=20261024_rm5" in admin_html, "admin.js token not bumped")
+    need("app.js?v=20261026_nm1" in index_html, "app.js token not bumped")
+    need("admin.js?v=20261026_nm1" in admin_html, "admin.js token not bumped")
     need("styles.css?v=20261024_rm6" in index_html and "styles.css?v=20261024_rm6" in admin_html,
          "styles.css token not bumped")
     for cls in [".day-popover", ".dp-late", ".dp-short", ".dp-ontime", "focus-visible"]:
