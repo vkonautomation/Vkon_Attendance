@@ -125,9 +125,9 @@ def verify_all():
         need(sel in styles, sel + " CSS missing")
     print("  PASS")
 
-    # Cache tokens bumped for the current build (portal carries nm2, admin nm1).
+    # Cache tokens bumped for the current build (portal carries nm3, admin nm1).
     print("\n[Cache] cache-buster tokens present (current build):")
-    need("_apr" in index_html and "20261026_nm2" in index_html, "index.html cache tokens not set")
+    need("_apr" in index_html and "20261026_nm3" in index_html, "index.html cache tokens not set")
     need("_apr" in admin_html and "20261026_nm1" in admin_html, "admin.html cache tokens not set")
     print("  PASS")
 

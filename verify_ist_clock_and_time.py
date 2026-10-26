@@ -33,7 +33,7 @@ def test_ist_implementation():
     print("PASS: Both Employee Portal and Admin Console live clocks run strictly on Indian Standard Time.")
 
     # 4. Cache-buster query parameters in HTML (current build token)
-    assert "20261026_nm2" in html, "index.html must have updated cache buster for fresh load"
+    assert "20261026_nm3" in html, "index.html must have updated cache buster for fresh load"
     print("PASS: index.html has fresh cache-buster parameters.")
 
     print("\n" + "=" * 50)

@@ -514,14 +514,20 @@ function cancelLopEntriesByRef(refId) {
   return changed;
 }
 
+// The SET of LOP dates for an employee in a 'YYYY-MM' month, taken from the LOP
+// ledger (approved LOP leave, excess-leave conversion and auto short-hours LOP).
+// WHOLE DAYS ONLY: a date appears at most once, so legacy 0.5 entries collapse.
+function getLopDatesForMonth(empId, monthStr) {
+  const list = getLopEntries().filter(e => e.employeeId === empId && e.status === "active" && e.date.slice(0, 7) === monthStr);
+  return new Set(list.map(e => e.date));
+}
+
 // Total LOP days for an employee in a 'YYYY-MM' month.
 // WHOLE DAYS ONLY: each calendar day counts at most 1, so a day is either 0 or 1.
 // This normalises legacy stored entries that carried a 0.5 fraction (half-day LOP
 // was removed by policy) and collapses any duplicate same-day sources to one day.
 function computeLopDaysForMonth(empId, monthStr) {
-  const list = getLopEntries().filter(e => e.employeeId === empId && e.status === "active" && e.date.slice(0, 7) === monthStr);
-  const dates = new Set(list.map(e => e.date));
-  return dates.size;
+  return getLopDatesForMonth(empId, monthStr).size;
 }
 
 // Expand an approved leave range into LOP day objects. Weekends / declared

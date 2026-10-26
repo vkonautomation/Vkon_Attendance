@@ -429,6 +429,10 @@ function renderMonthlyCalendar() {
   let countLop = 0;
   let countAbsent = 0;
   let countNotMarked = 0;
+  // Unresolved working days whose payroll month has closed. They carry no LOP
+  // ledger entry (nothing was ever recorded), but they ARE a whole day of LOP,
+  // so the LOP tile must count them too.
+  const closedLopDates = new Set();
 
   // Previous Month Padded Days
   for (let i = firstDayIndex - 1; i >= 0; i--) {
@@ -570,6 +574,7 @@ function renderMonthlyCalendar() {
             const cellCutOffDay = (typeof getAttendanceSettings === "function") ? (getAttendanceSettings() || {}).payrollCutOffDay : 1;
             const cellPastCutOff = (typeof _isPastPayrollCutOff === "function") && _isPastPayrollCutOff(dateStr, cellCutOffDay);
             if (cellPastCutOff) {
+              closedLopDates.add(dateStr);
               badgeHtml = `
               <span class="day-badge-pill badge-notmarked" title="Day closed with no record and past the payroll cut-off &mdash; counted as a whole day of LOP"><i class="fa-solid fa-circle-half-stroke"></i> Not Marked</span>
               <span class="cell-lop-note" title="Payroll for that month has closed &mdash; the day is already counted as a whole day of LOP"><i class="fa-solid fa-circle-xmark"></i> Counted as LOP</span>
@@ -639,12 +644,21 @@ function renderMonthlyCalendar() {
   if (statL) statL.textContent = countLeave;
     const statLop = document.getElementById("statsLopCount");
     if (statLop) {
-      // Prefer the authoritative LOP day count for the month.
+      // Prefer the authoritative LOP day count for the month: the LOP ledger
+      // plus the closed unresolved days (already whole-day LOP, no ledger row).
       let lopVal = countLop;
       try {
         if (employeeState.currentEmployee && typeof computeLopDaysForMonth === "function") {
           const ms = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}`;
-          lopVal = computeLopDaysForMonth(employeeState.currentEmployee.id, ms);
+          const ledgerDates = (typeof getLopDatesForMonth === "function")
+            ? getLopDatesForMonth(employeeState.currentEmployee.id, ms)
+            : null;
+          if (ledgerDates) {
+            closedLopDates.forEach(d => ledgerDates.add(d));
+            lopVal = ledgerDates.size;
+          } else {
+            lopVal = computeLopDaysForMonth(employeeState.currentEmployee.id, ms) + closedLopDates.size;
+          }
         }
       } catch (e) { /* fall back to record count */ }
       statLop.textContent = lopVal;
