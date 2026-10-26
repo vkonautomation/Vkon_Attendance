@@ -514,10 +514,14 @@ function cancelLopEntriesByRef(refId) {
   return changed;
 }
 
-// Total (decimal) LOP days for an employee in a 'YYYY-MM' month.
+// Total LOP days for an employee in a 'YYYY-MM' month.
+// WHOLE DAYS ONLY: each calendar day counts at most 1, so a day is either 0 or 1.
+// This normalises legacy stored entries that carried a 0.5 fraction (half-day LOP
+// was removed by policy) and collapses any duplicate same-day sources to one day.
 function computeLopDaysForMonth(empId, monthStr) {
   const list = getLopEntries().filter(e => e.employeeId === empId && e.status === "active" && e.date.slice(0, 7) === monthStr);
-  return round2(list.reduce((s, e) => s + (Number(e.fraction) || 0), 0));
+  const dates = new Set(list.map(e => e.date));
+  return dates.size;
 }
 
 // Expand an approved leave range into LOP day objects. Weekends / declared
