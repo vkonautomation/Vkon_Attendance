@@ -1353,7 +1353,21 @@ function updatePunchStatus() {
   if (!employeeState.currentEmployee) return;
   const todayKey = getTodayKey();
   const records = getStore(STORAGE_KEYS.RECORDS, {});
-  const todayRecord = records[`${employeeState.currentEmployee.id}_${todayKey}`];
+  const todayRecKey = `${employeeState.currentEmployee.id}_${todayKey}`;
+  let todayRecord = records[todayRecKey];
+
+  // A WFH day is a projection of an approved request, never a source of truth. If
+  // the request is gone the row is stale, and trusting it here would hide both punch
+  // buttons and tell the employee they are working from home today when nobody ever
+  // assigned it. The same check runs for every store on load in shared.js; this
+  // catches the case where the request disappeared while the portal was open.
+  if (todayRecord && todayRecord.status === "WFH" &&
+      typeof hasApprovedWfhRequest === "function" &&
+      !hasApprovedWfhRequest(employeeState.currentEmployee.id, todayKey)) {
+    delete records[todayRecKey];
+    setStore(STORAGE_KEYS.RECORDS, records);
+    todayRecord = undefined;
+  }
 
   // Req 2/3: on a holiday / non-working day, hide the Mark Present card and the
   // "Ready to Punch"/"Not Punched In" status and show a holiday card instead.

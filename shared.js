@@ -879,6 +879,39 @@ function removeApprovedEffect(type, req) {
   }
 }
 
+// A WFH day exists only while an Approved WFH request backs it: applyApprovedEffect
+// writes the record, removeApprovedEffect deletes it. When the request disappears by
+// any other route (an import that replaces the requests but not the records, a
+// partial reset, a hand-edited store) the record is orphaned, and every screen that
+// trusts it then reports a work-from-home day nobody assigned -- including the weekly
+// allowance, which counts WFH records, and the punch card, which hides both buttons
+// for a WFH day. Drop those orphans so the calendar, the punch card and the quota
+// agree with the requests again.
+function hasApprovedWfhRequest(empId, dateKey) {
+  if (!empId || !dateKey) return false;
+  const allWfh = getStore(STORAGE_KEYS.WFH, []);
+  return allWfh.some(w => w.employeeId === empId && w.date === dateKey && w.status === "Approved");
+}
+
+// Returns the number of WFH days removed.
+function reconcileWfhRecords() {
+  const records = getStore(STORAGE_KEYS.RECORDS, {});
+  const orphans = [];
+  Object.keys(records).forEach(k => {
+    const r = records[k];
+    if (!r || r.status !== "WFH") return;
+    // Older rows may carry the identity only in the "EMP001_2026-10-05" key.
+    const empId = r.employeeId || k.split("_")[0];
+    const dateKey = r.date || k.split("_").slice(1).join("_");
+    if (!hasApprovedWfhRequest(empId, dateKey)) orphans.push(k);
+  });
+  if (!orphans.length) return 0;
+  orphans.forEach(k => delete records[k]);
+  setStore(STORAGE_KEYS.RECORDS, records);
+  console.warn("Dropped WFH day(s) with no approved WFH request:", orphans.join(", "));
+  return orphans.length;
+}
+
 function _approvalLabel(type) { return type === "wfh" ? "WFH" : type === "regularisation" ? "Regularisation" : "Leave"; }
 
 
@@ -2552,6 +2585,9 @@ function initializeDatabase() {
   // current and previous month (no server scheduler, so this runs on load/view).
   finalizeStaleOpenPunches();
   recalcShortHoursDays();
+  // Same lazy-reconciliation idea for WFH: a day may only stay marked WFH while an
+  // approved request backs it, so a stale row cannot lock someone out of punching in.
+  reconcileWfhRecords();
 }
 
 // ============================================================================
