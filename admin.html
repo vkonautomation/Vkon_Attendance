@@ -76,6 +76,11 @@
 
         <div class="quick-credentials-hint" style="text-align: center;">
           <span>Restricted area &mdash; administrator credentials required.</span>
+          <!-- Outside the button's wrapper on purpose: that wrapper is hidden when a
+               real server is authenticating, and this line must survive it. -->
+          <div>
+            <span id="adminAuthModeBadge" class="auth-quick-fill-label demo-mode-badge"></span>
+          </div>
           <div style="margin-top: 0.5rem;">
             <button type="button" id="quickFillAdminBtn" class="btn btn-ghost btn-xs" style="border: 1px solid var(--border-glass); padding: 5px 12px; border-radius: 6px; cursor: pointer; color: var(--text-muted); background: var(--bg-surface);">
               <i class="fa-solid fa-user-shield"></i> Auto-Fill Administrator Username
@@ -1681,10 +1686,15 @@
 
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <script src="shared.js?v=20261027_wfh1"></script>
+  <!-- The server adapter must be parsed before shared.js: shared.js asks it whether
+       this browser reads shared state or only its own localStorage, and waits on it
+       before seeding. Order here is load-bearing. -->
+  <script src="js/api.js?v=20261027_bk3"></script>
+  <script src="js/password-change.js?v=20261027_bk3"></script>
+  <script src="shared.js?v=20261027_bk3"></script>
   <script src="js/confirm-decision-modal.js?v=20261023_apr1"></script>
   <script src="js/day-popover.js?v=20261023_apr1"></script>
-  <script src="admin.js?v=20261026_sec1"></script>
+  <script src="admin.js?v=20261027_bk3"></script>
   <script src="js/password-toggle.js?v=20261019_ui1"></script>
   <script src="js/data-transfer.js?v=20261023_apr2"></script>
 </body>

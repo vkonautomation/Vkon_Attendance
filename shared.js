@@ -244,6 +244,67 @@ function demoAuthenticate(identifier, password) {
   return { code: "employee", employee: emp };
 }
 
+// The server adapter, or null when there is none. Reached through a function rather
+// than written inline at each call site because shared.js is also evaluated by the
+// node test harnesses, which have no `window` binding at all: a bare `window.VKON_API`
+// there throws, and inside getStore()'s try/catch that throw is indistinguishable
+// from "no data yet", so every store silently reads back its default.
+function apiAdapter() {
+  return (typeof window !== "undefined" && window.VKON_API) ? window.VKON_API : null;
+}
+
+// ============================================================================
+//  SIGN-IN -- the one entry point both consoles use
+// ============================================================================
+// demoAuthenticate() above cannot be trusted with real data: it runs in the
+// browser, so it is kept only for the static build. When js/api.js has talked to
+// a backend, this function asks the backend instead and returns the same shape of
+// answer, so neither caller has to know which mode it is in.
+//
+// Codes: "admin" | "employee" | "invalid" | "unconfigured" | "passwordChange"
+//        | "throttled" | "unreachable" | "noRoster"
+function serverBacked() {
+  const api = apiAdapter();
+  return !!(api && api.isServerBacked && api.isServerBacked());
+}
+
+async function signIn(identifier, password) {
+  const isServerBacked = serverBacked();
+  if (!isServerBacked) {
+    // Static host, or the backend is down: the demo check, exactly as before.
+    // localStorage holds only this browser's own data, so nothing is exposed.
+    return demoAuthenticate(identifier, password);
+  }
+
+  const result = await apiAdapter().login(identifier, password);
+
+  if (result.code === "admin") {
+    // Role comes from the server's session, never from what was typed here.
+    return { code: "admin", session: result.session };
+  }
+
+  if (result.code === "employee") {
+    // The server authenticates the person; the roster still describes them. Pull
+    // the row by the employee id the account is linked to so the rest of the app
+    // (which is written against roster rows) needs no changes at all.
+    const empId = result.session && result.session.employeeId;
+    const roster = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
+    const emp = roster.find(e => String(e.id) === String(empId));
+    if (!emp) return { code: "noRoster", employeeId: empId || null };
+    return { code: "employee", employee: emp, session: result.session };
+  }
+
+  return result;
+}
+
+// Leave the server session too, or the next person at this keyboard inherits it.
+async function signOut() {
+  const api = apiAdapter();
+  if (api && api.isServerBacked && api.isServerBacked()) {
+    try { await api.logout(); } catch (e) { /* the local clear below still runs */ }
+  }
+}
+
 const DEFAULT_GLOBAL_LEAVE_QUOTAS = {
   personalLeave: 14,
   restrictedLeave: 2
@@ -1664,6 +1725,14 @@ const CURRENT_DATE = getPresentDate(); // const CURRENT_DATE = new Date();
 
 function getStore(key, defaultVal) {
   try {
+    // When the server adapter is live it holds the in-memory copy of every shared
+    // store, hydrated at boot. Reading from it here is what keeps the ~190 call
+    // sites below this function synchronous and untouched by the backend.
+    const api = apiAdapter();
+    if (api && api.handles(key)) {
+      const cached = api.read(key);
+      if (cached !== undefined) return cached;
+    }
     const raw = localStorage.getItem(key);
     if (raw) return JSON.parse(raw);
 
@@ -1685,7 +1754,12 @@ function getStore(key, defaultVal) {
 
 function setStore(key, val) {
   try {
+    // localStorage stays the shadow copy on purpose: with the backend down, on a
+    // train, or on a static-only host, the portal keeps working exactly as it did
+    // before and nothing has to be reconciled afterwards.
     localStorage.setItem(key, JSON.stringify(val));
+    const api = apiAdapter();
+    if (api && api.handles(key)) api.write(key, val);
   } catch (e) {
     console.error("Storage write error:", e);
   }
@@ -2601,4 +2675,33 @@ const GPS_ACCURACY_MAX_M = 100;
 // devices this fairer threshold; the office geofence distance check still applies.
 const GPS_ACCURACY_MAX_NETWORK_M = 300;
 
-initializeDatabase();
+// The adapter has to finish hydrating before anything reads a store: otherwise the
+// first render shows whatever this browser cached yesterday and then pushes it back
+// to the server as though it were new. On a static-only host there is no adapter and
+// this is the same immediate call it always was.
+//
+// initializeDatabase() itself stays outside the window check on purpose. The node
+// test harnesses evaluate this file with no window at all and still need the seeded
+// defaults, so gating the init would silently empty every store they assert against.
+const bootAdapter = apiAdapter();
+if (bootAdapter && bootAdapter.ready) {
+  bootAdapter.ready.then(() => initializeDatabase());
+} else {
+  initializeDatabase();
+}
+
+// Two people in this console at once is normal, and the adapter silently adopts
+// whichever version arrived first. That is the safe half of the story; saying so on
+// screen is the other half. Without it an approval that just vanished looks like a
+// bug in the page rather than a decision somebody else already made.
+const toastAdapter = apiAdapter();
+if (toastAdapter) {
+  if (typeof toastAdapter.onConflict === "function") {
+    toastAdapter.onConflict((key, message) => {
+      try { showToast(message || "Someone else changed that first. Their version is now on your screen.", "warning"); } catch (e) { /* non-fatal */ }
+    });
+  }
+  toastAdapter.onRemoteUpdate = () => {
+    try { showToast("Attendance data updated by someone else. You are now looking at the shared records.", "info"); } catch (e) { /* non-fatal */ }
+  };
+}

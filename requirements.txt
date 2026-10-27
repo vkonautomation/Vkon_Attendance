@@ -1,0 +1,22 @@
+# VKON Attendance -- backend runtime.
+#
+# Deliberately small. This app's whole purpose is a shared source of truth for a
+# few hundred people on low-end Android phones over weak connections; every
+# dependency here earns its place and nothing pulls a build toolchain.
+#
+#   fastapi + uvicorn  -- ASGI server and routing
+#   sqlalchemy         -- ORM; the store documents and the relational tables
+#   bcrypt             -- password hashes (never md5/sha of a plaintext password)
+#   itsdangerous       -- signed session cookies (Starlette SessionMiddleware)
+#   pydantic           -- request validation (installed with fastapi)
+#
+# SQLite, not Postgres: the write volume is one punch per person per check-in,
+# and a single file on the named volume keeps the self-hosted compose setup to
+# one container. See docs/backend.md for the point at which that stops being
+# the right answer.
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+SQLAlchemy==2.0.36
+bcrypt==4.2.1
+itsdangerous==2.2.0
+pydantic==2.10.4

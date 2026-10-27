@@ -53,6 +53,38 @@ function clearLoginError() {
   }
 }
 
+// Sign-in codes that only a server-backed attempt can produce. Shared by both
+// forms on this page so they cannot drift apart. Returns true when the result has
+// been handled and the caller must stop.
+function handleServerAuthCodes(result) {
+  if (result.code === "passwordChange") {
+    showLoginError("Your account is still using the temporary password issued to it. Set a new one below, then sign in again.", "First Sign-In");
+    if (window.VKON_PASSWORD_CHANGE) {
+      VKON_PASSWORD_CHANGE.open({
+        requireCurrent: false,
+        session: result.session,
+        message: "Choose the password you will use from now on. The attendance server keeps nothing readable until this is done."
+      });
+    }
+    return true;
+  }
+  if (result.code === "throttled") {
+    showLoginError(result.message || "Too many attempts. Please wait a moment and try again.", "Too Many Attempts");
+    return true;
+  }
+  if (result.code === "unreachable") {
+    showLoginError("The attendance server could not be reached. Your own device still holds your data; sign in again once the connection is back.", "Server Unreachable");
+    return true;
+  }
+  if (result.code === "noRoster") {
+    // Authenticated against the server but no employee row matches the account.
+    // Almost always a roster an admin has not published yet, so say what fixes it.
+    showLoginError("Your sign-in worked, but this account is not linked to an employee record yet. An administrator needs to save the employee list.", "Account Not Linked");
+    return true;
+  }
+  return false;
+}
+
 function initAuthSystem() {
   const authScreen = document.getElementById("authScreen");
   const mainAppWrapper = document.getElementById("mainAppWrapper");
@@ -100,32 +132,58 @@ function initAuthSystem() {
     });
   });
 
-  // Make it unmistakable that this build does not authenticate anyone while the
-  // temporary demo check is switched on (see the demo-auth note in shared.js).
+  // Say what this build actually does about identity. "Demo mode" and "a real
+  // server is verifying you" are very different promises and the screen must not
+  // blur them (see the demo-auth note in shared.js).
+  //
+  // Wording matches where this badge sits: inside the login card, which the portal
+  // replaces once someone is in. So it must never claim a sign-in that has not
+  // happened - it reports whether a server is present and in charge.
   const demoBadge = document.querySelector(".demo-mode-badge");
-  if (demoBadge && typeof demoAuthEnabled === "function") {
-    demoBadge.innerHTML = demoAuthEnabled()
-      ? '<i class="fa-solid fa-flask"></i> Demo mode &mdash; not authenticated'
-      : '<i class="fa-solid fa-lock"></i> Sign-in disabled';
+  function paintAuthBadge() {
+    if (!demoBadge) return;
+    if (serverBacked()) {
+      demoBadge.innerHTML = '<i class="fa-solid fa-shield-halved"></i> Attendance server &mdash; sign in required';
+    } else if (typeof demoAuthEnabled === "function" && demoAuthEnabled()) {
+      demoBadge.innerHTML = '<i class="fa-solid fa-flask"></i> Demo mode &mdash; not authenticated';
+    } else {
+      demoBadge.innerHTML = '<i class="fa-solid fa-lock"></i> Sign-in disabled';
+    }
   }
+  paintAuthBadge();
+  // The mode is only known once /api/health has answered, which can be after this
+  // function first runs. Repaint when it does rather than showing the wrong claim.
+  if (window.VKON_API && VKON_API.ready) VKON_API.ready.then(paintAuthBadge);
 
-  // With the demo check switched off nothing here can sign anyone in, so the
-  // one-tap shortcut must not keep promising that it can.
-  const quickFillWrap = document.querySelector(".auth-quick-fill-wrap");
-  if (quickFillWrap && typeof demoAuthEnabled === "function" && !demoAuthEnabled()) {
-    quickFillWrap.style.display = "none";
+  // One-tap identity chips are a demo affordance. With a real shared database
+  // behind the screen, filling someone's username in for them is not a shortcut,
+  // it is an invitation, so the chips go away in both non-demo states.
+  //
+  // Only the chips. The badge lives in this same container, and hiding the wrapper
+  // hid it too - which removed the mode indicator precisely in the one state where
+  // a person needs to know their data is going to a real server.
+  function paintQuickFill() {
+    const allowed = !serverBacked() &&
+      (typeof demoAuthEnabled !== "function" || demoAuthEnabled());
+    document.querySelectorAll(".quick-fill-emp-btn").forEach(btn => {
+      btn.style.display = allowed ? "" : "none";
+    });
   }
+  paintQuickFill();
+  if (window.VKON_API && VKON_API.ready) VKON_API.ready.then(paintQuickFill);
 
   // Employee Login Form
-  empForm.addEventListener("submit", (e) => {
+  empForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     clearLoginError();
     const uname = document.getElementById("loginUsername").value;
     const pwd = document.getElementById("loginPassword").value;
 
-    // The ONE client-side check, and it is a temporary demo, not security.
-    // It answers with a code, so no branch below can print a credential.
-    const result = demoAuthenticate(uname, pwd);
+    // The ONE client-side check. Against a server it asks the server; otherwise it
+    // is the temporary demo. It answers with a code, so no branch below can print
+    // a credential.
+    const result = await signIn(uname, pwd);
+    if (handleServerAuthCodes(result)) return;
 
     if (result.code === "unconfigured") {
       showLoginError(DEMO_AUTH_UNAVAILABLE_MSG, "Sign-In Unavailable");
@@ -171,13 +229,14 @@ function initAuthSystem() {
 
   // Admin Login Form (if present)
   if (adminForm) {
-    adminForm.addEventListener("submit", (e) => {
+    adminForm.addEventListener("submit", async (e) => {
       e.preventDefault();
       clearLoginError();
       const uname = document.getElementById("adminUsername").value;
       const pwd = document.getElementById("adminPassword").value;
 
-      const result = demoAuthenticate(uname, pwd);
+      const result = await signIn(uname, pwd);
+      if (handleServerAuthCodes(result)) return;
 
       if (result.code === "unconfigured") {
         showLoginError(DEMO_AUTH_UNAVAILABLE_MSG, "Sign-In Unavailable");
@@ -224,7 +283,10 @@ function initAuthSystem() {
   // Logout
   const logoutBtn = document.getElementById("logoutBtn");
   if (logoutBtn) {
-    logoutBtn.addEventListener("click", () => {
+    logoutBtn.addEventListener("click", async () => {
+      // Drop the server session first: a shared deployment must not leave a valid
+      // cookie behind for the next person at this device.
+      if (serverBacked()) { try { await signOut(); } catch (e) { /* local clear still runs */ } }
       sessionStorage.removeItem(STORAGE_KEYS.CURRENT_SESSION);
       localStorage.removeItem(STORAGE_KEYS.CURRENT_SESSION);
       localStorage.removeItem("apex_session_v5");
@@ -2142,6 +2204,27 @@ async function handleConfirmVerification() {
   const now = new Date();
   const timeStr = formatTimeString(now);
 
+  // Server-side evidence of a punch. The record written below stays what decides
+  // the day (that arithmetic lives in shared.js and is tested), but a punch the
+  // server never saw is a punch nobody can audit: this gives the backend its own
+  // clock, its own geofence verdict and a trail that survives an emptied browser.
+  // Fire and forget: nobody at a gate should be held up by a slow network, and the
+  // adapter queues the punch locally if this call cannot get through.
+  function punchEvidence(kind) {
+    if (!serverBacked() || !window.VKON_API) return;
+    const emp = employeeState.currentEmployee || {};
+    const loc = employeeState.userLocation || {};
+    try {
+      VKON_API.punch(kind, {
+        punchId: `${emp.id}_${todayKey}_${kind}`,
+        employeeId: emp.id || null,
+        latitude: loc.lat !== undefined ? loc.lat : null,
+        longitude: loc.lng !== undefined ? loc.lng : null,
+        accuracyM: loc.accuracy !== undefined ? loc.accuracy : null,
+      }).catch(() => { /* queued on the device; drains when the network returns */ });
+    } catch (e) { /* never blocks a punch */ }
+  }
+
   if (currentVerifyMode === "in") {
     // Punch In (Check-In) -> Marked Present immediately, photo goes to Admin
     records[`${employeeState.currentEmployee.id}_${todayKey}`] = {
@@ -2162,6 +2245,7 @@ async function handleConfirmVerification() {
       selfieUrl: capturedLiveSelfie
     };
     setStore(STORAGE_KEYS.RECORDS, records);
+    punchEvidence("in");
     showToast(`Attendance marked Present at ${timeStr}! Photo submitted to Admin Console.`, "success");
   } else {
     // Punch Out (Clock-Out)
@@ -2177,6 +2261,7 @@ async function handleConfirmVerification() {
       existing.outSelfieUrl = capturedLiveSelfie;
       records[`${employeeState.currentEmployee.id}_${todayKey}`] = existing;
       setStore(STORAGE_KEYS.RECORDS, records);
+      punchEvidence("out");
       // Re-derive the day classification (Present / Short hours - review /
       // Short hours (LOP)) now that worked hours are known.
       try { if (typeof recalcDayForRecord === "function") recalcDayForRecord(employeeState.currentEmployee.id, todayKey); } catch (e) { console.error(e); }
@@ -4051,7 +4136,7 @@ function renderDashboardStats() {
 // 10. BOOTSTRAP
 // ============================================================================
 
-window.addEventListener("DOMContentLoaded", () => {
+function bootEmployeePortal() {
   try { initClock(); } catch (e) { console.error("Error in initClock:", e); }
   try { if (window.DayPopover) DayPopover.init(); } catch (e) { console.error("Error in DayPopover.init:", e); }
   try { initTheme(); } catch (e) { console.error("Error in initTheme:", e); }
@@ -4069,4 +4154,36 @@ window.addEventListener("DOMContentLoaded", () => {
   try { checkActiveSession(); } catch (e) { console.error("Error in checkActiveSession:", e); }
 
   console.log("VKON Employee Portal Initialized.");
+}
+
+// The adapter decides whether this browser reads shared server state or only its
+// own localStorage, and that answer is not known until /api/health has come back.
+// Booting before it would paint the previous visit's cached copy as though it were
+// current, and the first edits of the session would be pushed up as if they were
+// the truth. On a static host there is no adapter, so this is the immediate call
+// it always was.
+const domReady = new Promise((resolve) => {
+  if (document.readyState !== "loading") resolve();
+  else window.addEventListener("DOMContentLoaded", resolve, { once: true });
+});
+const adapterReady = (window.VKON_API && VKON_API.ready) ? VKON_API.ready : Promise.resolve();
+
+Promise.all([domReady, adapterReady]).then(() => {
+  if (window.VKON_API && VKON_API.needsPasswordChange && VKON_API.needsPasswordChange()) {
+    // A cookie from a sign-in that never finished its forced password change. The
+    // server has shared nothing, so the local mirror of the session cannot be
+    // honoured: sign the shell out and put the demand in front of them.
+    sessionStorage.removeItem(STORAGE_KEYS.CURRENT_SESSION);
+    localStorage.removeItem(STORAGE_KEYS.CURRENT_SESSION);
+    bootEmployeePortal();
+    if (window.VKON_PASSWORD_CHANGE) {
+      VKON_PASSWORD_CHANGE.open({
+        requireCurrent: false,
+        message: "This account is still using the temporary password it was issued. Set a new one to reach the shared attendance data.",
+        onSuccess: () => { window.location.reload(); }
+      });
+    }
+    return;
+  }
+  bootEmployeePortal();
 });

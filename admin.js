@@ -43,6 +43,11 @@ function checkAdminAuth() {
 
       const quickBtn = document.getElementById("quickFillAdminBtn");
       if (quickBtn) {
+        // A one-tap fill of the administrator identity belongs to the demo. Once a
+        // real server is authenticating, offering it invites people to try the
+        // account that matters most. The button alone, never a container that also
+        // holds the mode badge below it.
+        quickBtn.style.display = serverBacked() ? "none" : "";
         // Identity only -- no credential is filled in, printed or stored.
         quickBtn.onclick = () => {
           const u = document.getElementById("adminOverlayUsername");
@@ -50,6 +55,25 @@ function checkAdminAuth() {
           loginForm.dispatchEvent(new Event("submit"));
         };
       }
+
+      // The employee portal says which mode it is in; this screen decides who can
+      // change everyone's records, so it has to say the same thing. Like that badge,
+      // this one only ever shows before sign-in, so it describes the server rather
+      // than claiming a sign-in that has not happened.
+      const modeBadge = document.getElementById("adminAuthModeBadge");
+      function paintAdminAuthBadge() {
+        if (!modeBadge) return;
+        if (serverBacked()) {
+          modeBadge.textContent = "Attendance server \u2014 sign in required";
+        } else if (typeof demoAuthEnabled === "function" && demoAuthEnabled()) {
+          modeBadge.textContent = "Demo mode \u2014 not authenticated";
+        } else {
+          modeBadge.textContent = "Sign-in disabled";
+        }
+      }
+      paintAdminAuthBadge();
+      // The mode is only known once /api/health has answered.
+      if (window.VKON_API && VKON_API.ready) VKON_API.ready.then(paintAdminAuthBadge);
 
       function showOverlayAlert(title, message) {
         if (!errorAlert) return;
@@ -63,14 +87,39 @@ function checkAdminAuth() {
         errorAlert.classList.add("shake");
       }
 
-      loginForm.onsubmit = (e) => {
+      loginForm.onsubmit = async (e) => {
         e.preventDefault();
         const enteredUser = document.getElementById("adminOverlayUsername").value;
         const enteredPass = document.getElementById("adminOverlayPassword").value;
 
-        // TEMPORARY demo check only -- see the demo-auth note in shared.js. It
-        // returns a code, so nothing below can echo a credential back.
-        const result = demoAuthenticate(enteredUser, enteredPass);
+        // Against a server this asks the server; otherwise it is the TEMPORARY demo
+        // check (see the demo-auth note in shared.js). Either way it returns a code,
+        // so nothing below can echo a credential back.
+        const result = await signIn(enteredUser, enteredPass);
+
+        if (result.code === "passwordChange") {
+          showOverlayAlert("First Sign-In", "Your account is still using the temporary password issued to it. Set a new one below, then sign in again.");
+          if (window.VKON_PASSWORD_CHANGE) {
+            VKON_PASSWORD_CHANGE.open({
+              requireCurrent: false,
+              session: result.session,
+              message: "Choose the password you will use from now on. The attendance server keeps nothing readable until this is done."
+            });
+          }
+          return;
+        }
+        if (result.code === "throttled") {
+          showOverlayAlert("Too Many Attempts", result.message || "Too many attempts. Please wait a moment and try again.");
+          return;
+        }
+        if (result.code === "unreachable") {
+          showOverlayAlert("Server Unreachable", "The attendance server could not be reached. Sign in again once the connection is back.");
+          return;
+        }
+        if (result.code === "noRoster") {
+          showOverlayAlert("Account Not Linked", "Your sign-in worked, but this account is not linked to an employee record yet.");
+          return;
+        }
 
         if (result.code === "unconfigured") {
           showOverlayAlert("Sign-In Unavailable", DEMO_AUTH_UNAVAILABLE_MSG);
@@ -80,7 +129,12 @@ function checkAdminAuth() {
 
         if (result.code === "admin") {
           if (errorAlert) errorAlert.style.display = "none";
-          const currentCreds = getAdminCredentials();
+          // On a server-backed sign-in the name and username come from the session
+          // the server issued, not from what the browser holds for the demo.
+          const serverSession = result.session || null;
+          const currentCreds = serverSession
+            ? { username: serverSession.username, name: serverSession.name }
+            : getAdminCredentials();
           const adminSession = {
             username: currentCreds.username,
             name: currentCreds.name || "VKON Executive Administrator",
@@ -213,7 +267,9 @@ function initAdminTabs() {
     });
   });
 
-  document.getElementById("adminLogoutBtn").addEventListener("click", () => {
+  document.getElementById("adminLogoutBtn").addEventListener("click", async () => {
+    // Leave the server session too, or the cookie outlives the person who used it.
+    if (serverBacked()) { try { await signOut(); } catch (e) { /* local clear still runs */ } }
     sessionStorage.removeItem(STORAGE_KEYS.CURRENT_SESSION);
     localStorage.removeItem(STORAGE_KEYS.CURRENT_SESSION);
     localStorage.removeItem("apex_session_v5");
@@ -3599,9 +3655,39 @@ function startAdminConsole() {
   console.log("VKON Executive Admin Console initialized.");
 }
 
-window.addEventListener("DOMContentLoaded", () => {
+function bootAdminConsole() {
   initThemeSystem();
   if (checkAdminAuth()) {
     startAdminConsole();
   }
+}
+
+// Wait for the adapter's verdict on where this console reads its data from. An
+// administrator who approves a request against a stale local copy, before the
+// shared state has arrived, would push an out-of-date document up and take a
+// conflict. On a static host there is no adapter and this is the same immediate
+// DOMContentLoaded handler it always was.
+const adminDomReady = new Promise((resolve) => {
+  if (document.readyState !== "loading") resolve();
+  else window.addEventListener("DOMContentLoaded", resolve, { once: true });
+});
+const adminAdapterReady = (window.VKON_API && VKON_API.ready) ? VKON_API.ready : Promise.resolve();
+
+Promise.all([adminDomReady, adminAdapterReady]).then(() => {
+  if (window.VKON_API && VKON_API.needsPasswordChange && VKON_API.needsPasswordChange()) {
+    // A half-finished first sign-in. The server has shared nothing, so the stored
+    // admin session cannot be honoured: show the gate instead of an empty console.
+    sessionStorage.removeItem(STORAGE_KEYS.CURRENT_SESSION);
+    localStorage.removeItem(STORAGE_KEYS.CURRENT_SESSION);
+    bootAdminConsole();
+    if (window.VKON_PASSWORD_CHANGE) {
+      VKON_PASSWORD_CHANGE.open({
+        requireCurrent: false,
+        message: "This account is still using the temporary password it was issued. Set a new one to reach the shared attendance data.",
+        onSuccess: () => { window.location.reload(); }
+      });
+    }
+    return;
+  }
+  bootAdminConsole();
 });

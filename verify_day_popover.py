@@ -93,10 +93,10 @@ def verify_all():
         "index.html script order wrong (expected shared -> day-popover -> app)"
     assert admin_html.index("shared.js?v=") < admin_html.index("day-popover.js?v=") < admin_html.index("admin.js?v="), \
         "admin.html script order wrong (expected shared -> day-popover -> admin)"
-    need("shared.js?v=20261027_wfh1" in index_html and "shared.js?v=20261027_wfh1" in admin_html,
+    need("shared.js?v=20261027_bk3" in index_html and "shared.js?v=20261027_bk3" in admin_html,
          "shared.js token not bumped")
-    need("app.js?v=20261027_roll1" in index_html, "app.js token not bumped")
-    need("admin.js?v=20261026_sec1" in admin_html, "admin.js token not bumped")
+    need("app.js?v=20261027_bk3" in index_html, "app.js token not bumped")
+    need("admin.js?v=20261027_bk3" in admin_html, "admin.js token not bumped")
     need("styles.css?v=20261026_nm2" in index_html and "styles.css?v=20261026_nm2" in admin_html,
          "styles.css token not bumped")
     for cls in [".day-popover", ".dp-late", ".dp-short", ".dp-ontime", "focus-visible"]:

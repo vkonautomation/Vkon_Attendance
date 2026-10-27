@@ -28,14 +28,24 @@ __pycache__/
 *.pyc
 .pytest_cache/
 
-# Backend source (must never be reachable as a static file)
-server/
+# Scratch output from a test run pointed at VKON_TEST_DATA_DIR. It can contain a
+# live SQLite database and a one-time credentials file.
+.scratch/
 
-# Tests and docs are not part of the served site
+# Backend source is NOT excluded here any more. Docker honours exactly one ignore
+# file per build, and the backend image (Dockerfile.backend) needs server/ while
+# the static image must not have it. The real control is that the static Dockerfile
+# lists what it copies and never copies server/, and that the backend serves files
+# from an explicit allow-list. See server/main.py PUBLIC_FILES.
+
+# Tests and docs are not part of the served site. requirements.txt stays available:
+# Dockerfile.backend installs from it, and the static image never reads it.
 test_*.py
 test_*.js
 verify_*.py
+docs/
 README.md
 Dockerfile
+Dockerfile.backend
 docker-compose.yml
 .dockerignore

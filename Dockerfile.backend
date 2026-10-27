@@ -1,0 +1,71 @@
+# VKON Attendance -- full stack: the API and the front end in one container.
+#
+# One origin on purpose. The browser talks to /api/* on the same host that served
+# the page, so there is no CORS, no preflight round trip on a weak mobile
+# connection, and the session cookie is first-party and httpOnly -- which is also
+# why no token is ever stored in localStorage, where an XSS could read it.
+#
+# The static image (Dockerfile) is unchanged and still the default deployment. This
+# one is the deliberate switch: see docs/backend.md.
+#
+# .dockerignore no longer excludes server/, because one ignore file has to serve both
+# builds. The disclosure control here is not the build context: it is PUBLIC_FILES in
+# server/main.py, which answers a request for /server/config.py or /.env with a 404.
+
+# --- deps ----------------------------------------------------------------------
+# Resolved into a prefix so the runtime stage can copy one directory and inherit
+# nothing else from the builder (no pip, no cache, no compiler).
+FROM python:3.12-slim AS deps
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+WORKDIR /build
+COPY requirements.txt /build/
+RUN pip install --prefix=/install -r requirements.txt
+
+# --- runtime -------------------------------------------------------------------
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    VKON_ENV=production \
+    VKON_DATA_DIR=/var/lib/vkon \
+    VKON_DB_PATH=/var/lib/vkon/vkon.db
+
+WORKDIR /app
+
+# The interpreter on PATH is the base image's own; only /install moves over, landing
+# on /usr/local so site-packages resolves exactly as pip intended.
+COPY --from=deps /install /usr/local
+
+# Backend source and the browser files, copied explicitly. Nothing else from the
+# repository enters the image: no .git, no tests, no .env.
+COPY server/ /app/server/
+COPY index.html admin.html styles.css /app/
+COPY app.js admin.js shared.js /app/
+COPY js/ /app/js/
+COPY assets/ /app/assets/
+
+# uid 10001 matches the static image so the same named volume keeps its ownership
+# when a deployment switches from one to the other.
+RUN mkdir -p /var/lib/vkon \
+ && useradd --system --uid 10001 --no-create-home --shell /usr/sbin/nologin vkon \
+ && chown -R vkon:vkon /app /var/lib/vkon
+
+USER vkon
+
+EXPOSE 8000
+
+# Single worker, deliberately. SQLite in WAL mode is safe with one writer, and the
+# login brute-force counters live in process memory; several workers would multiply
+# both the write contention and the allowed attempt budget. Scale by container, not
+# by worker, if this ever needs it.
+#
+# No --proxy-headers. Uvicorn would then trust X-Forwarded-For from whoever connects,
+# and behind a Cloudflare Tunnel that is the tunnel itself -- so an attacker could
+# forge the source address and dodge rate limiting. The application reads
+# cf-connecting-ip instead, and only when VKON_TRUST_PROXY_HEADERS is set.
+CMD ["python", "-m", "uvicorn", "server.main:app", "--host", "0.0.0.0", "--port", "8000"]
