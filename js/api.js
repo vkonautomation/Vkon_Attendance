@@ -359,10 +359,16 @@ window.VKON_API = (function () {
    * (length, blocklist, not the username) and clears the forced-change flag.
    */
   async function changePassword(currentPassword, newPassword) {
+    const body = { newPassword: newPassword };
+    // An empty current password means the dialog never asked for one, which is the
+    // forced first change. Sending "" there was rejected by the request schema as a
+    // 422 before the handler ran, so the key is left out and the verified sign-in
+    // stands as the proof instead.
+    if (currentPassword) body.currentPassword = currentPassword;
     try {
       await request("/auth/password", {
         method: "POST",
-        body: JSON.stringify({ currentPassword: currentPassword, newPassword: newPassword }),
+        body: JSON.stringify(body),
       });
     } catch (err) {
       return { ok: false, message: err.message || "Could not change the password." };

@@ -5,7 +5,7 @@ client does not need a translation layer on the hot path.
 """
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
@@ -16,7 +16,11 @@ class LoginRequest(BaseModel):
 
 
 class PasswordChange(BaseModel):
-    currentPassword: str = Field(min_length=1, max_length=200)
+    # Optional because the forced first change is already authorised: the person
+    # proved the one-time password to sign in, and the dialog deliberately does not
+    # ask for it a second time. A required min_length=1 here rejected the browser's
+    # own payload with a 422 before the handler ever ran.
+    currentPassword: Optional[str] = Field(default=None, max_length=200)
     newPassword: str = Field(min_length=1, max_length=200)
 
 

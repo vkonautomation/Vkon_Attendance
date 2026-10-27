@@ -522,3 +522,52 @@ def test_the_csp_does_not_open_more_than_the_pages_need(client):
             assert host in allowed, f"{directive} allows {host}, which the app never uses"
     assert "default-src 'self'" in csp
     assert "object-src 'none'" in csp
+
+
+# ------------------------------------------------------- forced password change
+
+def test_the_forced_change_accepts_the_payload_the_browser_sends(
+        client, employee_roster_published):
+    """A first login may change its password without re-typing it.
+
+    Regression: js/password-change.js deliberately hides the current-password field
+    on a first login - the one-time password is already in the sign-in box - but the
+    request schema required min_length=1 on that key. Every forced change from a real
+    browser therefore died with a 422, and no test saw it because each one handily
+    sent the password the user was never asked for.
+    """
+    temp = _temp_password("priya")
+    fresh = TestClient(app)
+    signed_in = _login(fresh, "priya", temp)
+    assert signed_in.status_code == 200, signed_in.text
+    assert signed_in.json()["mustChangePassword"] is True
+
+    r = fresh.post("/api/auth/password", json={"newPassword": "Priya-Long-Pass-4"})
+    assert r.status_code == 200, r.text
+    assert r.json() == {"ok": True}
+    # The whole point of the dialog: the data gate opens behind it.
+    assert fresh.get("/api/state").status_code == 200
+
+    burned = TestClient(app)
+    assert _login(burned, "priya", temp).status_code == 401, "the one-time password must stop working"
+    rotated = TestClient(app)
+    assert _login(rotated, "priya", "Priya-Long-Pass-4").status_code == 200
+
+
+def test_only_the_forced_change_may_omit_the_current_password(client, employee_roster_published):
+    """The exemption above has to expire with the one-time password.
+
+    Once an account holds a password of its own, the session no longer proves the
+    old one was known, so a change without it must be refused rather than quietly
+    letting a hijacked cookie re-key the account.
+    """
+    past_change = _employee_client(client, "EMP001", "mukesh")
+
+    r = past_change.post("/api/auth/password", json={"newPassword": "Mukesh-Rotated-Twice-2"})
+    assert r.status_code == 400, r.text
+    assert "current password" in r.json()["error"]["message"].lower()
+
+    untouched = TestClient(app)
+    assert _login(untouched, "mukesh", "Mukesh-Long-Pass-1").status_code == 200, \
+        "the refused change must not have moved the password"
+

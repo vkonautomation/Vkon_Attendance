@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 Static verification for the Manager + Admin Approval Workflow.
 
@@ -127,8 +127,8 @@ def verify_all():
 
     # Cache tokens bumped for the current build (backend adapter wiring: bk1).
     print("\n[Cache] cache-buster tokens present (current build):")
-    need("_apr" in index_html and "20261027_bk3" in index_html, "index.html cache tokens not set")
-    need("_apr" in admin_html and "20261027_bk3" in admin_html, "admin.html cache tokens not set")
+    need("_apr" in index_html and "20261027_bk4" in index_html, "index.html cache tokens not set")
+    need("_apr" in admin_html and "20261027_bk4" in admin_html, "admin.html cache tokens not set")
     print("  PASS")
 
     print("\n" + "=" * 54)

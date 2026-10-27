@@ -218,7 +218,16 @@ def logout(request: Request, db: Session = Depends(get_db)) -> dict:
 def change_password(body: PasswordChange, request: Request,
                     db: Session = Depends(get_db)):
     user = require_login(request, db)
-    if not security.verify_password(body.currentPassword, user.password_hash):
+    # Treat an empty string as "not offered": the first-login dialog never asks for
+    # the current password, and an older cached client may still send "".
+    supplied = body.currentPassword or None
+    if supplied is None:
+        # Omitting it is only safe while the account still carries its generated
+        # password, because verifying that password is what created this session.
+        # Once the account has a real password of its own, a change has to prove it.
+        if not user.must_change_password:
+            return error(400, "Enter your current password to change it.")
+    elif not security.verify_password(supplied, user.password_hash):
         return error(401, "Your current password is not correct.")
     problem = security.password_problem(body.newPassword, user.username)
     if problem:

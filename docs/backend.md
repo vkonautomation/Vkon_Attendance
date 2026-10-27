@@ -117,6 +117,16 @@ There is no default password anywhere in this repository or in the image.
   server refuses every data request until it is done.
 - Existing accounts are never reset by a roster edit. Their password, role and lock
   state are theirs.
+- **The forced change asks for no current password, on purpose.** The dialog hides that
+  field on a first login because the one-time password is already sitting in the sign-in
+  box, so the browser posts `{"newPassword": ...}` and nothing else. `currentPassword`
+  is therefore optional, and the server only waives it while `must_change_password` is
+  still set — verifying that password is what created the session. Once the account has
+  a password of its own the field is required again and a change without it is refused.
+  This contract broke once, silently: the schema demanded a non-empty `currentPassword`
+  and every real browser got a 422, while each test passed because it cheerfully sent
+  the password the UI never collects. A test that supplies input the user was not asked
+  for proves nothing about the user's path.
 
 ## Boundaries of phase 1
 

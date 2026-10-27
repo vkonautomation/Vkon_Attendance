@@ -190,6 +190,42 @@ const drain = () => new Promise((r) => setImmediate(r));
         scheduled[scheduled.length - 1] > scheduled[0], true);
   check("without ever exceeding the cap", Math.max(...scheduled) <= 30000, true);
 
+  // ------------------------------------------- the forced first change payload
+  // js/password-change.js hides the current-password field on a first login, because
+  // the one-time password is already sitting in the sign-in box. api.js used to send
+  // an empty string for it, the request schema required a non-empty one, and every
+  // real-browser change died with a 422 - invisible to any test that cheerfully
+  // supplied the password the user was never asked to type.
+  const bodies = [];
+  const pw = build((url, opts) => {
+    if (url === "/api/health") return { status: 200, body: { status: "ok" } };
+    if (url === "/api/auth/me") return { status: 200, body: { signedIn: false } };
+    if (url === "/api/auth/login") {
+      return { status: 200, body: { role: "employee", employeeId: "EMP002", mustChangePassword: true } };
+    }
+    if (url === "/api/auth/password") {
+      bodies.push(JSON.parse(opts.body));
+      return { status: 200, body: { ok: true } };
+    }
+    if (url === "/api/state") return { status: 200, body: { serverVersion: 1, stores: {} } };
+    return { status: 404, body: {} };
+  });
+  await pw.api.ready;
+  await drain();
+  await pw.api.login("priya", "one-time");
+  await drain();
+
+  const forced = await pw.api.changePassword("", "Priya-Long-Pass-4");
+  await drain();
+  check("the forced change goes through", forced.ok, true);
+  check("without an empty current-password on the wire",
+        bodies.length > 0 && !("currentPassword" in bodies[0]), true);
+  check("carrying the chosen password instead", bodies[0].newPassword, "Priya-Long-Pass-4");
+
+  await pw.api.changePassword("Priya-Long-Pass-4", "Priya-Another-Pass-9");
+  await drain();
+  check("a later change does prove the old password", bodies[1].currentPassword, "Priya-Long-Pass-4");
+
   console.log(fails ? `\n>>> ${fails} ADAPTER ASSERTION(S) FAILED <<<` : "\n>>> ADAPTER AUTH GATE OK <<<");
   process.exit(fails ? 1 : 0);
 })();
