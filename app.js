@@ -342,7 +342,16 @@ function initClock() {
     const dayKey = formatDateKey(pDate);
     if (dayKey !== lastDayKey) {
       lastDayKey = dayKey;
+      // Midnight passed with this tab still open. Everything the load-time pass in
+      // shared.js reconciles has to be reconciled again here, and the punch card has
+      // to be rebuilt after it: yesterday's unfinished punch is no longer a live
+      // shift, so leaving it open would keep the card offering "Punch Out" for a
+      // shift that ended yesterday and never offer today's "Punch In".
+      try { finalizeStaleOpenPunches(); } catch (e) { /* non-fatal */ }
+      try { recalcShortHoursDays(); } catch (e) { /* non-fatal */ }
+      try { reconcileWfhRecords(); } catch (e) { /* non-fatal */ }
       try { renderMonthlyCalendar(); } catch (e) { /* non-fatal */ }
+      try { updatePunchStatus(); } catch (e) { /* non-fatal */ }
       try { renderRegAlertBanner(); } catch (e) { /* non-fatal */ }
       try { if (employeeState.currentEmployee) renderNotifications(employeeState.currentEmployee.id); } catch (e) { /* non-fatal */ }
     }
@@ -1543,6 +1552,15 @@ function openVerificationModal(mode = "in") {
     const todayKey = getTodayKey();
     const records = getStore(STORAGE_KEYS.RECORDS, {});
     const todayRecord = records[`${employeeState.currentEmployee.id}_${todayKey}`];
+    // Nothing open for today means the shift being closed belongs to an earlier day
+    // (the tab sat open across midnight) or was already closed. Say that plainly
+    // instead of measuring elapsed time against a record that is not there and
+    // reporting a confusing "Worked: 0h 00m".
+    if (!todayRecord || (typeof isOpenPunch === "function" && !isOpenPunch(todayRecord))) {
+      showToast("No open shift today to punch out from. Mark Present to start today, or raise a Regularisation for the missed day.", "warning");
+      playSound("error");
+      return;
+    }
     const minPolicy = getMinWorkDurationPolicy();
     const elapsedMinutes = getElapsedShiftMinutes(todayRecord);
     const reqMinutes = minPolicy.totalMinutes || (minPolicy.hours * 60 + minPolicy.minutes);
