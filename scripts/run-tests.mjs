@@ -185,10 +185,12 @@ if (SKIP_SERVE) {
     // requests share one loopback address, so a live per-IP limit would lock the suite
     // out. The hardened behaviour is exercised against its own instance in phase 2.
     // punches.mjs belongs here too: it posts no Origin and needs the DB, the same as auth.
+    // roster.mjs likewise: it drives /api/employees over the wire against the real employees
+    // table and, like punches, sends no Origin and relies on the DB being reachable.
     await servePhase(
       PORT,
       { PUBLIC_ORIGIN: "", VKON_TRUST_PROXY_HEADERS: "false", RATE_LIMIT_MAX_FAILURES: "1000" },
-      ["tests/probe.mjs", "tests/integration/auth.mjs", "tests/integration/punches.mjs"],
+      ["tests/probe.mjs", "tests/integration/auth.mjs", "tests/integration/punches.mjs", "tests/integration/roster.mjs"],
     );
 
     // Phase 2 -- the hardened instance. PUBLIC_ORIGIN and the real 5-failure window are

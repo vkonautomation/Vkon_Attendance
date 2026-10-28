@@ -19,11 +19,15 @@ repository being web-served is a different build, not a longer deny list.
   * `js/`: the server adapter (`api.js`), password flows, day popover, approval
     modal, data transfer. `assets/`: logos and icons.
 * **`app/api/` — the server:** route handlers only, no pages. `health`, the
-  `auth/*` vertical slice (login, logout, me, password, sessions) and `punches` are live.
+  `auth/*` vertical slice (login, logout, me, password, sessions), `punches` and
+  `employees` are live.
   Auth is hardened (M4: two-bucket rate limiting on sign-in, an Origin check on every
   non-GET, body-size ceilings, generic errors); `POST /api/punches` (M6) is idempotent on
   the queue's key, draws the geofence verdict server-side from the stored fix, and closes
-  an unfinished prior day on a new check-in. The `/state` document facade is deliberately
+  an unfinished prior day on a new check-in. `GET /api/employees` (M7) scopes the roster by
+  the role on the session row — an admin sees everyone, a manager their own team, an employee
+  only themselves — and `POST`/`PATCH` are admin-only, with `PATCH` the place a manager
+  re-org is checked against the cycle rule. The `/state` document facade is deliberately
   not shipped yet — see the note below — so the portal still hydrates from `public/`.
 * **`lib/`** — `config.ts` reads and validates the environment once; `db/` is the
   app-role pool and the append-only audit writer; `auth/` is bcrypt, the session
@@ -35,8 +39,12 @@ repository being web-served is a different build, not a longer deny list.
   directly and the browser and the server are held to the same arithmetic; `geofence.ts`
   is the server-side presence verdict (haversine mirroring `shared.js`, fail-closed on an
   unusable fix). `punches.ts` is the punch command/projection (one row per employee per IST
-  day) and `state/settings.ts` reads the fence radius and accuracy gate from the `settings`
-  table so a policy change re-decides history, not only new punches.
+  day), `roster.ts` is the employee directory (role-scoped reads, admin writes, and the
+  constraint-violation translation that turns a `manager_id` write into a clear field error
+  when it would close a reporting loop), `http/fields.ts` the small validated body readers
+  both roster routes share so their rules cannot diverge, and `state/settings.ts` reads the
+  fence radius and accuracy gate from the `settings` table so a policy change re-decides
+  history, not only new punches.
 * **`server/`** — the outgoing FastAPI backend, still the thing production runs
   until the Next.js one is verified. It reads the same `public/` directory.
 * **`scripts/`** — `start-standalone.mjs` assembles and runs the deployable
@@ -73,7 +81,13 @@ repository being web-served is a different build, not a longer deny list.
   real `records` table (a replayed flush leaves one row; a fix coarser than the trust limit
   is refused by the fence but still recorded as evidence; a tab left open past midnight
   yields yesterday's close at the boundary and today's open; a non-admin cannot punch for
-  another and an anonymous punch is 401).
+  another and an anonymous punch is 401);
+  `integration/roster.mjs` drives the M7 slice over HTTP against the served payload and the
+  real `employees` table (an employee's create/patch is 403 while an admin's lands; a manager
+  reads exactly themselves and their direct reports and an employee only themselves; a
+  mid-session deactivation is a 401 on the very next request with the cookie still held; and
+  filing an employee under one of their own reports closes a loop that is refused, leaving the
+  manager pointer unchanged).
 * **Verification and testing scripts** (`test_*.js`, `verify_*.py`,
   `test_backend.py`) sit at the repository root and load the portal from
   `public/`; `node scripts/run-tests.mjs` runs all of them.

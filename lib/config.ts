@@ -50,6 +50,7 @@ export interface AppConfig {
     auth: number;
     state: number;
     punch: number;
+    roster: number;
   };
 
   /**
@@ -99,6 +100,10 @@ const DEFAULTS = {
   // A punch is a kind, a timestamp and three numbers. Small on purpose: a punch endpoint
   // that takes a large body is a punch endpoint being used to store something else.
   punchBodyBytes: 8192,
+  // A roster write is one employee record: a handful of short strings and numbers. Same
+  // ceiling as a punch -- an employee who does not fit in 8 KiB is a request being used to
+  // upload something that is not an employee.
+  rosterBodyBytes: 8192,
   // A phone reporting 5 km of accuracy was not meaningfully at the office. Matches the
   // outgoing FastAPI's VKON_MAX_ACCURACY default so a re-implementation is not stricter or
   // laxer than the thing it replaces.
@@ -165,6 +170,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       auth: num(env.MAX_AUTH_BODY_BYTES, DEFAULTS.authBodyBytes, 256, 1024 * 1024, "MAX_AUTH_BODY_BYTES"),
       state: num(env.MAX_STATE_BODY_BYTES, DEFAULTS.stateBodyBytes, 1024, 16 * 1024 * 1024, "MAX_STATE_BODY_BYTES"),
       punch: num(env.MAX_PUNCH_BODY_BYTES, DEFAULTS.punchBodyBytes, 256, 64 * 1024, "MAX_PUNCH_BODY_BYTES"),
+      roster: num(env.MAX_ROSTER_BODY_BYTES, DEFAULTS.rosterBodyBytes, 256, 64 * 1024, "MAX_ROSTER_BODY_BYTES"),
     },
     geofence: {
       defaultMaxTrustedAccuracyM: num(env.GEOFENCE_MAX_ACCURACY_M, DEFAULTS.maxTrustedAccuracyM, 1, 5000, "GEOFENCE_MAX_ACCURACY_M"),
