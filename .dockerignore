@@ -55,6 +55,7 @@ deploy/
 README.md
 Dockerfile
 Dockerfile.backend
+Dockerfile.app
 docker-compose.yml
 .dockerignore
 

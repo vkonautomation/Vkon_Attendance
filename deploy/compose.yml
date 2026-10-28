@@ -1,4 +1,10 @@
-# VKON Attendance -- PostgreSQL, and the network it lives on.
+# VKON Attendance -- the Next.js app, PostgreSQL, and the network they live on.
+#
+# The `db` service is the standing production database. The `app` service is the
+# M12 cut-over target: the Next.js container that replaces the nginx-serves-the-git-
+# working-tree arrangement that attendance.vkon.in runs on today. It is defined here
+# but the host does not start it until docs/cutover.md is executed -- until then this
+# file is a template, exactly as the db service was when it first landed.
 #
 # This file is tracked, and it is a template. The deploy host keeps its own
 # untracked docker-compose.yml at the repository root, because the host updates by
@@ -81,6 +87,80 @@ services:
       - max_connections=40
       - -c
       - timezone=UTC
+
+  app:
+    # The Next.js container. Built from Dockerfile.app, which ships only the
+    # standalone output: server.js, its pruned node_modules, .next/static and
+    # public/. The repository, .git, server/, db/ and every .env are simply not in
+    # the image, so the / 403 that a repo-root webroot now throws cannot recur, and
+    # neither can /.git or /server be fetched -- there is nothing above public/ to
+    # reach. That is the entire point of the cut-over.
+    build:
+      context: ..
+      dockerfile: Dockerfile.app
+    image: vkon-attendance-app:latest
+    container_name: attendance-app
+    restart: unless-stopped
+
+    # The app connects as attendance_app and can only read/write; it never migrates.
+    # Migrations are run from the host checkout as the owner before this starts (see
+    # docs/cutover.md), so a running container holds no copy of the schema and no way
+    # to change it. It waits for the database to be healthy, not merely started.
+    depends_on:
+      db:
+        condition: service_healthy
+
+    environment:
+      VKON_ENV: production
+      # The app-role connection string. Required; lib/db/pool.ts refuses to boot
+      # without it rather than falling back to the owner, which has CREATE.
+      DATABASE_URL_APP: ${DATABASE_URL_APP:?set DATABASE_URL_APP in the host .env}
+      # https://attendance.vkon.in -- the Origin check (M4) compares every non-GET
+      # against it. Required in production; config.ts throws if it is blank.
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?set PUBLIC_ORIGIN in the host .env}
+      # attendance.vkon.in is HTTPS end to end via the tunnel, so the session cookie
+      # must be Secure. config.ts refuses to start production with it off.
+      COOKIE_SECURE: "true"
+      # Behind cloudflared the socket peer is the tunnel container, so the per-address
+      # brute-force bucket needs cf-connecting-ip. Trusting it is only safe because
+      # the tunnel is the sole way in -- which is what the cut-over establishes.
+      VKON_TRUST_PROXY_HEADERS: "true"
+      # Measure on THIS host's CPU (the calibrate script lives in the host checkout,
+      # not in the image, which ships only the standalone payload) before signing off:
+      #   npm ci && npm run bcrypt:calibrate      # set BCRYPT_COST_FACTOR from its output
+      BCRYPT_COST_FACTOR: ${BCRYPT_COST_FACTOR:-11}
+      SESSION_IDLE_HOURS: ${SESSION_IDLE_HOURS:-12}
+      SESSION_ABSOLUTE_HOURS: ${SESSION_ABSOLUTE_HOURS:-36}
+      RATE_LIMIT_MAX_FAILURES: ${RATE_LIMIT_MAX_FAILURES:-5}
+      RATE_LIMIT_WINDOW_MINUTES: ${RATE_LIMIT_WINDOW_MINUTES:-15}
+
+    # Loopback only, on the port the tunnel already points at. cloudflared runs on
+    # the host and its ingress for attendance.vkon.in is http://127.0.0.1:8135, so
+    # taking over 8135 (once nginx releases it) means the tunnel config does not
+    # change at cut-over -- only what is listening behind it does. Nothing is bound
+    # on a public interface; the container is reachable from outside only via the
+    # tunnel, exactly as the database is reachable only via this network.
+    ports:
+      - "127.0.0.1:${APP_PORT:-8135}:8000"
+
+    networks:
+      - attendance-internal
+
+    # Liveness is /api/health, the same URL the browser probes to choose server vs
+    # local mode and the same URL run-tests.mjs waits on. node:slim ships no curl,
+    # so the check uses node's global fetch.
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:8000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
 
 networks:
   attendance-internal:

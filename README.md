@@ -61,8 +61,14 @@ repository being web-served is a different build, not a longer deny list.
   people are loaded on the deploy host, never committed here: this repository is
   public and `tests/guard.mjs` fails the build if anything looks like real data.
 * **`deploy/compose.yml`** — PostgreSQL on its own network and volume, publishing
-  no port. `deploy/compose.dev.yml` adds a loopback listener for a laptop, and is
-  kept separate so it cannot be applied to production by accident.
+  no port, plus the `app` service (built from `Dockerfile.app`) that is the M12
+  cut-over target: the Next.js container that takes over `127.0.0.1:8135` from the
+  nginx-serves-the-git-working-tree setup `attendance.vkon.in` runs on today. It ships
+  only the standalone payload, so `/.git` and `/server` are not merely denied, they are
+  absent. `deploy/compose.dev.yml` adds a loopback listener for a laptop, and is
+  kept separate so it cannot be applied to production by accident. The ordered
+  procedure — and the fix for the `/` 403 that M0 introduced on the old host — is
+  **`docs/cutover.md`**.
 * **`tests/`** — `guard.mjs` is the public-repository check, and tests itself so it
   cannot pass by being blind; `probe.mjs` asserts the shape of the running server
   (which URLs answer, which headers are set, what must stay unreachable);
