@@ -68,18 +68,26 @@ interface Fixture {
   expected?: Record<string, unknown>;
 }
 
+/**
+ * Date surface that takes "...anything", used only as the super() target below.
+ * Date's constructor is a set of fixed overloads with no rest signature, so
+ * `super(...args)` over an arbitrary-length array cannot type-check (ts(2556):
+ * a spread argument must be a tuple or go into a rest parameter). This alias
+ * re-declares just the call shape we forward through, so at runtime the exact
+ * arguments shared.js passed still reach the real Date unchanged (no-arg ->
+ * the pinned instant, a date string -> parsed, (y, m, d, ...) -> field-built),
+ * leaving behaviour identical.
+ */
+type VariadicDate = new (...args: any[]) => Date;
+
 /** A Date whose "now" is pinned, so shared.js's getNowIST() reads the fixture instant. */
 function makeFrozenDate(epochMs: number): typeof Date {
   const fixed = epochMs;
-  class FrozenDate extends Date {
+  class FrozenDate extends (Date as unknown as VariadicDate) {
     constructor(...args: any[]) {
       // new Date() with no args is the ONLY call that means "now"; every parsed or
       // field-built construction must fall through to the real Date behaviour.
-      if (args.length === 0) {
-        super(fixed);
-      } else {
-        super(...args);
-      }
+      super(...(args.length === 0 ? [fixed] : args));
     }
     static now(): number {
       return fixed;
