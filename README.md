@@ -6,22 +6,30 @@ A comprehensive web-based attendance and verification platform designed to track
 
 ## 📁 Project Structure
 
-The repository contains the following core components:
+Next.js owns the process: it serves the portal out of `public/` and hosts the API
+under `app/api/*`. `output: "standalone"` means the deployable is one directory,
+so nothing outside `public/` can be fetched over HTTP at all — the fix for the
+repository being web-served is a different build, not a longer deny list.
 
-* **Frontend & Pages:**
-  * `index.html`: Main user-facing check-in and dashboard interface[cite: 2].
-  * `admin.html`: Administrative control panel for managing records[cite: 2].
-  * `styles.css`: Core styling and layout sheets[cite: 2].
-  * `app.js` & `admin.js`: Frontend logic for user and admin actions[cite: 2].
-  * `shared.js`: Shared utility functions across pages[cite: 2].
-* **Verification & Testing Scripts:**
-  * `verify_present_day_and_all.py`: Validates present day attendance logs and records[cite: 2].
-  * `verify_checkin_and_login.py`: Handles check-in and authentication verification[cite: 2].
-  * `verify_ist_clock_and_time.py`: Ensures accurate Indian Standard Time (IST) clock synchronization[cite: 2].
-  * `test_all_8_requirements.py` & `verify_requirements.py`: Automated testing suites for core system requirements[cite: 2].
-  * Additional feature verification scripts (`verify_three_new_features.py`, `verify_new_4_requests.py`)[cite: 2].
-* **Assets:**
-  * Logos and iconography (`vkon-logo.svg`, `vkon-logo-light.png`, `vkon-logo-dark.png`, `vkon-icon.svg`)[cite: 2].
+* **`public/` — everything the browser can reach, and nothing else:**
+  * `index.html` / `admin.html`: the employee portal and the admin console.
+  * `shared.js`: the attendance rule engine (day status, LOP, quotas, alerts).
+  * `app.js` / `admin.js`: page logic for the portal and the console.
+  * `styles.css`: presentation.
+  * `js/`: the server adapter (`api.js`), password flows, day popover, approval
+    modal, data transfer. `assets/`: logos and icons.
+* **`app/api/` — the server:** route handlers only, no pages. `health` is live;
+  auth, punches, state and the rest arrive per milestone.
+* **`lib/`** — database access and HTTP helpers shared by the route handlers.
+* **`server/`** — the outgoing FastAPI backend, still the thing production runs
+  until the Next.js one is verified. It reads the same `public/` directory.
+* **`scripts/`** — `start-standalone.mjs` assembles and runs the deployable
+  payload; `run-tests.mjs` is the whole suite in one command.
+* **`tests/`** — `probe.mjs` asserts the shape of the running server (which URLs
+  answer, which headers are set, what must stay unreachable).
+* **Verification and testing scripts** (`test_*.js`, `verify_*.py`,
+  `test_backend.py`) sit at the repository root and load the portal from
+  `public/`; `node scripts/run-tests.mjs` runs all of them.
 
 ---
 

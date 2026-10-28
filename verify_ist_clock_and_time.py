@@ -1,15 +1,15 @@
-﻿def test_ist_implementation():
+def test_ist_implementation():
     print("=== VERIFYING INDIAN STANDARD TIME (IST) IMPLEMENTATION ===")
     
-    with open("shared.js", "r", encoding="utf-8") as f:
+    with open("public/shared.js", "r", encoding="utf-8") as f:
         shared = f.read()
-    with open("app.js", "r", encoding="utf-8") as f:
+    with open("public/app.js", "r", encoding="utf-8") as f:
         app = f.read()
-    with open("admin.js", "r", encoding="utf-8") as f:
+    with open("public/admin.js", "r", encoding="utf-8") as f:
         admin = f.read()
-    with open("index.html", "r", encoding="utf-8") as f:
+    with open("public/index.html", "r", encoding="utf-8") as f:
         html = f.read()
-    with open("styles.css", "r", encoding="utf-8") as f:
+    with open("public/styles.css", "r", encoding="utf-8") as f:
         css = f.read()
 
     # 1. IST Engine in shared.js

@@ -28,6 +28,12 @@ __pycache__/
 *.pyc
 .pytest_cache/
 
+# Build output from whoever last ran the app locally. A stale .next/ in the build
+# context is a second, older copy of the server inside the image.
+.next/
+out/
+*.tsbuildinfo
+
 # Scratch output from a test run pointed at VKON_TEST_DATA_DIR. It can contain a
 # live SQLite database and a one-time credentials file.
 .scratch/
@@ -43,7 +49,9 @@ __pycache__/
 test_*.py
 test_*.js
 verify_*.py
+tests/
 docs/
+deploy/
 README.md
 Dockerfile
 Dockerfile.backend

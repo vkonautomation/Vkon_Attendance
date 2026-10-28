@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 Static verification for the HIDE PUNCHING ON DECLARED HOLIDAYS feature.
 
@@ -20,7 +20,7 @@ import sys
 
 
 def read(name):
-    with open(name, "r", encoding="utf-8") as f:
+    with open("public/" + name, "r", encoding="utf-8") as f:
         return f.read()
 
 

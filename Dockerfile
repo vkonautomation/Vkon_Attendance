@@ -13,11 +13,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /srv
 
-# Dedicated public folder: only HTML, CSS, JS and images are copied in.
-COPY index.html admin.html styles.css /srv/public/
-COPY app.js admin.js shared.js /srv/public/
-COPY js/ /srv/public/js/
-COPY assets/ /srv/public/assets/
+# Dedicated public folder: only HTML, CSS, JS and images are copied in. Everything
+# the browser needs already lives under public/, so this is one directory and not
+# a list of files that could drift.
+COPY public/ /srv/public/
 
 # Data lives outside the served docroot; mount a volume here.
 RUN mkdir -p /var/lib/vkon \

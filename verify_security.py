@@ -11,15 +11,25 @@ def check(cond, msg):
         FAILURES.append(msg)
 
 
-SHIPPED = [
+# Two bases, because "what the browser can fetch" and "what the repository
+# contains" are different sets and the scan has to cover both. Everything the
+# portal loads now lives under public/; the deploy files stay at the root.
+WEB = [
     "shared.js", "app.js", "admin.js", "index.html", "admin.html",
+    "js/api.js", "js/password-change.js",
+]
+ROOT = [
     "Dockerfile", "docker-compose.yml", ".dockerignore", ".env.example", ".gitignore",
     # Added with the backend: these ship to the browser and to the image too, so a
     # burned credential in either would be published exactly like one in shared.js.
-    "js/api.js", "js/password-change.js", "Dockerfile.backend", "requirements.txt",
+    "Dockerfile.backend", "requirements.txt",
 ]
 src = {}
-for f in SHIPPED:
+SHIPPED = WEB + ROOT
+for f in WEB:
+    with open("public/" + f, "r", encoding="utf-8") as fh:
+        src[f] = fh.read()
+for f in ROOT:
     with open(f, "r", encoding="utf-8") as fh:
         src[f] = fh.read()
 

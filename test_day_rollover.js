@@ -2,7 +2,8 @@
 // and the punch card must be rebuilt when midnight passes with the tab open.
 const fs = require('fs');
 const vm = require('vm');
-const code = fs.readFileSync('shared.js', 'utf8');
+const path = require('path');
+const code = fs.readFileSync(path.join(__dirname, 'public', 'shared.js'), 'utf8');
 const sandbox = {
   console, localStorage: {
     _store: {}, getItem(k) { return this._store[k] || null; },
@@ -69,7 +70,7 @@ check('an open punch on a declared holiday is left as-is',
 // 5. Regression guard: the clock's day-rollover branch must re-run the reconciliation
 // AND repaint the punch card, in that order. Without updatePunchStatus() the card
 // keeps offering "Punch Out" for yesterday's shift after midnight.
-const appSrc = fs.readFileSync('app.js', 'utf8');
+const appSrc = fs.readFileSync(path.join(__dirname, 'public', 'app.js'), 'utf8');
 const roll = appSrc.split('if (dayKey !== lastDayKey) {')[1] || '';
 const rollEnd = roll.indexOf('\n    }'); // the closing brace of the rollover block
 const rollBlock = roll.slice(0, rollEnd > -1 ? rollEnd : 1200);

@@ -44,10 +44,7 @@ COPY --from=deps /install /usr/local
 # Backend source and the browser files, copied explicitly. Nothing else from the
 # repository enters the image: no .git, no tests, no .env.
 COPY server/ /app/server/
-COPY index.html admin.html styles.css /app/
-COPY app.js admin.js shared.js /app/
-COPY js/ /app/js/
-COPY assets/ /app/assets/
+COPY public/ /app/public/
 
 # uid 10001 matches the static image so the same named volume keeps its ownership
 # when a deployment switches from one to the other.

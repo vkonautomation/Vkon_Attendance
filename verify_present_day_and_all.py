@@ -3,17 +3,17 @@ import re
 def verify_all():
     print("=== TESTING COMPLETE PRESENT DAY & CALENDAR LOGIC ===")
 
-    with open("shared.js", "r", encoding="utf-8") as f:
+    with open("public/shared.js", "r", encoding="utf-8") as f:
         shared = f.read()
-    with open("app.js", "r", encoding="utf-8") as f:
+    with open("public/app.js", "r", encoding="utf-8") as f:
         app = f.read()
-    with open("index.html", "r", encoding="utf-8") as f:
+    with open("public/index.html", "r", encoding="utf-8") as f:
         html = f.read()
-    with open("admin.html", "r", encoding="utf-8") as f:
+    with open("public/admin.html", "r", encoding="utf-8") as f:
         admin_html = f.read()
-    with open("admin.js", "r", encoding="utf-8") as f:
+    with open("public/admin.js", "r", encoding="utf-8") as f:
         admin_js = f.read()
-    with open("styles.css", "r", encoding="utf-8") as f:
+    with open("public/styles.css", "r", encoding="utf-8") as f:
         css = f.read()
 
     # 1. getPresentDate in shared.js ensures Oct 12 is active present day

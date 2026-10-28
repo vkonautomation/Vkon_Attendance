@@ -7,7 +7,8 @@
 // unchanged: with no adapter, behaviour must be exactly the old demo check.
 const fs = require('fs');
 const vm = require('vm');
-const code = fs.readFileSync('shared.js', 'utf8');
+const path = require('path');
+const code = fs.readFileSync(path.join(__dirname, 'public', 'shared.js'), 'utf8');
 
 let pass = true;
 const check = (label, got, want) => {
@@ -19,7 +20,7 @@ const check = (label, got, want) => {
 // The adapter's own never-synced list, read from the file it is written in. Kept in
 // sync by assertion rather than by copy, because a stub that disagrees with the real
 // module would make this test prove nothing.
-const LOCAL_ONLY = (fs.readFileSync('js/api.js', 'utf8')
+const LOCAL_ONLY = (fs.readFileSync(path.join(__dirname, 'public', 'js', 'api.js'), 'utf8')
   .match(/const LOCAL_ONLY = new Set\(\[([\s\S]*?)\]\)/)[1]
   .match(/"[^"]*"/g) || []).map(s => s.slice(1, -1));
 if (!LOCAL_ONLY.length) { console.log('FAIL: could not read LOCAL_ONLY from js/api.js'); process.exit(1); }

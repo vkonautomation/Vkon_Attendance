@@ -5,7 +5,7 @@ def test_requirements():
     print("=== RUNNING REQUIREMENTS VERIFICATION ===")
     
     # 1. Check admin.html
-    with open("admin.html", "r", encoding="utf-8") as f:
+    with open("public/admin.html", "r", encoding="utf-8") as f:
         admin_html = f.read()
     
     # Requirement 2: Check rate column removed in admin main page
@@ -22,7 +22,7 @@ def test_requirements():
     print("PASS: Requirement 3 (Admin HTML) - Individual customization removed, Min Work Duration policy form added")
 
     # 2. Check admin.js
-    with open("admin.js", "r", encoding="utf-8") as f:
+    with open("public/admin.js", "r", encoding="utf-8") as f:
         admin_js = f.read()
 
     assert "initMinWorkPolicyForm" in admin_js, "Fail: initMinWorkPolicyForm missing in admin.js"
@@ -30,7 +30,7 @@ def test_requirements():
     print("PASS: Requirement 3 (Admin JS) - initMinWorkPolicyForm connects correctly")
 
     # 3. Check shared.js
-    with open("shared.js", "r", encoding="utf-8") as f:
+    with open("public/shared.js", "r", encoding="utf-8") as f:
         shared_js = f.read()
 
     assert "MIN_WORK_POLICY" in shared_js, "Fail: MIN_WORK_POLICY missing in shared.js"
@@ -39,7 +39,7 @@ def test_requirements():
     print("PASS: Requirement 3 (Shared JS) - Storage keys & policy helpers present")
 
     # 4. Check index.html
-    with open("index.html", "r", encoding="utf-8") as f:
+    with open("public/index.html", "r", encoding="utf-8") as f:
         index_html = f.read()
 
     # Requirement 4: Action cards with [X] mark
@@ -61,7 +61,7 @@ def test_requirements():
     print("PASS: Requirement 4 & 1 (Index HTML) - Action cards, [X] close buttons, lock banner, restricted holiday controls exist")
 
     # 5. Check app.js
-    with open("app.js", "r", encoding="utf-8") as f:
+    with open("public/app.js", "r", encoding="utf-8") as f:
         app_js = f.read()
 
     assert "openActionCard" in app_js, "Fail: openActionCard missing in app.js"
@@ -75,7 +75,7 @@ def test_requirements():
     print("PASS: Requirement 1, 3, 4 (App JS) - Modal card open/close, restricted holiday workflow, punch-out restrictions")
 
     # 6. Check styles.css
-    with open("styles.css", "r", encoding="utf-8") as f:
+    with open("public/styles.css", "r", encoding="utf-8") as f:
         styles_css = f.read()
 
     assert ".action-card-dialog" in styles_css, "Fail: .action-card-dialog missing in styles.css"

@@ -13,8 +13,9 @@
  */
 const fs = require("fs");
 const vm = require("vm");
+const path = require("path");
 
-const SRC = fs.readFileSync("js/api.js", "utf8");
+const SRC = fs.readFileSync(path.join(__dirname, "public", "js", "api.js"), "utf8");
 
 let fails = 0;
 function check(name, got, want) {

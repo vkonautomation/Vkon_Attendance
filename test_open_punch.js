@@ -10,7 +10,7 @@ const vm = require("vm");
 const path = require("path");
 
 function loadShared() {
-  const code = fs.readFileSync(path.join(__dirname, "shared.js"), "utf8");
+  const code = fs.readFileSync(path.join(__dirname, "public", "shared.js"), "utf8");
   const store = new Map();
   const localStorage = {
     getItem: (k) => (store.has(k) ? store.get(k) : null),

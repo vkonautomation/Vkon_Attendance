@@ -23,6 +23,10 @@ from .api import AuthError, router as api_router
 from .policy import PolicyError
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+# The browser files moved under public/ when the Next.js app took over serving
+# them, so that "what is web-reachable" is a directory boundary rather than a list.
+# This backend is the same list of files one level down; it is retired at cut-over.
+WEB_DIR = BASE_DIR / "public"
 
 # Files the browser is allowed to fetch from this origin. Anything not listed here
 # is a 404, including this package's own source.
@@ -138,7 +142,7 @@ def create_app() -> FastAPI:
     # --- static front end -----------------------------------------------------
 
     for mount, folder in PUBLIC_DIRS.items():
-        target = BASE_DIR / folder
+        target = WEB_DIR / folder
         if target.exists():
             app.mount(mount, StaticFiles(directory=str(target)), name=folder.lstrip("/"))
 
@@ -150,7 +154,7 @@ def create_app() -> FastAPI:
 
         candidate = PUBLIC_FILES.get(full_path)
         if candidate:
-            file = BASE_DIR / candidate
+            file = WEB_DIR / candidate
             if file.exists():
                 return FileResponse(str(file))
             return JSONResponse(status_code=404, content={"error": {"message": "Not found."}})

@@ -13,7 +13,7 @@ the audit log.
 import sys
 
 def read(name):
-    with open(name, "r", encoding="utf-8") as f:
+    with open("public/" + name, "r", encoding="utf-8") as f:
         return f.read()
 
 def verify_all():

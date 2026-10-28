@@ -492,7 +492,7 @@ def test_the_csp_permits_every_origin_the_pages_reference(client):
     }
     checked = 0
     for page in ("index.html", "admin.html"):
-        with open(os.path.join(os.getcwd(), page), encoding="utf-8") as handle:
+        with open(os.path.join(os.getcwd(), "public", page), encoding="utf-8") as handle:
             html = handle.read()
         for directive, pattern in patterns.items():
             for origin in set(re.findall(pattern, html)):
