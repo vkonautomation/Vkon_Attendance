@@ -3,10 +3,10 @@
  *
  * The rule this exists to enforce: a milestone is only done when the portal still
  * works. That means the 11 Node rule suites (which load public/shared.js for real
- * inside a shim), the Python source-and-backend verifiers, and the HTTP probe run
- * against the assembled standalone payload -- the same directory the image ships
- * and the only arrangement in which "nothing outside public/ is reachable" is a
- * claim that can actually be tested.
+ * inside a shim), the Python source-and-backend verifiers, the database integration
+ * suite, and the HTTP probe run against the assembled standalone payload -- the same
+ * directory the image ships and the only arrangement in which "nothing outside
+ * public/ is reachable" is a claim that can actually be tested.
  *
  * Nothing here is a framework. Each suite is a file that exits non-zero when it
  * fails, which is the only contract a runner needs.
@@ -62,6 +62,15 @@ for (const f of verifiers) run(`python ${f}`, py, [f]);
 
 console.log("\n=== pytest ===");
 run("pytest", py, ["-m", "pytest", "-q"]);
+
+/* ------------------------------------------------------------- database integration */
+
+// The database suite skips itself, loudly, when no Postgres is reachable -- see the
+// header of tests/integration/db.mjs for why a skip has to be visible rather than
+// green. REQUIRE_DB=1 turns that skip into a failure for a machine that is meant to
+// have one.
+console.log("\n=== database integration ===");
+run("tests/integration/db.mjs", process.execPath, [join(ROOT, "tests", "integration", "db.mjs")]);
 
 /* ------------------------------------------------- typecheck, then the live probe */
 

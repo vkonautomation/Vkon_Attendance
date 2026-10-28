@@ -57,3 +57,11 @@ Dockerfile
 Dockerfile.backend
 docker-compose.yml
 .dockerignore
+
+# Schema and operational scripts. Neither belongs in an image: migrations and role
+# setup are run from the host's checkout against the database container, so a running
+# container holds no copy of the schema it is writing to and no way to change it. A
+# container that can migrate its own database is a container whose compromise is also
+# a schema compromise.
+db/
+scripts/

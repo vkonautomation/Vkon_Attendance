@@ -1,0 +1,92 @@
+# VKON Attendance -- PostgreSQL, and the network it lives on.
+#
+# This file is tracked, and it is a template. The deploy host keeps its own
+# untracked docker-compose.yml at the repository root, because the host updates by
+# `git merge --ff-only` and an untracked file sitting in the way of an incoming
+# tracked one aborts the merge -- that is what happened on push 9e06e87. So the
+# production topology lives here and is applied by hand, once.
+#
+# Deliberately separate from the vkon.in store: its own container, its own volume,
+# its own network, its own database name. Nothing here can be reached from the
+# store's containers and nothing here reaches theirs, because no network is shared
+# and no port is published. Attendance data and order data do not get to talk.
+#
+#   docker compose -f deploy/compose.yml up -d db
+#   docker compose -f deploy/compose.yml --env-file .env config --quiet
+#
+# Run it with the tunnel host's own `cloudflared` service reproduced in the host's
+# file; deleting that takes attendance.vkon.in offline.
+
+name: vkon-attendance
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: attendance-postgres
+    restart: unless-stopped
+
+    # The image's superuser, which is the role that runs migrations and owns the
+    # schema. The application never connects as this user: it connects as
+    # attendance_app, which scripts/db-setup.mjs creates with INSERT and SELECT on
+    # the audit log and nothing more. Passwords come from the environment and are
+    # never given a default -- a baked-in fallback is how a development secret ends
+    # up listening in production.
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in the host .env}
+      POSTGRES_USER: ${POSTGRES_OWNER_USER:?set POSTGRES_OWNER_USER in the host .env}
+      POSTGRES_PASSWORD: ${POSTGRES_OWNER_PASSWORD:?set POSTGRES_OWNER_PASSWORD in the host .env}
+      # PGDATA one level down, so the named volume keeps its lost+found and
+      # Postgres still refuses to initialise on a directory it did not create.
+      PGDATA: /var/lib/postgresql/data/pgdata
+      # UTC on the wire. Attendance days are computed in Asia/Kolkata by the server
+      # and stored as `date` columns; the database clock must not be a second,
+      # silent timezone assumption sitting underneath them.
+      TZ: UTC
+      PGTZ: UTC
+
+    volumes:
+      - attendance-pgdata:/var/lib/postgresql/data
+
+    networks:
+      - attendance-internal
+
+    # No `ports:` key at all. Not 0.0.0.0, not 127.0.0.1:5432: nothing is bound on
+    # the host, so `psql -h 127.0.0.1 -p 5432` from the deploy box fails and a
+    # scanner reaching the machine's public interface finds nothing. Reachability
+    # is by container network only, which is what tests/integration/db.mjs asserts.
+    #
+    # Local development adds a loopback listener through compose.dev.yml; it is a
+    # separate file precisely so it cannot be applied to production by accident.
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\" -h 127.0.0.1 -p 5432",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+
+    # A database that is killed mid-write on a host that is not ours to babysit.
+    # Fast shutdown is the wrong trade here; fsync is the only thing standing between
+    # a power cut and an attendance table that lies about who was at work.
+    command:
+      - postgres
+      - -c
+      - fsync=on
+      - -c
+      - full_page_writes=on
+      - -c
+      - max_connections=40
+      - -c
+      - timezone=UTC
+
+networks:
+  attendance-internal:
+    name: attendance-internal
+    driver: bridge
+
+volumes:
+  attendance-pgdata:
+    name: attendance-pgdata

@@ -16,9 +16,14 @@
     "build": "next build",
     "start": "node scripts/start-standalone.mjs",
     "typecheck": "tsc --noEmit",
+    "db:up": "docker compose -f deploy/compose.yml -f deploy/compose.dev.yml --env-file .env up -d db",
+    "db:down": "docker compose -f deploy/compose.yml -f deploy/compose.dev.yml --env-file .env down",
+    "db:setup": "node scripts/db-setup.mjs",
+    "db:migrate": "node scripts/db-migrate.mjs",
     "test": "node scripts/run-tests.mjs",
     "test:fast": "node scripts/run-tests.mjs --no-serve",
-    "test:probe": "node tests/probe.mjs"
+    "test:probe": "node tests/probe.mjs",
+    "test:db": "node tests/integration/db.mjs"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

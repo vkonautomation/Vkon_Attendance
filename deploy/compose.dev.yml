@@ -1,0 +1,19 @@
+# VKON Attendance -- local development overlay. Production never uses this file.
+#
+#   docker compose -f deploy/compose.yml -f deploy/compose.dev.yml --env-file .env up -d db
+#
+# The base file publishes no port at all, which is correct for a host running the
+# tunnel and wrong for a laptop: the migration runner and the integration tests are
+# Node processes on the host, and with nothing bound they have no way to reach the
+# database. This overlay binds one loopback listener, on a non-default port so it
+# cannot collide with a Postgres already installed on the machine, and it is kept in
+# a separate file because a production stack that happens to include a published
+# 5432 is the exact mistake this whole layout exists to prevent.
+#
+# Nothing here is safe on a shared or public interface. 127.0.0.1 is the only bind
+# address, and it stays that way.
+
+services:
+  db:
+    ports:
+      - "127.0.0.1:${DEV_DB_PORT:-5433}:5432"
