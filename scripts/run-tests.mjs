@@ -26,7 +26,6 @@ import { fileURLToPath } from "node:url";
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const SKIP_SERVE = process.argv.includes("--no-serve");
 const PORT = Number(process.env.TEST_PORT || 3210);
-const BASE = `http://127.0.0.1:${PORT}`;
 
 const results = [];
 
@@ -49,6 +48,61 @@ function pythonExe() {
   const unix = join(ROOT, ".venv", "bin", "python");
   if (existsSync(unix)) return unix;
   return process.platform === "win32" ? "py" : "python3";
+}
+
+// Assemble + serve the standalone payload on `port`, wait for /api/health, run each
+// suite file with PROBE_BASE_URL pointed at it, then stop the server and wait for it to
+// exit. The exit await matters: the payload directory is re-assembled on every start
+// (start-standalone wipes and re-copies public/), so a second phase must not begin while
+// a first-phase server still has it open. `extraEnv` is what configures the instance --
+// the hardening phase turns on the Origin check and the real rate limit here.
+function servePhase(port, extraEnv, suites) {
+  return new Promise((resolvePhase) => {
+    const base = `http://127.0.0.1:${port}`;
+    console.log(`\n=== serving the standalone payload on ${base} ===`);
+    const server = spawn(process.execPath, [join(ROOT, "scripts", "start-standalone.mjs")], {
+      cwd: ROOT,
+      env: Object.assign({}, process.env, { BIND_HOST: "127.0.0.1", PORT: String(port) }, extraEnv),
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let serverLog = "";
+    server.stdout.on("data", (d) => { serverLog += d; });
+    server.stderr.on("data", (d) => { serverLog += d; });
+    server.on("error", (e) => { serverLog += `\n${e.message}`; });
+
+    (async () => {
+      let up = false;
+      for (let i = 0; i < 60 && !up; i++) {
+        try {
+          const r = await fetch(`${base}/api/health`, { signal: AbortSignal.timeout(1500) });
+          up = r.ok;
+        } catch {
+          await new Promise((r) => setTimeout(r, 400));
+        }
+      }
+
+      if (!up) {
+        record("server started", 1, serverLog);
+      } else {
+        record("server started", 0);
+        for (const suite of suites) {
+          const child = spawnSync(process.execPath, [join(ROOT, suite)], {
+            cwd: ROOT, encoding: "utf8",
+            env: Object.assign({}, process.env, extraEnv, { PROBE_BASE_URL: base }),
+          });
+          record(suite, child.status === null ? 1 : child.status,
+                 `${child.stdout || ""}${child.stderr || ""}`);
+        }
+        console.log("     --- server log ---");
+        for (const line of serverLog.trim().split("\n").slice(-12)) console.log(`     ${line}`);
+      }
+
+      server.kill();
+      server.on("exit", () => resolvePhase());
+      // Do not hang the suite if a kill somehow never reaps the process.
+      setTimeout(() => resolvePhase(), 5000).unref();
+    })();
+  });
 }
 
 /* ------------------------------------------------------------- the public-repo guard */
@@ -109,52 +163,30 @@ if (SKIP_SERVE) {
   if (results.some((r) => !r.passed)) {
     console.log("\n>>> not probing: the build or a suite already failed <<<");
   } else {
-    console.log(`\n=== serving the standalone payload on ${BASE} ===`);
-    const server = spawn(process.execPath, [join(ROOT, "scripts", "start-standalone.mjs")], {
-      cwd: ROOT,
-      env: Object.assign({}, process.env, { BIND_HOST: "127.0.0.1", PORT: String(PORT) }),
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-    let serverLog = "";
-    server.stdout.on("data", (d) => { serverLog += d; });
-    server.stderr.on("data", (d) => { serverLog += d; });
-    server.on("error", (e) => { serverLog += `\n${e.message}`; });
+    // Phase 1 -- the primary instance. The Origin check is off (PUBLIC_ORIGIN unset) and
+    // the rate limit is lifted to its ceiling, because auth.mjs deliberately makes many
+    // failed attempts (timing, enumeration) and sends no Origin; all three of its
+    // requests share one loopback address, so a live per-IP limit would lock the suite
+    // out. The hardened behaviour is exercised against its own instance in phase 2.
+    await servePhase(
+      PORT,
+      { PUBLIC_ORIGIN: "", VKON_TRUST_PROXY_HEADERS: "false", RATE_LIMIT_MAX_FAILURES: "1000" },
+      ["tests/probe.mjs", "tests/integration/auth.mjs"],
+    );
 
-    let up = false;
-    for (let i = 0; i < 60 && !up; i++) {
-      try {
-        const r = await fetch(`${BASE}/api/health`, { signal: AbortSignal.timeout(1500) });
-        up = r.ok;
-      } catch {
-        await new Promise((r) => setTimeout(r, 400));
-      }
-    }
-
-    if (!up) {
-      record("server started", 1, serverLog);
-    } else {
-      record("server started", 0);
-      const probe = spawnSync(process.execPath, [join(ROOT, "tests", "probe.mjs")], {
-        cwd: ROOT, encoding: "utf8", env: Object.assign({}, process.env, { PROBE_BASE_URL: BASE }),
-      });
-      record("tests/probe.mjs", probe.status === null ? 1 : probe.status,
-             `${probe.stdout || ""}${probe.stderr || ""}`);
-
-      // The auth vertical slice (M3) is tested over the wire against this same served
-      // payload -- it needs a running server and the app-role database, both of which only
-      // exist in this phase. It skips itself (exit 0) when PROBE_BASE_URL or DATABASE_URL_APP
-      // is missing, so it never turns a database-less machine red.
-      const auth = spawnSync(process.execPath, [join(ROOT, "tests", "integration", "auth.mjs")], {
-        cwd: ROOT, encoding: "utf8", env: Object.assign({}, process.env, { PROBE_BASE_URL: BASE }),
-      });
-      record("tests/integration/auth.mjs", auth.status === null ? 1 : auth.status,
-             `${auth.stdout || ""}${auth.stderr || ""}`);
-
-      // Whatever the probe said about the wire is what the payload really served.
-      console.log("     --- server log ---");
-      for (const line of serverLog.trim().split("\n").slice(-12)) console.log(`     ${line}`);
-    }
-    server.kill();
+    // Phase 2 -- the hardened instance. PUBLIC_ORIGIN and the real 5-failure window are
+    // on, and proxy headers are trusted so the suite can attribute requests to distinct
+    // TEST-NET addresses and prove the per-account and per-IP buckets act independently.
+    await servePhase(
+      PORT + 1,
+      {
+        PUBLIC_ORIGIN: `http://127.0.0.1:${PORT + 1}`,
+        VKON_TRUST_PROXY_HEADERS: "true",
+        RATE_LIMIT_MAX_FAILURES: "5",
+        COOKIE_SECURE: "false",
+      },
+      ["tests/integration/hardening.mjs"],
+    );
   }
 }
 

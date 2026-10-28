@@ -18,6 +18,7 @@ import { revokeSessionByToken } from "@/lib/auth/session";
 import { recordAudit } from "@/lib/db/audit";
 import { clientIp } from "@/lib/http/request";
 import { errorResponse } from "@/lib/http/errors";
+import { assertSameOrigin } from "@/lib/http/guard";
 import { json } from "@/lib/http/json";
 import { resolveActor, sessionToken } from "@/lib/http/require-session";
 
@@ -25,6 +26,7 @@ export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest): Promise<Response> {
   try {
+    assertSameOrigin(req);
     const token = sessionToken(req);
     const { session } = await resolveActor(req);
 

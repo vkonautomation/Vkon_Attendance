@@ -51,6 +51,19 @@ export interface AppConfig {
     state: number;
   };
 
+  /**
+   * Sign-in brute-force relief (M4). Two independent buckets -- per account and per
+   * client address -- each allowing `maxFailures` failures inside `windowMs` before the
+   * key is refused until the window passes. Keeping them separate is the point: one
+   * person fumbling their password must not lock the whole office out (which is what a
+   * single shared-IP limit does behind a tunnel), and one attacker must not be able to
+   * sit on a valid account's limit forever by rotating source addresses.
+   */
+  rateLimit: {
+    maxFailures: number;
+    windowMs: number;
+  };
+
   /** Pool sizing. The database's max_connections is 40 and the app role's own
    *  connection limit is 20, so a pool larger than that is a queue that times out
    *  with a confusing error rather than a capacity setting. */
@@ -71,6 +84,11 @@ const DEFAULTS = {
   // The document facade (D1) puts a whole roster or a month of records in one body.
   // This is the ceiling until M11 retires it; it is not a limit nobody hits.
   stateBodyBytes: 2 * 1024 * 1024,
+  // 5 failures / 15 minutes: enough that a genuine person mistyping twice is untouched,
+  // low enough that a password list makes no headway. The window is a floor on how long
+  // an account is protected, not how long a person is locked out -- a success clears it.
+  rateLimitMaxFailures: 5,
+  rateLimitWindowMinutes: 15,
 };
 
 function num(raw: string | undefined, fallback: number, min: number, max: number, name: string): number {
@@ -127,6 +145,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     maxBodyBytes: {
       auth: num(env.MAX_AUTH_BODY_BYTES, DEFAULTS.authBodyBytes, 256, 1024 * 1024, "MAX_AUTH_BODY_BYTES"),
       state: num(env.MAX_STATE_BODY_BYTES, DEFAULTS.stateBodyBytes, 1024, 16 * 1024 * 1024, "MAX_STATE_BODY_BYTES"),
+    },
+    rateLimit: {
+      maxFailures: num(env.RATE_LIMIT_MAX_FAILURES, DEFAULTS.rateLimitMaxFailures, 1, 1000, "RATE_LIMIT_MAX_FAILURES"),
+      windowMs: num(env.RATE_LIMIT_WINDOW_MINUTES, DEFAULTS.rateLimitWindowMinutes, 1, 120, "RATE_LIMIT_WINDOW_MINUTES") * 60_000,
     },
     dbPoolMax: num(env.DB_POOL_MAX, DEFAULTS.dbPoolMax, 1, 20, "DB_POOL_MAX"),
     dbStatementTimeoutMs: num(env.DB_STATEMENT_TIMEOUT_MS, DEFAULTS.dbStatementTimeoutMs, 500, 120000, "DB_STATEMENT_TIMEOUT_MS"),

@@ -19,11 +19,13 @@ repository being web-served is a different build, not a longer deny list.
   * `js/`: the server adapter (`api.js`), password flows, day popover, approval
     modal, data transfer. `assets/`: logos and icons.
 * **`app/api/` — the server:** route handlers only, no pages. `health` and the
-  `auth/*` vertical slice (login, logout, me, password, sessions) are live; punches,
-  state and the rest arrive per milestone.
+  `auth/*` vertical slice (login, logout, me, password, sessions) are live and hardened
+  (M4: two-bucket rate limiting on sign-in, an Origin check on every non-GET, body-size
+  ceilings, generic errors); punches, state and the rest arrive per milestone.
 * **`lib/`** — `config.ts` reads and validates the environment once; `db/` is the
   app-role pool and the append-only audit writer; `auth/` is bcrypt, the session
-  table and the cookie; `http/` is `requireSession()` and the one error shape.
+  table, the cookie and the sign-in rate limiter; `http/` is `requireSession()`, the one
+  error shape, the request body reader and the same-origin guard.
 * **`server/`** — the outgoing FastAPI backend, still the thing production runs
   until the Next.js one is verified. It reads the same `public/` directory.
 * **`scripts/`** — `start-standalone.mjs` assembles and runs the deployable
@@ -48,7 +50,11 @@ repository being web-served is a different build, not a longer deny list.
   `unit/` holds the pure loader tests; `integration/db.mjs` asserts the roles, the
   runner, every schema constraint and the network; `integration/auth.mjs` drives the
   sign-in flow over HTTP against the served payload (equal-time unknown user, no
-  enumeration, mid-session deactivation, expiry, password change revoking other sessions).
+  enumeration, mid-session deactivation, expiry, password change revoking other sessions);
+  `integration/hardening.mjs` drives the M4 controls against a second instance started
+  with `PUBLIC_ORIGIN` and the real rate limit (a 6th attempt on one account is 429 while
+  a different account signs in, a foreign or absent `Origin` is 403 while the correct one
+  succeeds, a second address is untouched by the first's lockout, an oversized body is 413).
 * **Verification and testing scripts** (`test_*.js`, `verify_*.py`,
   `test_backend.py`) sit at the repository root and load the portal from
   `public/`; `node scripts/run-tests.mjs` runs all of them.

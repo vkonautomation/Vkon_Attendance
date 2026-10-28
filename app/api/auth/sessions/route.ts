@@ -19,6 +19,7 @@ import { listEmployeeSessions, revokeEmployeeSessions } from "@/lib/auth/session
 import { recordAudit } from "@/lib/db/audit";
 import { clientIp } from "@/lib/http/request";
 import { errorResponse } from "@/lib/http/errors";
+import { assertSameOrigin } from "@/lib/http/guard";
 import { json } from "@/lib/http/json";
 import { requireSession } from "@/lib/http/require-session";
 
@@ -43,6 +44,7 @@ export async function GET(req: NextRequest): Promise<Response> {
  */
 export async function DELETE(req: NextRequest): Promise<Response> {
   try {
+    assertSameOrigin(req);
     const session = await requireSession(req, { gate: false });
     const revoked = await revokeEmployeeSessions(session.employeeId, session.sessionId);
 

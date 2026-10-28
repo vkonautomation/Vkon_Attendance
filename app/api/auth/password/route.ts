@@ -31,6 +31,7 @@ import { setPassword } from "@/lib/auth/password";
 import { recordAudit } from "@/lib/db/audit";
 import { clientIp } from "@/lib/http/request";
 import { errorResponse } from "@/lib/http/errors";
+import { assertSameOrigin } from "@/lib/http/guard";
 import { expectObject, json, readJsonBody } from "@/lib/http/json";
 import { requireSession } from "@/lib/http/require-session";
 
@@ -42,6 +43,7 @@ const reject = (message: string, reason: string, status = 400) =>
 
 export async function POST(req: NextRequest): Promise<Response> {
   try {
+    assertSameOrigin(req);
     // gate: false -- this is the endpoint you reach *because* the gate is shut.
     const session = await requireSession(req, { gate: false });
     const body = expectObject(await readJsonBody(req, config().maxBodyBytes.auth));

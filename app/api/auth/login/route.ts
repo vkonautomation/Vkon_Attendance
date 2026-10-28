@@ -20,9 +20,11 @@ import { config } from "@/lib/config";
 import { authenticate } from "@/lib/auth/authenticate";
 import { clearSessionCookie, sessionCookie } from "@/lib/auth/cookie";
 import { createSession } from "@/lib/auth/session";
+import { checkRateLimit, recordFailure, recordSuccess, type RateKeys } from "@/lib/auth/ratelimit";
 import { recordAudit } from "@/lib/db/audit";
 import { clientIp, userAgent } from "@/lib/http/request";
-import { badRequest, errorResponse } from "@/lib/http/errors";
+import { badRequest, errorResponse, tooManyRequests } from "@/lib/http/errors";
+import { assertSameOrigin } from "@/lib/http/guard";
 import { expectObject, json, readJsonBody } from "@/lib/http/json";
 import { sessionForBrowser } from "@/lib/http/require-session";
 
@@ -44,14 +46,35 @@ function credentials(body: Record<string, unknown>): { identifier: string; passw
 
 export async function POST(req: NextRequest): Promise<Response> {
   try {
+    // Second CSRF lock (M4): a cross-origin or origin-less sign-in POST is refused
+    // before a password is even looked at. No-op when PUBLIC_ORIGIN is unset.
+    assertSameOrigin(req);
+
     const { identifier, password } = credentials(
       expectObject(await readJsonBody(req, config().maxBodyBytes.auth)),
     );
 
     const ip = clientIp(req);
+    // The account bucket keys on the identifier as typed (normalised), so an attempt
+    // against a name that does not exist still consumes it -- there is no cheaper way to
+    // probe for accounts, and the address bucket is the one that stops a list being
+    // worked at all. `ip` is null when the address cannot be honestly attributed, in
+    // which case only the account limit applies (see lib/auth/ratelimit.ts).
+    const keys: RateKeys = { account: identifier.toLowerCase(), ip };
+
+    // Refused before the bcrypt comparison: a throttled flood must not pay hashing cost.
+    const limit = checkRateLimit(keys);
+    if (!limit.allowed) {
+      throw tooManyRequests(
+        "Too many sign-in attempts. Wait a moment before trying again.",
+        limit.retryAfterSeconds,
+      );
+    }
+
     const result = await authenticate(identifier, password);
 
     if (!result.ok) {
+      recordFailure(keys);
       // The reason stays server-side. An audit entry recording that somebody tried the
       // name of an account that does not exist is worth having; putting it in a 401 body
       // is what turns a login form into a staff directory.
@@ -70,6 +93,7 @@ export async function POST(req: NextRequest): Promise<Response> {
     }
 
     const account = result.account;
+    recordSuccess(keys);
     const created = await createSession(account.id, { ip, userAgent: userAgent(req) });
 
     await recordAudit({

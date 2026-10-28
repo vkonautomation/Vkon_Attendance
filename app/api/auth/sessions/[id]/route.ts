@@ -18,6 +18,7 @@ import { clearSessionCookie } from "@/lib/auth/cookie";
 import { recordAudit } from "@/lib/db/audit";
 import { clientIp } from "@/lib/http/request";
 import { errorResponse, notFound } from "@/lib/http/errors";
+import { assertSameOrigin } from "@/lib/http/guard";
 import { json } from "@/lib/http/json";
 import { requireSession } from "@/lib/http/require-session";
 
@@ -30,6 +31,7 @@ export async function DELETE(
   context: { params: Promise<{ id: string }> },
 ): Promise<Response> {
   try {
+    assertSameOrigin(req);
     const session = await requireSession(req, { gate: false });
     const { id } = await context.params;
 

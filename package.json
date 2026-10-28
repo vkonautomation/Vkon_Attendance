@@ -29,6 +29,7 @@
     "test:unit": "node tests/unit/env.mjs",
     "test:db": "node tests/integration/db.mjs",
     "test:auth": "node tests/integration/auth.mjs",
+    "test:hardening": "node tests/integration/hardening.mjs",
     "bcrypt:calibrate": "node scripts/bcrypt-calibrate.mjs"
   },
   "dependencies": {
