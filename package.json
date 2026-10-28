@@ -27,7 +27,9 @@
     "test:probe": "node tests/probe.mjs",
     "test:guard": "node tests/guard.mjs",
     "test:unit": "node tests/unit/env.mjs",
-    "test:db": "node tests/integration/db.mjs"
+    "test:db": "node tests/integration/db.mjs",
+    "test:auth": "node tests/integration/auth.mjs",
+    "bcrypt:calibrate": "node scripts/bcrypt-calibrate.mjs"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

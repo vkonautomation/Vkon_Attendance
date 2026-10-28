@@ -18,9 +18,12 @@ repository being web-served is a different build, not a longer deny list.
   * `styles.css`: presentation.
   * `js/`: the server adapter (`api.js`), password flows, day popover, approval
     modal, data transfer. `assets/`: logos and icons.
-* **`app/api/` — the server:** route handlers only, no pages. `health` is live;
-  auth, punches, state and the rest arrive per milestone.
-* **`lib/`** — database access and HTTP helpers shared by the route handlers.
+* **`app/api/` — the server:** route handlers only, no pages. `health` and the
+  `auth/*` vertical slice (login, logout, me, password, sessions) are live; punches,
+  state and the rest arrive per milestone.
+* **`lib/`** — `config.ts` reads and validates the environment once; `db/` is the
+  app-role pool and the append-only audit writer; `auth/` is bcrypt, the session
+  table and the cookie; `http/` is `requireSession()` and the one error shape.
 * **`server/`** — the outgoing FastAPI backend, still the thing production runs
   until the Next.js one is verified. It reads the same `public/` directory.
 * **`scripts/`** — `start-standalone.mjs` assembles and runs the deployable
@@ -30,7 +33,10 @@ repository being web-served is a different build, not a longer deny list.
 * **`db/migrations/`** — the schema, as ordered SQL. One transaction per file, and
   `schema_migrations` records the checksum of the file that applied each one.
 * **`db/seed/synthetic.sql`** — a roster of `EMP001`…`EMP005` and `@example.test`
-  addresses, idempotent, and refused outright when `VKON_ENV=production`. Real
+  addresses, idempotent, and refused outright when `VKON_ENV=production`. It sets no
+  password for anyone; in development `db-seed.mjs` then bootstraps the one `admin`
+  account with a freshly generated password, printed once and forced to change on first
+  sign-in (never committed — the hash is made at runtime). Real
   people are loaded on the deploy host, never committed here: this repository is
   public and `tests/guard.mjs` fails the build if anything looks like real data.
 * **`deploy/compose.yml`** — PostgreSQL on its own network and volume, publishing
@@ -40,7 +46,9 @@ repository being web-served is a different build, not a longer deny list.
   cannot pass by being blind; `probe.mjs` asserts the shape of the running server
   (which URLs answer, which headers are set, what must stay unreachable);
   `unit/` holds the pure loader tests; `integration/db.mjs` asserts the roles, the
-  runner, every schema constraint and the network.
+  runner, every schema constraint and the network; `integration/auth.mjs` drives the
+  sign-in flow over HTTP against the served payload (equal-time unknown user, no
+  enumeration, mid-session deactivation, expiry, password change revoking other sessions).
 * **Verification and testing scripts** (`test_*.js`, `verify_*.py`,
   `test_backend.py`) sit at the repository root and load the portal from
   `public/`; `node scripts/run-tests.mjs` runs all of them.

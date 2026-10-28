@@ -19,10 +19,19 @@ import { cpSync, existsSync, readFileSync, readdirSync, rmSync, statSync } from 
 import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { loadEnvChain } from "./lib/env.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const BUILD = join(ROOT, ".next");
 const STANDALONE = join(BUILD, "standalone");
+
+// The API routes need the app-role database URL. The payload itself is deliberately
+// stripped of every .env file (below), so the configuration has to come from the real
+// environment -- which, on a developer laptop running the test server, is the repository
+// checkout's .env / .env.local. loadEnvChain leaves anything already exported untouched,
+// so a container that injects DATABASE_URL_APP through its orchestrator is unaffected and
+// a machine with no .env file simply relies on the environment as-is.
+loadEnvChain();
 
 function die(msg) {
   console.error(`[vkon] ${msg}`);

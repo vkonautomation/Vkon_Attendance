@@ -15,15 +15,29 @@
  * ON CONFLICT DO NOTHING or a NOT EXISTS guard, so running it twice changes nothing the
  * second time. That is what makes it safe to put in a compose entrypoint.
  *
+ * Admin bootstrap (M3). The synthetic SQL sets no password for anyone -- an account with
+ * no hash cannot sign in, which is the only state that cannot become a default
+ * credential. So the one live administrator is made here, in the same transaction, from
+ * a freshly generated password printed once and forced to change on first sign-in. It is
+ * insert-if-absent (a re-run leaves a real person's chosen password alone) and it is
+ * development-only, because the production refusal above runs before this ever does. The
+ * hash is generated at runtime, never committed: a bcrypt string sitting in a source
+ * file is exactly what the public-repository guard fails a build over, and rightly so.
+ *
  * Usage:
  *   node scripts/db-seed.mjs
  *   node scripts/db-seed.mjs --file db/seed/synthetic.sql
  */
 
+import { createHash, randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { join, relative, resolve } from "node:path";
 import { loadEnvChain, REPO_ROOT } from "./lib/env.mjs";
 import { withOwnerClient } from "./lib/db-config.mjs";
+
+const require = createRequire(import.meta.url);
+const bcrypt = require("bcryptjs");
 
 loadEnvChain();
 
@@ -66,6 +80,7 @@ async function main() {
     await client.query("BEGIN");
     try {
       await client.query(sql);
+      await bootstrapAdmin(client);
       await client.query("COMMIT");
     } catch (err) {
       await client.query("ROLLBACK").catch(() => { /* connection already gone */ });
@@ -80,6 +95,46 @@ async function main() {
     }
     console.log(`[seed] ${relative(REPO_ROOT, SEED_FILE)}: ${counts.join(", ")}`);
   });
+}
+
+/**
+ * Create the first administrator, if there is not one yet.
+ *
+ * Runs inside the caller's transaction, so a seed that fails after this point does not
+ * leave a half-written admin behind, and an admin that exists is never re-passworded by a
+ * later `make dev`. The password is randomBytes base64url -- not a word, not a name, not
+ * anything in the burned-secret list -- and is echoed exactly once, on the line that says
+ * it is temporary.
+ */
+async function bootstrapAdmin(client) {
+  const exists = await client.query("SELECT 1 FROM employees WHERE username = 'admin' LIMIT 1");
+  if ((exists.rowCount ?? 0) > 0) {
+    console.log("[seed:admin] administrator already present; password left untouched");
+    return;
+  }
+
+  const password = randomBytes(18).toString("base64url");
+  // The same SHA-256 -> base64 pre-hash lib/auth/hash.ts applies, so a hash written here
+  // verifies there. bcrypt's own 72-byte truncation would otherwise be reachable.
+  const preHash = createHash("sha256").update(password, "utf8").digest("base64");
+  const cost = Number(process.env.BCRYPT_COST_FACTOR || 11);
+  const hash = await bcrypt.hash(preHash, cost);
+
+  // active so the account can sign in; role admin so it can authorise; password_change_required
+  // so this generated password cannot quietly become the permanent one. No email: a
+  // bootstrap is not a person with a mailbox, and the seeded-email domain rule would then
+  // have to make an exception for an address that does not exist.
+  await client.query(
+    `INSERT INTO employees
+       (employee_code, username, name, role, active, password_hash, password_changed_at,
+        password_change_required, timezone)
+     VALUES
+       ('ADMIN', 'admin', 'Attendance Administrator', 'admin', TRUE, $1, now(), TRUE, 'Asia/Kolkata')`,
+    [hash],
+  );
+
+  console.log("[seed:admin] created the first administrator (username: admin).");
+  console.log(`[seed:admin] TEMPORARY password (sign in once, then it forces a change): ${password}`);
 }
 
 main().catch((e) => {

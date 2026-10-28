@@ -139,6 +139,17 @@ if (SKIP_SERVE) {
       });
       record("tests/probe.mjs", probe.status === null ? 1 : probe.status,
              `${probe.stdout || ""}${probe.stderr || ""}`);
+
+      // The auth vertical slice (M3) is tested over the wire against this same served
+      // payload -- it needs a running server and the app-role database, both of which only
+      // exist in this phase. It skips itself (exit 0) when PROBE_BASE_URL or DATABASE_URL_APP
+      // is missing, so it never turns a database-less machine red.
+      const auth = spawnSync(process.execPath, [join(ROOT, "tests", "integration", "auth.mjs")], {
+        cwd: ROOT, encoding: "utf8", env: Object.assign({}, process.env, { PROBE_BASE_URL: BASE }),
+      });
+      record("tests/integration/auth.mjs", auth.status === null ? 1 : auth.status,
+             `${auth.stdout || ""}${auth.stderr || ""}`);
+
       // Whatever the probe said about the wire is what the payload really served.
       console.log("     --- server log ---");
       for (const line of serverLog.trim().split("\n").slice(-12)) console.log(`     ${line}`);

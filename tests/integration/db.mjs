@@ -745,22 +745,34 @@ async function seedIsIdempotent(owner) {
     Number(counts.holidays) >= 2 && Number(counts.records) >= 5 && Number(counts.seeded) === 1,
     JSON.stringify(counts));
 
-  // The plan's rule for a public repository, restated as a database assertion: a seed
-  // that carries a credential is a leaked credential, however synthetic the name is.
+  // The plan's rule for a public repository, restated as a database assertion: a synthetic
+  // roster that carries a credential is a leaked credential, however fake the name. The
+  // bootstrap admin is the one exception -- it is created by the M3 seed with a generated
+  // (never committed) hash -- so the rule is scoped to everyone the SQL file inserts.
   const hashed = (await owner.query(
-    "SELECT COUNT(*) AS n FROM employees WHERE password_hash IS NOT NULL")).rows[0].n;
-  check("no seeded employee has a password hash", Number(hashed) === 0, `${hashed} rows`);
+    "SELECT COUNT(*) AS n FROM employees WHERE password_hash IS NOT NULL AND username <> 'admin'")).rows[0].n;
+  check("no synthetic roster employee carries a committed password hash", Number(hashed) === 0, `${hashed} rows`);
 
   const domains = (await owner.query(`
     SELECT DISTINCT split_part(email, '@', 2) AS d FROM employees WHERE email IS NOT NULL`)).rows;
   check("every seeded email is at a reserved test domain",
     domains.every((r) => ["example.test", "example.com", "test.invalid"].includes(r.d)),
-    domains.map((r) => r.d).join(", "));
+    domains.map((r) => (r.d || "(null)")).join(", "));
 
-  const active = (await owner.query(
-    "SELECT COUNT(*) AS n FROM employees WHERE active AND role = 'admin'")).rows[0].n;
-  check("the seed does not create a live administrator", Number(active) === 0,
-    "the first admin is a bootstrap decision (M3), never a seeded one");
+  // M3 changed what a development seed does: it bootstraps exactly one live administrator,
+  // forced to change its generated password on first sign-in. This used to assert the
+  // opposite ("the seed does not create a live administrator") before bcrypt arrived.
+  const admin = (await owner.query(`
+    SELECT COUNT(*) AS n,
+           bool_and(active)                     AS active,
+           bool_and(role = 'admin')             AS is_admin,
+           bool_and(password_change_required)   AS forced,
+           bool_and(password_hash IS NOT NULL)  AS has_hash
+      FROM employees WHERE username = 'admin'`)).rows[0];
+  check("db:seed bootstraps one admin, forced to change on first sign-in",
+    Number(admin.n) === 1 && admin.active === true && admin.is_admin === true &&
+    admin.forced === true && admin.has_hash === true,
+    JSON.stringify(admin));
 }
 
 /* ------------------------------------------------------ claim 3: internal-only network */
