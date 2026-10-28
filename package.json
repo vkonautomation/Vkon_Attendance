@@ -27,6 +27,7 @@
     "test:probe": "node tests/probe.mjs",
     "test:guard": "node tests/guard.mjs",
     "test:unit": "node tests/unit/env.mjs",
+    "test:conformance": "vitest run",
     "test:db": "node tests/integration/db.mjs",
     "test:auth": "node tests/integration/auth.mjs",
     "test:hardening": "node tests/integration/hardening.mjs",

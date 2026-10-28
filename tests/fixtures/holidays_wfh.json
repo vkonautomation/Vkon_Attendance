@@ -1,0 +1,47 @@
+{
+  "name": "Holiday vs restricted-holiday & weekly WFH allowance",
+  "ist_now": "2026-10-14T10:00:00+05:30",
+  "employees": [
+    { "id": "EMP001", "name": "A Tester", "department": "Engineering", "monthlySalary": 50000, "enrolledAt": "2026-01-01" },
+    { "id": "EMP002", "name": "B Tester", "department": "Product", "enrolledAt": "2026-01-01" },
+    { "id": "EMP003", "name": "C Tester", "department": "Operations", "enrolledAt": "2026-01-01" },
+    { "id": "EMP009", "name": "D Tester", "department": "Infrastructure", "enrolledAt": "2026-01-01" }
+  ],
+  "holidays": [
+    { "id": "HOL-D1", "date": "2026-08-15", "name": "Independence Day", "type": "Declared Holiday" },
+    { "id": "HOL-R1", "date": "2026-10-20", "name": "Festival One", "type": "Restricted Holiday" },
+    { "id": "HOL-R2", "date": "2026-10-21", "name": "Festival Two", "type": "Restricted Holiday" }
+  ],
+  "leaves": [
+    { "employeeId": "EMP002", "status": "Approved", "category": "Restricted", "type": "Restricted Holiday Leave", "date": "2026-10-20", "daysCount": 1 }
+  ],
+  "holidayWork": {
+    "EMP003_2026-08-15": { "empId": "EMP003", "date": "2026-08-15", "reason": "go-live support", "mode": "compoff", "actor": "Admin" }
+  },
+  "wfh": [
+    { "id": "WFH-T1", "employeeId": "EMP001", "date": "2026-10-12", "status": "Approved", "weekKey": "2026-W42" }
+  ],
+  "records": {
+    "EMP001_2026-10-12": { "employeeId": "EMP001", "date": "2026-10-12", "status": "WFH", "checkInTime": "09:00 AM", "checkOutTime": "06:00 PM", "hoursDecimal": 9 },
+    "EMP001_2026-10-14": { "employeeId": "EMP001", "date": "2026-10-14", "status": "WFH", "checkInTime": "09:00 AM", "checkOutTime": "06:00 PM", "hoursDecimal": 9 },
+    "EMP009_2026-10-13": { "employeeId": "EMP009", "date": "2026-10-13", "status": "WFH", "checkInTime": "09:00 AM", "checkOutTime": "06:00 PM", "hoursDecimal": 9 }
+  },
+  "checks": [
+    { "id": "nwd_declared", "kind": "isNonWorkingDay", "date": "2026-08-15", "empId": "EMP001" },
+    { "id": "nwd_rh_approved", "kind": "isNonWorkingDay", "date": "2026-10-20", "empId": "EMP002" },
+    { "id": "nwd_rh_no_leave", "kind": "isNonWorkingDay", "date": "2026-10-20", "empId": "EMP001" },
+    { "id": "nwd_worked_override", "kind": "isNonWorkingDay", "date": "2026-08-15", "empId": "EMP003" },
+    { "id": "nwd_plain_workday", "kind": "isNonWorkingDay", "date": "2026-10-14", "empId": "EMP001" },
+    { "id": "wfh_week_allowance", "kind": "countWfhUsedInWeek", "empId": "EMP001", "weekKey": "2026-W42" },
+    { "id": "wfh_orphan_counts", "kind": "countWfhUsedInWeek", "empId": "EMP009", "weekKey": "2026-W42" }
+  ],
+  "expected": {
+    "nwd_declared": true,
+    "nwd_rh_approved": true,
+    "nwd_rh_no_leave": false,
+    "nwd_worked_override": false,
+    "nwd_plain_workday": false,
+    "wfh_week_allowance": 2,
+    "wfh_orphan_counts": 1
+  }
+}

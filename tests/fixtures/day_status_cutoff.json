@@ -1,0 +1,28 @@
+{
+  "name": "Day status, payroll cut-off boundary & open shift",
+  "ist_now": "2026-02-10T10:00:00+05:30",
+  "employees": [
+    { "id": "EMP001", "name": "A Tester", "department": "Engineering", "monthlySalary": 50000, "enrolledAt": "2026-01-01" }
+  ],
+  "records": {
+    "EMP001_2026-01-15": { "employeeId": "EMP001", "date": "2026-01-15", "status": "Present", "checkInTime": "09:20 AM", "checkOutTime": "06:00 PM", "hoursDecimal": 8.67, "locationType": "Office" },
+    "EMP001_2026-01-20": { "employeeId": "EMP001", "date": "2026-01-20", "status": "Present", "checkInTime": "09:30 AM", "checkOutTime": "04:00 PM", "hoursDecimal": 7.5, "locationType": "Office", "dayClassification": "Short hours (LOP)" },
+    "EMP001_2026-02-05": { "employeeId": "EMP001", "date": "2026-02-05", "status": "Present", "checkInTime": "09:30 AM", "checkOutTime": "04:00 PM", "hoursDecimal": 7.5, "locationType": "Office" },
+    "EMP001_2026-02-06": { "employeeId": "EMP001", "date": "2026-02-06", "status": "Present", "checkInTime": "09:00 AM", "checkOutTime": "06:00 PM", "hoursDecimal": 9, "locationType": "Office", "overridePresent": true, "overrideReason": "system maintenance" },
+    "EMP001_2026-02-09": { "employeeId": "EMP001", "date": "2026-02-09", "status": "Present", "checkInTime": "11:30 PM", "checkOutTime": "-", "hoursDecimal": 0, "locationType": "Office" }
+  },
+  "checks": [
+    { "id": "cls_full_present", "kind": "classifyDay", "empId": "EMP001", "date": "2026-01-15" },
+    { "id": "cls_short_lop", "kind": "classifyDay", "empId": "EMP001", "date": "2026-01-20" },
+    { "id": "cls_short_review", "kind": "classifyDay", "empId": "EMP001", "date": "2026-02-05" },
+    { "id": "cls_open_rollover", "kind": "classifyDay", "empId": "EMP001", "date": "2026-02-09" },
+    { "id": "cls_override", "kind": "classifyDay", "empId": "EMP001", "date": "2026-02-06" },
+    { "id": "eff_present", "kind": "getEffectiveStatus", "key": "EMP001_2026-01-15" },
+    { "id": "eff_review", "kind": "getEffectiveStatus", "key": "EMP001_2026-02-05" },
+    { "id": "eff_open", "kind": "getEffectiveStatus", "key": "EMP001_2026-02-09" },
+    { "id": "disp_lop", "kind": "displayStatusForRecord", "key": "EMP001_2026-01-20" }
+  ],
+  "expected": {
+    "disp_lop": "Short hours (LOP)"
+  }
+}

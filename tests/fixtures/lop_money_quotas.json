@@ -1,0 +1,41 @@
+{
+  "name": "LOP money & leave quotas",
+  "ist_now": "2026-02-10T10:00:00+05:30",
+  "employees": [
+    { "id": "EMP001", "name": "A Tester", "department": "Engineering", "monthlySalary": 50000, "enrolledAt": "2026-01-01" },
+    { "id": "EMP002", "name": "B Tester", "department": "Product" },
+    { "id": "EMP003", "name": "C Tester", "department": "Operations", "customLeaveQuota": 10, "customRhQuota": 3 }
+  ],
+  "leaves": [
+    { "employeeId": "EMP001", "status": "Approved", "category": "", "type": "Personal Leave", "startDate": "2026-02-02", "daysCount": 2 },
+    { "employeeId": "EMP001", "status": "Approved", "category": "Restricted", "type": "Restricted Holiday Leave", "startDate": "2026-09-15", "daysCount": 1 },
+    { "employeeId": "EMP001", "status": "Pending Manager", "category": "", "type": "Personal Leave", "startDate": "2026-03-01", "daysCount": 5 },
+    { "employeeId": "EMP001", "status": "Approved", "category": "LossOfPay", "type": "Loss of Pay", "startDate": "2026-04-01", "daysCount": 3 }
+  ],
+  "checks": [
+    { "id": "ded50k3", "kind": "computeLopDeduction", "opts": { "monthlySalary": 50000, "lopDays": 3 } },
+    { "id": "ded50k0", "kind": "computeLopDeduction", "opts": { "monthlySalary": 50000, "lopDays": 0 } },
+    { "id": "ded60k2", "kind": "computeLopDeduction", "opts": { "monthlySalary": 60000, "lopDays": 2 } },
+    { "id": "est_emp1", "kind": "estimateLopDeduction", "empId": "EMP001", "lopDays": 3 },
+    { "id": "est_emp2_dept_default", "kind": "estimateLopDeduction", "empId": "EMP002", "lopDays": 1 },
+    { "id": "quota_default", "kind": "employeeLeaveQuota", "empId": "EMP001" },
+    { "id": "quota_override", "kind": "employeeLeaveQuota", "empId": "EMP003" },
+    { "id": "quota_missing", "kind": "employeeLeaveQuota", "empId": "EMP999" },
+    { "id": "personal_used", "kind": "approvedPersonalLeaveDaysUsed", "empId": "EMP001" },
+    { "id": "restricted_sept", "kind": "approvedRestrictedLeaveDaysInMonth", "empId": "EMP001", "year": 2026, "month": 8 },
+    { "id": "approved_total", "kind": "approvedLeaveDaysUsed", "empId": "EMP001" }
+  ],
+  "expected": {
+    "ded50k3": { "gross": 50000, "perDaySalary": 1666.67, "lopDays": 3, "lopAmount": 5000, "otherDeductions": 0, "net": 45000 },
+    "ded50k0": { "gross": 50000, "perDaySalary": 1666.67, "lopDays": 0, "lopAmount": 0, "otherDeductions": 0, "net": 50000 },
+    "ded60k2": { "gross": 60000, "perDaySalary": 2000, "lopDays": 2, "lopAmount": 4000, "otherDeductions": 0, "net": 56000 },
+    "est_emp1": { "perDaySalary": 1666.67, "amount": 5000 },
+    "est_emp2_dept_default": { "perDaySalary": 2600, "amount": 2600 },
+    "quota_default": { "personalLeave": 14, "restrictedLeave": 2, "isOverridden": false },
+    "quota_override": { "personalLeave": 10, "restrictedLeave": 3, "isOverridden": true },
+    "quota_missing": { "personalLeave": 14, "restrictedLeave": 2 },
+    "personal_used": 2,
+    "restricted_sept": 1,
+    "approved_total": 3
+  }
+}

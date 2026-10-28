@@ -25,7 +25,11 @@ repository being web-served is a different build, not a longer deny list.
 * **`lib/`** — `config.ts` reads and validates the environment once; `db/` is the
   app-role pool and the append-only audit writer; `auth/` is bcrypt, the session
   table, the cookie and the sign-in rate limiter; `http/` is `requireSession()`, the one
-  error shape, the request body reader and the same-origin guard.
+  error shape, the request body reader and the same-origin guard; `rules/` is the
+  attendance engine as pure TypeScript functions (day status, whole-day LOP, payroll
+  cut-off, declared-vs-restricted holidays, WFH-per-week, quotas, alerts) that take
+  their inputs as arguments and read no store, so route handlers can import them
+  directly and the browser and the server are held to the same arithmetic.
 * **`server/`** — the outgoing FastAPI backend, still the thing production runs
   until the Next.js one is verified. It reads the same `public/` directory.
 * **`scripts/`** — `start-standalone.mjs` assembles and runs the deployable
@@ -47,7 +51,10 @@ repository being web-served is a different build, not a longer deny list.
 * **`tests/`** — `guard.mjs` is the public-repository check, and tests itself so it
   cannot pass by being blind; `probe.mjs` asserts the shape of the running server
   (which URLs answer, which headers are set, what must stay unreachable);
-  `unit/` holds the pure loader tests; `integration/db.mjs` asserts the roles, the
+  `unit/` holds the pure loader tests; `conformance/conformance.spec.ts` loads `public/shared.js`
+  for real in a `node:vm` and runs the same JSON fixtures in `tests/fixtures/` against it and
+  against `lib/rules/`, failing on any divergence — the check that keeps one source of truth
+  from quietly becoming two while both sides are still live (M5); `integration/db.mjs` asserts the roles, the
   runner, every schema constraint and the network; `integration/auth.mjs` drives the
   sign-in flow over HTTP against the served payload (equal-time unknown user, no
   enumeration, mid-session deactivation, expiry, password change revoking other sessions);
@@ -63,7 +70,7 @@ A development database from nothing:
 
 ```bash
 npm run db:up && npm run db:prepare   # setup, migrate, seed
-npm run test                          # guard, unit, 11 Node suites, Python, db, probe
+npm run test                          # guard, unit, 11 Node suites, conformance, Python, db, probe
 ```
 
 ---

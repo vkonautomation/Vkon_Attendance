@@ -3,14 +3,17 @@
  *
  * The rule this exists to enforce: a milestone is only done when the portal still
  * works. That means the public-repository guard, the unit tests, the 11 Node rule
- * suites (which load public/shared.js for real inside a shim), the Python
+ * suites (which load public/shared.js for real inside a shim), the rules conformance
+ * harness (which runs the same JSON fixtures against shared.js and lib/rules and fails
+ * on any divergence), the Python
  * source-and-backend verifiers, the database integration suite, and the HTTP probe run
  * against the assembled standalone payload -- the same directory the image ships and
  * the only arrangement in which "nothing outside public/ is reachable" is a claim that
  * can actually be tested.
  *
- * Nothing here is a framework. Each suite is a file that exits non-zero when it
- * fails, which is the only contract a runner needs.
+ * Nothing here depends on a framework to pass or fail. Each suite -- including the
+ * vitest conformance run -- is invoked as a command that exits non-zero when it fails,
+ * which is the only contract a runner needs.
  *
  * Order is deliberate: the guard runs first because it is the only check whose failure
  * means something has already been published. Everything after it can wait.
@@ -124,6 +127,19 @@ for (const f of unitSuites) run(`tests/unit/${f}`, process.execPath, [join(unitD
 const jsSuites = readdirSync(ROOT).filter((f) => /^test_.*\.js$/.test(f)).sort();
 console.log(`\n=== ${jsSuites.length} Node suites ===`);
 for (const f of jsSuites) run(`node ${f}`, process.execPath, [f]);
+
+/* ------------------------------------------------------- rules conformance (vitest) */
+
+// D2: the same JSON fixtures are run against public/shared.js (loaded for real in a
+// node:vm) and against the compiled lib/rules/*.ts, and the two outputs must be
+// deep-equal. This is the check that keeps "one source of truth" from quietly
+// becoming two while both sides are still live.
+console.log("\n=== rules conformance (vitest: shared.js vs lib/rules) ===");
+run(
+  "vitest conformance",
+  process.execPath,
+  [join(ROOT, "node_modules", "vitest", "vitest.mjs"), "run"],
+);
 
 /* ------------------------------------------------------------------- python suites */
 
