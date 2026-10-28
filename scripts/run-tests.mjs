@@ -187,10 +187,13 @@ if (SKIP_SERVE) {
     // punches.mjs belongs here too: it posts no Origin and needs the DB, the same as auth.
     // roster.mjs likewise: it drives /api/employees over the wire against the real employees
     // table and, like punches, sends no Origin and relies on the DB being reachable.
+    // state.mjs likewise: it drives the /api/state document facade over the wire against the
+    // real state_documents table, sends no Origin (the phase-1 instance has the check off), and
+    // relies on the DB being reachable.
     await servePhase(
       PORT,
       { PUBLIC_ORIGIN: "", VKON_TRUST_PROXY_HEADERS: "false", RATE_LIMIT_MAX_FAILURES: "1000" },
-      ["tests/probe.mjs", "tests/integration/auth.mjs", "tests/integration/punches.mjs", "tests/integration/roster.mjs"],
+      ["tests/probe.mjs", "tests/integration/auth.mjs", "tests/integration/punches.mjs", "tests/integration/roster.mjs", "tests/integration/state.mjs"],
     );
 
     // Phase 2 -- the hardened instance. PUBLIC_ORIGIN and the real 5-failure window are
