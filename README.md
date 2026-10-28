@@ -25,18 +25,32 @@ repository being web-served is a different build, not a longer deny list.
   until the Next.js one is verified. It reads the same `public/` directory.
 * **`scripts/`** — `start-standalone.mjs` assembles and runs the deployable
   payload; `run-tests.mjs` is the whole suite in one command; `db-setup.mjs`
-  creates the application role and `db-migrate.mjs` applies `db/migrations/*.sql`.
+  creates the application role, `db-migrate.mjs` applies `db/migrations/*.sql`
+  and `db-seed.mjs` loads the synthetic development data.
 * **`db/migrations/`** — the schema, as ordered SQL. One transaction per file, and
   `schema_migrations` records the checksum of the file that applied each one.
+* **`db/seed/synthetic.sql`** — a roster of `EMP001`…`EMP005` and `@example.test`
+  addresses, idempotent, and refused outright when `VKON_ENV=production`. Real
+  people are loaded on the deploy host, never committed here: this repository is
+  public and `tests/guard.mjs` fails the build if anything looks like real data.
 * **`deploy/compose.yml`** — PostgreSQL on its own network and volume, publishing
   no port. `deploy/compose.dev.yml` adds a loopback listener for a laptop, and is
   kept separate so it cannot be applied to production by accident.
-* **`tests/`** — `probe.mjs` asserts the shape of the running server (which URLs
-  answer, which headers are set, what must stay unreachable);
-  `integration/db.mjs` asserts the roles, the runner and the network.
+* **`tests/`** — `guard.mjs` is the public-repository check, and tests itself so it
+  cannot pass by being blind; `probe.mjs` asserts the shape of the running server
+  (which URLs answer, which headers are set, what must stay unreachable);
+  `unit/` holds the pure loader tests; `integration/db.mjs` asserts the roles, the
+  runner, every schema constraint and the network.
 * **Verification and testing scripts** (`test_*.js`, `verify_*.py`,
   `test_backend.py`) sit at the repository root and load the portal from
   `public/`; `node scripts/run-tests.mjs` runs all of them.
+
+A development database from nothing:
+
+```bash
+npm run db:up && npm run db:prepare   # setup, migrate, seed
+npm run test                          # guard, unit, 11 Node suites, Python, db, probe
+```
 
 ---
 

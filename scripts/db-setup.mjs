@@ -109,6 +109,24 @@ async function main() {
       ALTER DEFAULT PRIVILEGES FOR ROLE ${quotedIdentifier(owner)} IN SCHEMA public
         GRANT USAGE, SELECT ON SEQUENCES TO ${role}`);
 
+    // Re-assert the one table the blanket grant above must not reach. This has to live
+    // here as well as in 0005_audit.sql because the ordering is not fixed: run db:setup
+    // after migrating and GRANT ON ALL TABLES hands UPDATE and DELETE back to the app
+    // role, including on the audit log -- which would undo the append-only rule as a
+    // side effect of an unrelated re-run. The trigger in 0005 still refuses the write,
+    // so this is tidiness rather than the protection; the protection is the trigger.
+    await client.query(`
+      DO $$
+      BEGIN
+        IF to_regclass('public.audit_log') IS NOT NULL THEN
+          REVOKE UPDATE, DELETE, TRUNCATE ON audit_log FROM ${role};
+          GRANT INSERT, SELECT ON audit_log TO ${role};
+          REVOKE UPDATE, DELETE ON audit_log_id_seq FROM ${role};
+          GRANT USAGE, SELECT ON audit_log_id_seq TO ${role};
+        END IF;
+      END
+      $$`);
+
     console.log(`[setup] database ${database}: role ${role} ready, owner ${owner}`);
   });
 }

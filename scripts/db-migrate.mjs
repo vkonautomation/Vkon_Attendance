@@ -80,6 +80,14 @@ async function main() {
     // is the right behaviour for a deploy that races a cron entry.
     await takeMigrationLock(client);
     try {
+      // A migration that grants or revokes for the application role needs to know what
+      // it is called, and the name is configuration, not a constant: 0005_audit.sql
+      // hard-codes the default and reads this for anything else. Placeholder GUCs of the
+      // form "extension.name" are settable without a loaded extension, and a per-session
+      // value cannot leak into another connection.
+      await client.query("SELECT set_config('vkon.app_role', $1, false)", [
+        process.env.ATTENDANCE_APP_USER || "attendance_app",
+      ]);
       await client.query(ENSURE_TABLE);
       const applied = new Map(
         (await client.query("SELECT name, checksum FROM schema_migrations ORDER BY name"))

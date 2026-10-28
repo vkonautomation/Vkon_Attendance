@@ -20,9 +20,13 @@
     "db:down": "docker compose -f deploy/compose.yml -f deploy/compose.dev.yml --env-file .env down",
     "db:setup": "node scripts/db-setup.mjs",
     "db:migrate": "node scripts/db-migrate.mjs",
+    "db:seed": "node scripts/db-seed.mjs",
+    "db:prepare": "npm run db:setup && npm run db:migrate && npm run db:seed",
     "test": "node scripts/run-tests.mjs",
     "test:fast": "node scripts/run-tests.mjs --no-serve",
     "test:probe": "node tests/probe.mjs",
+    "test:guard": "node tests/guard.mjs",
+    "test:unit": "node tests/unit/env.mjs",
     "test:db": "node tests/integration/db.mjs"
   },
   "dependencies": {

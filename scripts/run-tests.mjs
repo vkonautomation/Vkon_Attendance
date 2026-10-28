@@ -2,14 +2,18 @@
  * scripts/run-tests.mjs -- the whole suite, in one command.
  *
  * The rule this exists to enforce: a milestone is only done when the portal still
- * works. That means the 11 Node rule suites (which load public/shared.js for real
- * inside a shim), the Python source-and-backend verifiers, the database integration
- * suite, and the HTTP probe run against the assembled standalone payload -- the same
- * directory the image ships and the only arrangement in which "nothing outside
- * public/ is reachable" is a claim that can actually be tested.
+ * works. That means the public-repository guard, the unit tests, the 11 Node rule
+ * suites (which load public/shared.js for real inside a shim), the Python
+ * source-and-backend verifiers, the database integration suite, and the HTTP probe run
+ * against the assembled standalone payload -- the same directory the image ships and
+ * the only arrangement in which "nothing outside public/ is reachable" is a claim that
+ * can actually be tested.
  *
  * Nothing here is a framework. Each suite is a file that exits non-zero when it
  * fails, which is the only contract a runner needs.
+ *
+ * Order is deliberate: the guard runs first because it is the only check whose failure
+ * means something has already been published. Everything after it can wait.
  *
  * Usage:  node scripts/run-tests.mjs [--no-serve]   (--no-serve skips the probe)
  */
@@ -46,6 +50,20 @@ function pythonExe() {
   if (existsSync(unix)) return unix;
   return process.platform === "win32" ? "py" : "python3";
 }
+
+/* ------------------------------------------------------------- the public-repo guard */
+
+console.log("\n=== public repository guard ===");
+run("tests/guard.mjs", process.execPath, [join(ROOT, "tests", "guard.mjs")]);
+
+/* ------------------------------------------------------------------- unit suites */
+
+const unitDir = join(ROOT, "tests", "unit");
+const unitSuites = existsSync(unitDir)
+  ? readdirSync(unitDir).filter((f) => f.endsWith(".mjs")).sort()
+  : [];
+console.log(`\n=== ${unitSuites.length} unit suites ===`);
+for (const f of unitSuites) run(`tests/unit/${f}`, process.execPath, [join(unitDir, f)]);
 
 /* ------------------------------------------------------------------ node rule suites */
 
