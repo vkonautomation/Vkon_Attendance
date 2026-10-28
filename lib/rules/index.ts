@@ -14,6 +14,7 @@ export * from "./ist";
 export * from "./holidays";
 export * from "./lop";
 export * from "./wfh";
+export * from "./geofence";
 export * from "./quotas";
 export * from "./day-status";
 export * from "./alerts";

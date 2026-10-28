@@ -122,6 +122,30 @@ export function formatMinutesHM(mins: number): string {
   return `${Math.floor(a / 60)}h ${String(a % 60).padStart(2, "0")}m`;
 }
 
+/**
+ * An instant as the browser's clock string, e.g. "09:20 AM". Ported from shared.js
+ * formatTimeString so a server-issued punch and a client-issued one read identically in
+ * the day table -- two spellings of the same time is exactly the drift this project exists
+ * to prevent.
+ */
+export function formatISTClock(date: Date): string {
+  try {
+    return date.toLocaleTimeString("en-US", {
+      timeZone: "Asia/Kolkata",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
+  } catch {
+    const ist = getISTDate(date);
+    let hours = ist.getHours();
+    const minutes = String(ist.getMinutes()).padStart(2, "0");
+    const ampm = hours >= 12 ? "PM" : "AM";
+    hours = hours % 12 || 12;
+    return `${String(hours).padStart(2, "0")}:${minutes} ${ampm}`;
+  }
+}
+
 /** `${year}-W${ww}` for a date, matching getWeekKey. */
 export function weekKey(d: Date): string {
   const year = d.getFullYear();

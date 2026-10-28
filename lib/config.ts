@@ -49,6 +49,18 @@ export interface AppConfig {
   maxBodyBytes: {
     auth: number;
     state: number;
+    punch: number;
+  };
+
+  /**
+   * Geofence accuracy gate (M6). The server draws the verdict from the stored fix, and a
+   * fix coarser than this is "presence unverified" rather than a pass. The strict-for-GPS /
+   * fairer-for-network numbers are an HR question still open (Q4), so this is an operator
+   * knob with a conservative default; a `geofence.office.maxTrustedAccuracyM` in the
+   * settings table overrides it per-deployment once the number is signed off.
+   */
+  geofence: {
+    defaultMaxTrustedAccuracyM: number;
   };
 
   /**
@@ -84,6 +96,13 @@ const DEFAULTS = {
   // The document facade (D1) puts a whole roster or a month of records in one body.
   // This is the ceiling until M11 retires it; it is not a limit nobody hits.
   stateBodyBytes: 2 * 1024 * 1024,
+  // A punch is a kind, a timestamp and three numbers. Small on purpose: a punch endpoint
+  // that takes a large body is a punch endpoint being used to store something else.
+  punchBodyBytes: 8192,
+  // A phone reporting 5 km of accuracy was not meaningfully at the office. Matches the
+  // outgoing FastAPI's VKON_MAX_ACCURACY default so a re-implementation is not stricter or
+  // laxer than the thing it replaces.
+  maxTrustedAccuracyM: 100,
   // 5 failures / 15 minutes: enough that a genuine person mistyping twice is untouched,
   // low enough that a password list makes no headway. The window is a floor on how long
   // an account is protected, not how long a person is locked out -- a success clears it.
@@ -145,6 +164,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     maxBodyBytes: {
       auth: num(env.MAX_AUTH_BODY_BYTES, DEFAULTS.authBodyBytes, 256, 1024 * 1024, "MAX_AUTH_BODY_BYTES"),
       state: num(env.MAX_STATE_BODY_BYTES, DEFAULTS.stateBodyBytes, 1024, 16 * 1024 * 1024, "MAX_STATE_BODY_BYTES"),
+      punch: num(env.MAX_PUNCH_BODY_BYTES, DEFAULTS.punchBodyBytes, 256, 64 * 1024, "MAX_PUNCH_BODY_BYTES"),
+    },
+    geofence: {
+      defaultMaxTrustedAccuracyM: num(env.GEOFENCE_MAX_ACCURACY_M, DEFAULTS.maxTrustedAccuracyM, 1, 5000, "GEOFENCE_MAX_ACCURACY_M"),
     },
     rateLimit: {
       maxFailures: num(env.RATE_LIMIT_MAX_FAILURES, DEFAULTS.rateLimitMaxFailures, 1, 1000, "RATE_LIMIT_MAX_FAILURES"),
