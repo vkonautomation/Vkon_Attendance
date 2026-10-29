@@ -1343,8 +1343,9 @@ function initEnrollmentForm() {
     // In server mode the roster is more than a document: a person only exists to the
     // sign-in system once they are a row in the database. Create that account first and
     // add them to the on-screen roster only if it succeeds, so the console never shows
-    // someone who cannot actually log in. The server issues the starting password; the
-    // (demo) field here is ignored and never published into the shared document.
+    // someone who cannot actually log in. The Login Password you type is sent to the server
+    // and hashed there (never published into the shared document); leave it blank and the
+    // server issues a one-time password instead, shown once below.
     const api = window.VKON_API;
     const serverBacked = !!(api && api.isServerBacked && api.isServerBacked());
     let oneTimePassword = null;
@@ -1360,7 +1361,8 @@ function initEnrollmentForm() {
         monthlySalary: null,
         geofenceEnabled: geofenceRule !== "exempt",
         active: true,
-        joinedOn: enrolledAt
+        joinedOn: enrolledAt,
+        password: password
       });
       if (!res.ok) {
         showToast(res.message || "Could not create the sign-in account.", "error");
@@ -1421,6 +1423,8 @@ function initEnrollmentForm() {
         `Temporary password: ${oneTimePassword}\n\n` +
         `Share these with them. They will be required to choose their own password the first time they sign in.`
       );
+    } else if (serverBacked) {
+      showToast(`Employee ${name} (${newId}) enrolled. They can sign in with the password you set.`, "success");
     } else {
       showToast(`Employee ${name} (${newId}) enrolled with master baseline photo! Ready to start work with clean history.`, "success");
     }

@@ -25,7 +25,7 @@
 import { randomBytes } from "node:crypto";
 import type { PoolClient } from "pg";
 import { query, withTransaction, PG, pgCode } from "./db/pool";
-import { hashPassword } from "./auth/hash";
+import { hashPassword, PASSWORD_MIN_LENGTH } from "./auth/hash";
 import { ApiError, badRequest } from "./http/errors";
 
 /** The access role, exactly as the schema's CHECK constrains it. */
@@ -181,6 +181,8 @@ export interface NewEmployee {
   geofenceEnabled: boolean;
   active: boolean;
   joinedOn: string | null;
+  /** Starting password chosen by the administrator; blank means the server issues a one-time password. */
+  password?: string | null;
 }
 
 export interface EmployeePatch {
@@ -232,10 +234,11 @@ function translateWriteError(err: unknown, context: { code: string }): never {
   throw err;
 }
 
-/** The outcome of enrolling: the roster row, plus the one-time password shown exactly once. */
+/** The outcome of enrolling: the roster row, plus a one-time password when the server issued one. */
 export interface CreatedEmployee {
   employee: RosterRow;
-  oneTimePassword: string;
+  /** The generated password, only when the administrator left the field blank; otherwise null. */
+  oneTimePassword: string | null;
 }
 
 /**
@@ -254,8 +257,26 @@ export async function createEmployee(cmd: NewEmployee): Promise<CreatedEmployee>
     throw badRequest("`monthlySalary` cannot be negative.", "invalid_salary");
   }
 
-  const oneTimePassword = randomBytes(18).toString("base64url");
-  const passwordHash = await hashPassword(oneTimePassword);
+  // The starting credential is either a password the administrator chose (used as-is, no
+  // forced change) or, when they left it blank, a server-generated one-time password the
+  // person must replace on first sign-in. Only its hash is ever stored; the plaintext is
+  // never written to the audit trail or the shared roster document.
+  let passwordToHash: string;
+  let oneTimePassword: string | null = null;
+  let changeRequired: boolean;
+  const chosen = typeof cmd.password === "string" ? cmd.password : "";
+  if (chosen.length) {
+    if (chosen.length < PASSWORD_MIN_LENGTH) {
+      throw badRequest(`A password must be at least ${PASSWORD_MIN_LENGTH} characters.`, "password_too_short");
+    }
+    passwordToHash = chosen;
+    changeRequired = false;
+  } else {
+    oneTimePassword = randomBytes(18).toString("base64url");
+    passwordToHash = oneTimePassword;
+    changeRequired = true;
+  }
+  const passwordHash = await hashPassword(passwordToHash);
 
   const employee = await withTransaction(async (client) => {
     const managerId = cmd.managerCode ? await resolveManagerId(client, cmd.managerCode) : null;
@@ -266,7 +287,7 @@ export async function createEmployee(cmd: NewEmployee): Promise<CreatedEmployee>
             monthly_salary, geofence_enabled, active, joined_on, timezone,
             password_hash, password_change_required, password_changed_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::date, 'Asia/Kolkata',
-                 $13, TRUE, now())`,
+                 $13, $14, now())`,
         [
           cmd.employeeCode.toUpperCase(),
           cmd.username.toLowerCase(),
@@ -281,6 +302,7 @@ export async function createEmployee(cmd: NewEmployee): Promise<CreatedEmployee>
           cmd.active,
           cmd.joinedOn,
           passwordHash,
+          changeRequired,
         ],
       );
       // Read back through the same join the GET uses, so a created row is shaped exactly like

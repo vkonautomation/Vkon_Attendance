@@ -68,6 +68,9 @@ export async function POST(req: NextRequest): Promise<Response> {
       // created through the roster is a person who can sign in, unless the admin said otherwise.
       active: boolField(body, "active", true),
       joinedOn: isoDateField(body, "joinedOn"),
+      // The administrator may set the starting password; blank makes the server issue a
+      // one-time password. It is hashed on the way in and never stored or audited as text.
+      password: optionalString(body, "password", 400),
     };
 
     const { employee, oneTimePassword } = await createEmployee(cmd);

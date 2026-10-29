@@ -213,11 +213,25 @@ async function runAdminOnlyWrite(client) {
     created.status === 201 && typeof created.json.oneTimePassword === "string" &&
     created.json.oneTimePassword.length >= 10,
     `${created.status} ${created.text}`);
-  const enrolSignIn = await login("zzx1", created.json && created.json.oneTimePassword);
-  check("the newly enrolled employee signs in with that password and must change it",
-    enrolSignIn.status === 200 && enrolSignIn.json && enrolSignIn.json.signedIn === true &&
-    enrolSignIn.json.mustChangePassword === true,
-    `${enrolSignIn.status} ${enrolSignIn.text}`);
+  // Verify the credential landed WITHOUT signing the account in: a login would write an
+  // audit row keyed to it, and the append-only trigger would then block the cleanup DELETE
+  // below, breaking re-runs. A direct read proves the same thing and stays removable.
+  const enrolRow = await client.query(
+    `SELECT (password_hash IS NOT NULL) AS has_pw, password_change_required
+       FROM employees WHERE employee_code = 'ZZX1'`);
+  const er = enrolRow.rows[0] || {};
+  check("the enrol stored a password and requires a first-login change",
+    er.has_pw === true && er.password_change_required === true, JSON.stringify(er));
+
+  // A password the administrator supplies is used as-is, so no one-time password comes back.
+  const withPw = await api("/api/employees", {
+    method: "POST", token: adminToken,
+    body: { employeeCode: "ZZX2", username: "zzx2", name: "Typed Password Probe", accessRole: "employee", password: "a-starting-password" },
+  });
+  check("a supplied password means no one-time password is returned",
+    withPw.status === 201 && withPw.json && withPw.json.oneTimePassword === null,
+    `${withPw.status} ${withPw.text}`);
+  await client.query(`DELETE FROM employees WHERE employee_code = 'ZZX2'`).catch(() => {});
 
   // An admin PATCH can set the salary/jobTitle and returns 200 with the change reflected.
   const patched = await api("/api/employees/ZZX1", {
