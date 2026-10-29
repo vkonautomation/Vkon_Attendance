@@ -140,8 +140,21 @@ function initAuthSystem() {
   // replaces once someone is in. So it must never claim a sign-in that has not
   // happened - it reports whether a server is present and in charge.
   const demoBadge = document.querySelector(".demo-mode-badge");
+  const quickFillWrap = document.querySelector(".auth-quick-fill-wrap");
+  function authModeProbing() {
+    return !!(window.VKON_API && VKON_API.isProbing && VKON_API.isProbing());
+  }
   function paintAuthBadge() {
     if (!demoBadge) return;
+    // The demo pill is hidden in the markup. Until /api/health has answered we do not
+    // know whether this is a real server or a static demo, and guessing "Demo Mode" for
+    // a second on the live site is both misleading and a visible flash. Keep the pill
+    // hidden while probing, then reveal it with the truthful badge.
+    if (authModeProbing()) {
+      if (quickFillWrap) quickFillWrap.style.display = "none";
+      return;
+    }
+    if (quickFillWrap) quickFillWrap.style.display = "";
     if (serverBacked()) {
       demoBadge.innerHTML = '<i class="fa-solid fa-shield-halved"></i> Attendance server &mdash; sign in required';
     } else if (typeof demoAuthEnabled === "function" && demoAuthEnabled()) {

@@ -53,10 +53,12 @@
         </div>
       </div>
 
-      <!-- Quick Fill Credentials Pill (Demo Mode only) -->
-      <div class="quick-credentials-hint auth-quick-fill-wrap">
+      <!-- Quick Fill Credentials Pill (Demo Mode only). Hidden in the markup so a
+           server-backed load never flashes this demo pill before /api/health answers;
+           app.js reveals it (with the truthful badge) once the mode is known. -->
+      <div class="quick-credentials-hint auth-quick-fill-wrap" style="display: none;">
         <span class="auth-quick-fill-label demo-mode-badge"><i class="fa-solid fa-flask"></i> Demo Mode</span>
-        <button type="button" class="quick-fill-emp-btn auth-quick-fill-btn" data-user="mukesh">
+        <button type="button" class="quick-fill-emp-btn auth-quick-fill-btn" data-user="mukesh" style="display: none;">
           <i class="fa-solid fa-user-check text-primary"></i> Mukesh Sharma (EMP001) &bull; tap to sign in
         </button>
       </div>
@@ -1060,12 +1062,12 @@
   <!-- The server adapter must be parsed before shared.js: shared.js asks it whether
        this browser reads shared state or only its own localStorage, and waits on it
        before seeding. Order here is load-bearing. -->
-  <script src="js/api.js?v=20261029_e4"></script>
-  <script src="js/password-change.js?v=20261029_e4"></script>
-  <script src="shared.js?v=20261029_e4"></script>
+  <script src="js/api.js?v=20261029_e5"></script>
+  <script src="js/password-change.js?v=20261029_e5"></script>
+  <script src="shared.js?v=20261029_e5"></script>
   <script src="js/confirm-decision-modal.js?v=20261023_apr1"></script>
   <script src="js/day-popover.js?v=20261023_apr1"></script>
-  <script src="app.js?v=20261029_e4"></script>
+  <script src="app.js?v=20261029_e5"></script>
   <script src="js/password-toggle.js?v=20261019_ui1"></script>
   <script src="js/data-transfer.js?v=20261023_apr2"></script>
 
