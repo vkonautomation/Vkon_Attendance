@@ -61,9 +61,12 @@ container image contains neither.
 ### Prerequisites (all must be true before starting)
 
 - [ ] **Host shell access** to the deploy box (to stop nginx, run compose, run migrations).
-- [ ] **The Cloudflare Tunnel** for `attendance.vkon.in` whose public service points at
-      `http://127.0.0.1:8135`. The container takes over `8135`, so the tunnel config
-      does not change — only what listens behind it.
+- [ ] **The Cloudflare Tunnel** for `attendance.vkon.in`. The ingress service URL lives
+      in the Cloudflare dashboard and may not be editable from the host; on the current
+      box the tunnel reaches the **nginx container** by container DNS on port 80 of the
+      `vkon_attendance_default` bridge (confirmed from nginx access logs), so nginx must
+      stay the tunnel endpoint and be repurposed as a reverse proxy rather than replaced
+      on `127.0.0.1:8135`.
 - [ ] **Postgres up** and the **application role created** (`npm run db:setup`), with
       `DATABASE_URL_APP` and `DATABASE_URL_OWNER` in the host `.env`.
 - [ ] **The real roster and policy numbers** loaded (see "Load real data" below). The
@@ -169,13 +172,76 @@ the checkout back to `079433e` (`git reset --hard 079433e`) exactly as in Part A
 `attendance-pgdata` volume is untouched by either action, so no attendance data is lost
 by backing the serving change out.
 
+### Executed procedure (2026-10-29, host `ptz`) — what actually ran
+
+The steps above were executed with two differences forced by the real topology (the
+tunnel endpoint must remain the nginx container) and by the host's node v12 (too old to
+build Next; the build cannot run on the host at all):
+
+1. Repo ff-merged to the cut-over commit; schema already at migration `0008` with the
+   `attendance_app` role present (`db:setup`/`db:migrate` had been run earlier).
+2. **Build in RAM**: `docker run node:20-alpine` with `--tmpfs /work:size=4g,exec`
+   mounting the checkout `:ro`; `npm ci` (fresh musl binaries — the host's
+   `node_modules` is glibc) then `node node_modules/next/dist/bin/next build`; the
+   standalone output (`.next/standalone/.` + `.next/static` + `public`) assembled into
+   `/home/ptz/project2/vkon-next-app`, with no `.env` copied into it.
+3. **App container**: `docker run -d --name attendance-app --network
+   vkon_attendance_default --network-alias attendance-app -v
+   /home/ptz/project2/vkon-next-app:/app -w /app --env-file <app-only keys> -e
+   NODE_ENV=production -e PORT=8000 -e HOSTNAME=0.0.0.0 --restart unless-stopped
+   node:20-alpine node server.js`, then `docker network connect attendance-internal
+   attendance-app` so `DATABASE_URL_APP` resolves `db:5432`. The env file is built by
+   grepping ONLY the app-role keys (`VKON_ENV`, `PUBLIC_ORIGIN`, `COOKIE_SECURE`,
+   `VKON_TRUST_PROXY_HEADERS`, `DATABASE_URL_APP`, `BCRYPT_COST_FACTOR`, session and
+   rate-limit knobs) out of `.env` — the owner URL and tunnel token never enter the
+   app container. No host port is published.
+4. **nginx flip (the cut-over itself)**: `proxy.conf` written to
+   `/home/ptz/project2/vkon-nginx/` — `location / { proxy_pass
+   http://attendance-app:8000; ... }` passing `Host`, `X-Forwarded-For`,
+   `X-Forwarded-Proto`, `X-Real-IP` and `CF-Connecting-IP` through — mounted over
+   `/etc/nginx/conf.d/default.conf` in the host `docker-compose.yml` (timestamped
+   backup of the compose file taken first; the `./public` mount is left in place).
+   `docker compose up -d app` recreates nginx as a pure reverse proxy; every response
+   including headers and rewrites now comes from Next, so nginx adds no rules of its
+   own.
+5. **First administrator**: `docker run --rm --network host -v <repo>:/app -w /app
+   node:20-alpine node scripts/db-bootstrap-admin.mjs` — host networking because
+   `DATABASE_URL_OWNER` points at `127.0.0.1:5433`. `VKON_ADMIN_PASSWORD` was blank,
+   so a one-time password was minted, printed once, and `password_change_required`
+   was set per owner policy. Re-running is inert (existing account untouched).
+6. **Verify**: `PROBE_BASE_URL=https://attendance.vkon.in node tests/probe.mjs` from a
+   `node:20-alpine --network host` container against the live domain → **144/144**;
+   `/api/health` returns `{"status":"ok","api":"v1"}`; `/.git/config`, `/.env`,
+   `/server/main.py` → 404; OTP login → 200 with `mustChangePassword: true`, and
+   `GET /api/state` under that session correctly returns **403 until the password is
+   changed** (`requireSession` gates every API on the forced change).
+
+Rollback for this topology: restore the timestamped compose backup and
+`docker compose -f docker-compose.yml --env-file .env up -d --force-recreate app` —
+nginx serves `./public` statically again in seconds. The `attendance-app` container can
+stay running harmlessly (it publishes no host port); remove it with
+`docker rm -f attendance-app` once the old serving model is confirmed healthy.
+
+**`BCRYPT_COST_FACTOR=12` is a host-measured number** (`bcrypt:calibrate` run on `ptz`),
+not the assumed 1-CPU default. The Cloudflare `/api/*` cache bypass (step 6 of the
+Ordered list) remains a dashboard action; the origin's `Cache-Control: no-store` on
+`/api/*` is verified live and carried through the proxy.
+
 ---
 
 ## Blocking items (why this is not done from the repo)
 
-1. **No host access** — stopping nginx, binding 8135, running owner migrations.
-2. **No tunnel/cache control** — the `/api/*` bypass is a Cloudflare dashboard action.
-3. **Real roster + policy numbers are HR-owned** — deliberately never committed; the
-   production DB is empty of real people until step 3 of Part B is run on the host.
-4. **The `/state` shared-data gap** above is a product decision: cut over now for auth +
-   punches + a closed `/.git` exposure, or wait for the state milestone for full sync.
+Status after the 2026-10-29 execution (see "Executed procedure" above): items 1 and 2
+were cleared on the host; the `/state` decision in item 4 is moot because the facade
+shipped in `c450987` and is live.
+
+1. **Host access** — required to run the build, the containers, the owner scripts and
+   the nginx flip. Done on `ptz`; re-run from the same place after each release.
+2. **Tunnel/cache control** — the cut-over works *with* the tunnel as it is (nginx
+   stays the endpoint), but the `/api/*` edge cache bypass remains a Cloudflare
+   dashboard action.
+3. **Real roster + policy numbers are owner-owned** — deliberately never committed. The
+   production DB holds only the bootstrap admin; real people arrive either by the
+   owner signing in (the browser's `adoptLocalState()` migrates its own `vkon_*`
+   documents on first sign-in) or by `npm run db:import` against the real Export file
+   once its fields are confirmed.
