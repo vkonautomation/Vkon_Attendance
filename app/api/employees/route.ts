@@ -70,25 +70,28 @@ export async function POST(req: NextRequest): Promise<Response> {
       joinedOn: isoDateField(body, "joinedOn"),
     };
 
-    const created = await createEmployee(cmd);
+    const { employee, oneTimePassword } = await createEmployee(cmd);
 
     // Salary and geofence are policy the audit trail should be able to reconstruct; email is
     // personal, so only the code and the role-changing fields are recorded (see lib/db/audit.ts).
+    // The one-time password is deliberately never recorded.
     await recordAudit({
       actorEmployeeId: session.employeeId,
       action: "roster.create",
       entityType: "employee",
-      entityId: created.id,
+      entityId: employee.id,
       detail: {
-        role: created.accessRole,
-        active: created.active,
-        manager: created.managerId,
-        geofenceEnabled: created.geofenceEnabled,
+        role: employee.accessRole,
+        active: employee.active,
+        manager: employee.managerId,
+        geofenceEnabled: employee.geofenceEnabled,
       },
       ip: clientIp(req),
     });
 
-    return json({ employee: created }, { status: 201 });
+    // The starting password is returned exactly once, here, so the administrator can hand it
+    // to the new person. The server stores only its hash.
+    return json({ employee, oneTimePassword }, { status: 201 });
   } catch (err) {
     return errorResponse(err, "POST /api/employees");
   }

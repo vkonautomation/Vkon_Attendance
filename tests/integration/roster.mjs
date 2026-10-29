@@ -206,8 +206,20 @@ async function runAdminOnlyWrite(client) {
   check("the created employee is really on file (active on enrol)",
     dbRow && dbRow.active === true && dbRow.role === "employee", dbRow ? "" : "no row");
 
-  // The created employee can now sign in with a set password? No -- create sets no password,
-  // so an admin PATCH can set the salary/manager and returns 200 with the change reflected.
+  // Enrolment now issues a real credential: the response carries a one-time password and the
+  // person can sign in with it immediately, on a forced change. This is what makes a console
+  // "add employee" actually able to log in -- the roster document alone never could.
+  check("the enrol response carries a one-time password",
+    created.status === 201 && typeof created.json.oneTimePassword === "string" &&
+    created.json.oneTimePassword.length >= 10,
+    `${created.status} ${created.text}`);
+  const enrolSignIn = await login("zzx1", created.json && created.json.oneTimePassword);
+  check("the newly enrolled employee signs in with that password and must change it",
+    enrolSignIn.status === 200 && enrolSignIn.json && enrolSignIn.json.signedIn === true &&
+    enrolSignIn.json.mustChangePassword === true,
+    `${enrolSignIn.status} ${enrolSignIn.text}`);
+
+  // An admin PATCH can set the salary/jobTitle and returns 200 with the change reflected.
   const patched = await api("/api/employees/ZZX1", {
     method: "PATCH", token: tok.ZZRA, body: { monthlySalary: 47500, jobTitle: "Junior Engineer" },
   });

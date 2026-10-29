@@ -391,6 +391,32 @@ window.VKON_API = (function () {
     pendingPasswordChange = false;
   }
 
+  /* --------------------------------------------------------------- roster */
+
+  /**
+   * Create a real, sign-in-capable employee account. This is the one front-end write
+   * that must not go through the document store: sign-in is validated against the
+   * database `employees` table, so an enrolled person only exists to the login system
+   * once this succeeds. The server issues the starting password; none is sent from here.
+   * Requires a verified (admin) session, so it never runs in local/demo mode.
+   */
+  async function createRosterEmployee(payload) {
+    if (mode !== "server" || !authenticated) {
+      return { ok: false, code: "no_session", message: "Sign in as an administrator to add employees." };
+    }
+    try {
+      const res = await request("/employees", { method: "POST", body: JSON.stringify(payload) });
+      return { ok: true, employee: res.employee, oneTimePassword: res.oneTimePassword };
+    } catch (err) {
+      return {
+        ok: false,
+        status: err.status,
+        code: (err.body && err.body.reason) || "error",
+        message: err.message || "Could not create the sign-in account.",
+      };
+    }
+  }
+
   function currentSession() { return session; }
   function isServerBacked() { return mode === "server"; }
   function isLocalOnly() { return mode === "local"; }
@@ -410,6 +436,7 @@ window.VKON_API = (function () {
     ready,
     handles, read, write, flush, pull,
     punch, login, logout, changePassword, boot,
+    createRosterEmployee,
     currentSession, isServerBacked, isProbing, isLocalOnly, pendingPunchCount,
     needsPasswordChange,
     onConflict: (fn) => { conflictHandler = fn; },

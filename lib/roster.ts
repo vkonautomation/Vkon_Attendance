@@ -22,8 +22,10 @@
  * to recognise the resulting check violation and say so in a message a person can act on.
  */
 
+import { randomBytes } from "node:crypto";
 import type { PoolClient } from "pg";
 import { query, withTransaction, PG, pgCode } from "./db/pool";
+import { hashPassword } from "./auth/hash";
 import { ApiError, badRequest } from "./http/errors";
 
 /** The access role, exactly as the schema's CHECK constrains it. */
@@ -230,24 +232,41 @@ function translateWriteError(err: unknown, context: { code: string }): never {
   throw err;
 }
 
+/** The outcome of enrolling: the roster row, plus the one-time password shown exactly once. */
+export interface CreatedEmployee {
+  employee: RosterRow;
+  oneTimePassword: string;
+}
+
 /**
- * Insert one employee. Everything happens in one transaction so the manager lookup and the
- * insert see the same snapshot; a cycle or a duplicate is refused and nothing partial is left.
+ * Insert one employee and give them a starting credential. Everything happens in one
+ * transaction so the manager lookup and the insert see the same snapshot; a cycle or a
+ * duplicate is refused and nothing partial is left.
+ *
+ * The password is always server-generated: a random one-time value the person must replace
+ * on first sign-in (the same OTP policy the bootstrap and importer use). A plaintext
+ * password never enters this call, so the roster body stays free of secrets and there is no
+ * "administrator sets someone's real password" path here to get wrong.
  */
-export async function createEmployee(cmd: NewEmployee): Promise<RosterRow> {
+export async function createEmployee(cmd: NewEmployee): Promise<CreatedEmployee> {
   validateRole(cmd.accessRole);
   if (cmd.monthlySalary !== null && cmd.monthlySalary < 0) {
     throw badRequest("`monthlySalary` cannot be negative.", "invalid_salary");
   }
 
-  return withTransaction(async (client) => {
+  const oneTimePassword = randomBytes(18).toString("base64url");
+  const passwordHash = await hashPassword(oneTimePassword);
+
+  const employee = await withTransaction(async (client) => {
     const managerId = cmd.managerCode ? await resolveManagerId(client, cmd.managerCode) : null;
     try {
       await client.query(
         `INSERT INTO employees
            (employee_code, username, name, email, job_title, department, role, manager_id,
-            monthly_salary, geofence_enabled, active, joined_on, timezone)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::date, 'Asia/Kolkata')`,
+            monthly_salary, geofence_enabled, active, joined_on, timezone,
+            password_hash, password_change_required, password_changed_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::date, 'Asia/Kolkata',
+                 $13, TRUE, now())`,
         [
           cmd.employeeCode.toUpperCase(),
           cmd.username.toLowerCase(),
@@ -261,6 +280,7 @@ export async function createEmployee(cmd: NewEmployee): Promise<RosterRow> {
           cmd.geofenceEnabled,
           cmd.active,
           cmd.joinedOn,
+          passwordHash,
         ],
       );
       // Read back through the same join the GET uses, so a created row is shaped exactly like
@@ -274,6 +294,8 @@ export async function createEmployee(cmd: NewEmployee): Promise<RosterRow> {
       translateWriteError(err, { code: cmd.employeeCode });
     }
   });
+
+  return { employee, oneTimePassword };
 }
 
 /**

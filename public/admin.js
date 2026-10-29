@@ -1315,7 +1315,7 @@ function initEnrollmentForm() {
     reader.readAsDataURL(file);
   });
 
-  form.addEventListener("submit", (e) => {
+  form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const name = document.getElementById("newEmpName").value.trim();
     const role = document.getElementById("newEmpRole").value.trim();
@@ -1337,17 +1337,49 @@ function initEnrollmentForm() {
     }
 
     const newId = `EMP${String(employees.length + 1).padStart(3, "0")}`;
+    const enrolledAt = (joinDateInput && joinDateInput.value) ? joinDateInput.value : formatDateKey(new Date());
+    const managerId = newMgrSel ? newMgrSel.value : "";
+
+    // In server mode the roster is more than a document: a person only exists to the
+    // sign-in system once they are a row in the database. Create that account first and
+    // add them to the on-screen roster only if it succeeds, so the console never shows
+    // someone who cannot actually log in. The server issues the starting password; the
+    // (demo) field here is ignored and never published into the shared document.
+    const api = window.VKON_API;
+    const serverBacked = !!(api && api.isServerBacked && api.isServerBacked());
+    let oneTimePassword = null;
+    if (serverBacked) {
+      const res = await api.createRosterEmployee({
+        employeeCode: newId,
+        username: username,
+        name: name,
+        jobTitle: role,
+        department: dept,
+        accessRole: "employee",
+        managerCode: managerId ? managerId.toUpperCase() : null,
+        monthlySalary: null,
+        geofenceEnabled: geofenceRule !== "exempt",
+        active: true,
+        joinedOn: enrolledAt
+      });
+      if (!res.ok) {
+        showToast(res.message || "Could not create the sign-in account.", "error");
+        return;
+      }
+      oneTimePassword = res.oneTimePassword;
+    }
+
     const newEmp = {
       id: newId,
       name: name,
       username: username,
-      password: password,
+      password: serverBacked ? "" : password,
       role: role,
       department: dept,
       geofenceEnforcement: geofenceRule,
-      managerId: newMgrSel ? newMgrSel.value : "",
+      managerId: managerId,
       avatar: adminCapturedMasterPhoto || previewImg.src,
-      enrolledAt: (joinDateInput && joinDateInput.value) ? joinDateInput.value : formatDateKey(new Date())
+      enrolledAt: enrolledAt
     };
 
     // Ensure newly enrolled member has completely clean slate (no previous present, leave, or absent history)
@@ -1380,7 +1412,18 @@ function initEnrollmentForm() {
     adminCapturedMasterPhoto = null;
     renderRosterTable();
     renderMonthlyReport();
-    showToast(`Employee ${name} (${newId}) enrolled with master baseline photo! Ready to start work with clean history.`, "success");
+
+    if (oneTimePassword) {
+      showToast(`Employee ${name} (${newId}) enrolled. Their sign-in account is ready.`, "success");
+      window.alert(
+        `${name} (${newId}) can now sign in.\n\n` +
+        `Username: ${username}\n` +
+        `Temporary password: ${oneTimePassword}\n\n` +
+        `Share these with them. They will be required to choose their own password the first time they sign in.`
+      );
+    } else {
+      showToast(`Employee ${name} (${newId}) enrolled with master baseline photo! Ready to start work with clean history.`, "success");
+    }
   });
 }
 
