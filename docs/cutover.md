@@ -74,28 +74,25 @@ container image contains neither.
 - [ ] **`.env` set** with `PUBLIC_ORIGIN=https://attendance.vkon.in`,
       `VKON_TRUST_PROXY_HEADERS=true`, `COOKIE_SECURE=true`, `APP_PORT=8135`.
 
-### Understand the one functional gap before you flip
+### The `/api/state` gap is now closed (update: shipped in `c450987`)
 
-The portal's **shared-state document API (`/api/state`) is not shipped yet** (see the
-M6 note in the README), and that changes what the cut-over actually delivers today.
-Trace `public/js/api.js` `boot()`:
+The shared-state document API **is shipped**: `GET /api/state` projects the `vkon_*`
+documents from the `state_documents` table (migration `0008`) and `PUT /api/state/{key}`
+writes them back with per-key optimistic concurrency and a role-based write policy.
+That means the D1 document facade — not just auth and punches — lands with this
+cut-over, so a signed-in browser hydrates **shared** state instead of falling through
+to `local` mode. Trace `public/js/api.js` `boot()`:
 
 - `/api/health` 404 → `local` mode (the old static behaviour). After the cut-over it
-  returns 200, so the login screen starts offering **real password auth** instead of the
-  demo shortcut — that part is an improvement.
-- A signed-in browser then calls `hydrate()` → `GET /api/state`. **That route does not
-  exist yet, so it 404s, and `api.js` falls back to `local` mode** (`api.js:122-125`).
+  returns 200, so the login screen offers **real password auth** and `hydrate()` runs.
+- `hydrate()` → `GET /api/state` now returns 200 with the shared documents; the browser
+  enters shared mode and its writes go to the server via `PUT /api/state/{key}`.
 
-So immediately after this cut-over the Next container gives you a correct `/`, a closed
-`/.git`/`/server` exposure, real sign-in/sessions, role-scoped `/api/employees`,
-server-clock `/api/punches` and the audit trail — but a **signed-in employee still sees
-their own device's `localStorage`, not shared data**, because `/api/state` is the
-missing piece. Multi-user shared roster/state sync lands with the `/state` facade
-milestone. **Do not present this to a live office as "shared attendance" until then.**
-If restoring `/` and closing the `/.git` exposure is enough for now (nobody was on
-shared data anyway — production is pure-static today), Part B is safe to run. If the
-goal is the shared system itself, finish the `/state` milestone first and treat Part B
-as that later launch.
+What remains is the **per-entity migration** (M8–M11: rules computed server-side, the
+document facade retired key by key). That is integrity/hardening work, **not** required
+for a functional shared launch. The one true prerequisite the repository cannot supply
+is **real people in the `employees` table** — see step 3 — because sign-in is checked
+against it and production refuses to seed synthetic staff.
 
 ### Ordered steps
 
@@ -114,8 +111,11 @@ Run from the host checkout, in this order. Each step is safe to stop at.
    ```
 3. **Load real data** — the live roster and the signed-off policy numbers, into the
    `employees` / `settings` tables. This is the HR-owned step; the repository never
-   holds it. Create the first admin via the documented bootstrap and hand out the
-   generated password, then delete the credentials file.
+   holds it. Create the first administrator with **`npm run db:admin`**
+   (`scripts/db-bootstrap-admin.mjs`): set `VKON_ADMIN_PASSWORD` in the host `.env` for a
+   chosen password with **no** forced change, or leave it blank for a one-time password
+   that forces a change on first sign-in. It refuses to reset an existing admin, so it is
+   safe to re-run. Grow the rest of the roster through the admin console (M7).
 4. **Build and start the app + database containers** (compose template is
    `deploy/compose.yml`; the host applies it to its own untracked `docker-compose.yml`):
    ```

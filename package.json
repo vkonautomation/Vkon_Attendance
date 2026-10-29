@@ -21,6 +21,7 @@
     "db:setup": "node scripts/db-setup.mjs",
     "db:migrate": "node scripts/db-migrate.mjs",
     "db:seed": "node scripts/db-seed.mjs",
+    "db:admin": "node scripts/db-bootstrap-admin.mjs",
     "db:prepare": "npm run db:setup && npm run db:migrate && npm run db:seed",
     "test": "node scripts/run-tests.mjs",
     "test:fast": "node scripts/run-tests.mjs --no-serve",
