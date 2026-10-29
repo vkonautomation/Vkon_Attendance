@@ -29,7 +29,10 @@
 <body class="light-theme admin-page">
 
   <!-- ================= IN-PAGE ADMIN LOGIN OVERLAY ================= -->
-  <div id="adminAuthOverlay" class="auth-screen-overlay" style="display: none;">
+  <!-- The overlay is up from first paint (see .auth-screen-overlay: display:flex) and the
+       console below starts hidden, so a refresh never flashes the admin shell before the
+       sign-in gate runs. checkAdminAuth reveals the console only for a valid hand-off. -->
+  <div id="adminAuthOverlay" class="auth-screen-overlay">
     <!-- Corner Theme Toggle for Admin Login Screen -->
     <div class="auth-theme-toggle-corner">
       <button type="button" id="adminAuthThemeToggleBtn" class="icon-btn theme-toggle-btn" title="Toggle Theme (Dark / Light)" aria-label="Toggle Theme">
@@ -99,7 +102,7 @@
     </div>
   </div>
 
-  <div class="app-wrapper admin-shell">
+  <div class="app-wrapper admin-shell" id="adminAppWrapper" style="display: none;">
     
     <!-- ================= DARK SIDEBAR (Onboardly-style) ================= -->
     <aside class="admin-sidebar">
@@ -1689,12 +1692,12 @@
   <!-- The server adapter must be parsed before shared.js: shared.js asks it whether
        this browser reads shared state or only its own localStorage, and waits on it
        before seeding. Order here is load-bearing. -->
-  <script src="js/api.js?v=20261029_e3"></script>
-  <script src="js/password-change.js?v=20261029_e3"></script>
-  <script src="shared.js?v=20261029_e3"></script>
+  <script src="js/api.js?v=20261029_e4"></script>
+  <script src="js/password-change.js?v=20261029_e4"></script>
+  <script src="shared.js?v=20261029_e4"></script>
   <script src="js/confirm-decision-modal.js?v=20261023_apr1"></script>
   <script src="js/day-popover.js?v=20261023_apr1"></script>
-  <script src="admin.js?v=20261029_e3"></script>
+  <script src="admin.js?v=20261029_e4"></script>
   <script src="js/password-toggle.js?v=20261019_ui1"></script>
   <script src="js/data-transfer.js?v=20261023_apr2"></script>
 </body>

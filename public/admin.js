@@ -26,12 +26,16 @@ function checkAdminAuth() {
   const overlay = document.getElementById("adminAuthOverlay");
   const errorAlert = document.getElementById("adminLoginErrorAlert");
   const loginForm = document.getElementById("adminOverlayLoginForm");
+  // The console starts hidden in the HTML so a refresh shows sign-in first, never the
+  // admin shell. It is revealed only once this gate confirms a valid hand-off session.
+  const consoleWrap = document.getElementById("adminAppWrapper");
 
   // A page load always begins at the sign-in screen. A persisted session is not enough
   // to skip it; only a one-time hand-off from a login that is mid-navigation is.
   const handoff = consumeAuthHandoff();
 
   if (!handoff || !session || session.role !== "admin") {
+    if (consoleWrap) consoleWrap.style.display = "none";
     if (overlay) {
       overlay.style.display = "flex";
       
@@ -148,6 +152,7 @@ function checkAdminAuth() {
           sessionStorage.setItem(STORAGE_KEYS.CURRENT_SESSION, JSON.stringify(adminSession));
           localStorage.setItem(STORAGE_KEYS.CURRENT_SESSION, JSON.stringify(adminSession));
           overlay.style.display = "none";
+          if (consoleWrap) consoleWrap.style.display = "";
           showToast("Administrator session authenticated.", "success");
           startAdminConsole();
           return;
@@ -179,6 +184,7 @@ function checkAdminAuth() {
   }
 
   if (overlay) overlay.style.display = "none";
+  if (consoleWrap) consoleWrap.style.display = "";
   return true;
 }
 
