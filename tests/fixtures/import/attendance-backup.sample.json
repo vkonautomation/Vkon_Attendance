@@ -1,0 +1,160 @@
+{
+  "_meta": {
+    "app": "VKON Attendance",
+    "schema": 1,
+    "exportedAt": "2026-10-29T09:00:00.000Z",
+    "sections": 12,
+    "note": "FAKE FIXTURE. Every person is a letter + role, every code is EMP9nn, there is no email and no password anywhere. Used only to exercise scripts/db-import.mjs in dry-run. Not real data."
+  },
+  "keys": {
+    "vkon_employees_v6": [
+      {
+        "id": "EMP901",
+        "name": "A Tester",
+        "username": "tester_a",
+        "role": "Test Engineer",
+        "department": "Engineering",
+        "avatar": "",
+        "annualLeaveQuota": 14,
+        "monthlySalary": 50000,
+        "geofenceEnforcement": "required",
+        "enrolledAt": "2026-01-10",
+        "managerId": "EMP903"
+      },
+      {
+        "id": "EMP902",
+        "name": "B Tester",
+        "username": "tester_b",
+        "role": "Test Designer",
+        "department": "Product",
+        "avatar": "",
+        "annualLeaveQuota": 14,
+        "monthlySalary": 42000,
+        "geofenceEnforcement": "required",
+        "enrolledAt": "2026-02-15",
+        "managerId": "EMP903"
+      },
+      {
+        "id": "EMP903",
+        "name": "C Manager",
+        "username": "tester_c",
+        "role": "Engineering Manager",
+        "department": "Operations",
+        "avatar": "",
+        "annualLeaveQuota": 14,
+        "monthlySalary": 68000,
+        "geofenceEnforcement": "exempt",
+        "enrolledAt": "2026-01-05",
+        "managerId": ""
+      }
+    ],
+    "vkon_records_v6": {
+      "EMP901_2026-10-05": {
+        "employeeId": "EMP901",
+        "date": "2026-10-05",
+        "status": "Present",
+        "checkInTime": "09:20 AM",
+        "checkOutTime": "06:35 PM",
+        "hoursDecimal": 9.25,
+        "distance": 40,
+        "locationType": "Office",
+        "bioVerified": true,
+        "capturedTimestamp": 1791172200000,
+        "outCapturedTimestamp": 1791205500000,
+        "selfieUrl": "data:image/jpeg;base64,NOTAREALSELFIE",
+        "outSelfieUrl": "data:image/jpeg;base64,NOTAREALSELFIE"
+      },
+      "EMP901_2026-10-06": {
+        "employeeId": "EMP901",
+        "date": "2026-10-06",
+        "status": "Present",
+        "checkInTime": "09:25 AM",
+        "checkOutTime": "-",
+        "hoursDecimal": 0,
+        "distance": 35,
+        "locationType": "Office",
+        "bioVerified": true,
+        "capturedTimestamp": 1791258900000
+      },
+      "EMP902_2026-10-06": {
+        "employeeId": "EMP902",
+        "date": "2026-10-06",
+        "status": "Short hours - review",
+        "checkInTime": "09:40 AM",
+        "checkOutTime": "04:10 PM",
+        "hoursDecimal": 6.5,
+        "distance": 1200,
+        "locationType": "Office",
+        "bioVerified": false
+      }
+    },
+    "vkon_leaves_v6": [
+      {
+        "id": "LEV-9001",
+        "employeeId": "EMP902",
+        "employeeName": "B Tester",
+        "startDate": "2026-10-19",
+        "endDate": "2026-10-20",
+        "daysCount": 2,
+        "category": "Personal",
+        "type": "Personal Leave",
+        "reason": "Family function (fake)",
+        "status": "Approved",
+        "approvalRoute": "manager_only",
+        "approvalTrail": [{ "actor": "tester_c", "state": "Approved", "at": "2026-10-13T11:30:00.000Z" }]
+      }
+    ],
+    "vkon_wfh_v6": [
+      {
+        "id": "WFH-9001",
+        "employeeId": "EMP901",
+        "employeeName": "A Tester",
+        "date": "2026-10-07",
+        "weekKey": "2026-W41",
+        "status": "Approved",
+        "approvalRoute": "manager_only",
+        "approvalTrail": [{ "actor": "tester_c", "state": "Approved", "at": "2026-10-06T17:00:00.000Z" }]
+      }
+    ],
+    "vkon_regularisations_v6": [
+      {
+        "id": "REG-9001",
+        "employeeId": "EMP901",
+        "employeeName": "A Tester",
+        "date": "2026-10-08",
+        "missedType": "Missed Punch-Out",
+        "inTime": "09:05 AM",
+        "outTime": "06:05 PM",
+        "reason": "Punch-out hardware fault (fake)",
+        "status": "Pending",
+        "approvalRoute": "manager_only",
+        "approvalTrail": []
+      }
+    ],
+    "vkon_holidays_v6": [
+      { "id": "HOL-90", "date": "2026-10-02", "name": "Founders Day (fake)", "type": "Declared Holiday" },
+      { "id": "HOL-91", "date": "2026-10-20", "name": "Region Observance (fake)", "type": "Restricted Holiday" }
+    ],
+    "vkon_holiday_work_v1": [
+      { "employeeId": "EMP901", "date": "2026-10-02", "mode": "compoff", "note": "Release cutover cover (fake)" }
+    ],
+    "vkon_lop_entries_v1": [
+      { "id": "LOP-9001", "employeeId": "EMP901", "date": "2026-10-30", "fraction": 1, "source": "short-hours", "refId": "SHORT-9001", "status": "active" }
+    ],
+    "vkon_settings_v6": {
+      "geofenceRadiusMeters": 500,
+      "officeLat": 12.9716,
+      "officeLng": 77.5946,
+      "officeName": "VKON Automation Tech Park"
+    },
+    "vkon_short_leave_settings_v1": {
+      "requiredHours": 9,
+      "minPresentHours": 8,
+      "maxPerMonth": 2,
+      "graceMinutes": 15
+    },
+    "vkon_min_work_policy_v6": { "hours": 8, "minutes": 0, "totalMinutes": 480 },
+    "vkon_leave_quotas_v6": { "personalLeave": 14, "restrictedLeave": 2 },
+    "vkon_admin_creds_v6": { "username": "zzfakeowner", "name": "Fictional Owner Account", "role": "System Administrator" }
+  }
+}
