@@ -27,7 +27,11 @@ function checkAdminAuth() {
   const errorAlert = document.getElementById("adminLoginErrorAlert");
   const loginForm = document.getElementById("adminOverlayLoginForm");
 
-  if (!session || session.role !== "admin") {
+  // A page load always begins at the sign-in screen. A persisted session is not enough
+  // to skip it; only a one-time hand-off from a login that is mid-navigation is.
+  const handoff = consumeAuthHandoff();
+
+  if (!handoff || !session || session.role !== "admin") {
     if (overlay) {
       overlay.style.display = "flex";
       
@@ -159,6 +163,7 @@ function checkAdminAuth() {
           };
           sessionStorage.setItem(STORAGE_KEYS.CURRENT_SESSION, JSON.stringify(sessionData));
           localStorage.setItem(STORAGE_KEYS.CURRENT_SESSION, JSON.stringify(sessionData));
+          markAuthHandoff();
           showToast(`Welcome ${result.employee.name}! Opening Employee Portal...`, "info");
           setTimeout(() => { window.location.href = "index.html"; }, 350);
           return;

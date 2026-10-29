@@ -127,8 +127,8 @@ def verify_all():
 
     # Cache tokens bumped for the current build (backend adapter wiring: bk1).
     print("\n[Cache] cache-buster tokens present (current build):")
-    need("_apr" in index_html and "20261029_e2" in index_html, "index.html cache tokens not set")
-    need("_apr" in admin_html and "20261029_e2" in admin_html, "admin.html cache tokens not set")
+    need("_apr" in index_html and "20261029_e3" in index_html, "index.html cache tokens not set")
+    need("_apr" in admin_html and "20261029_e3" in admin_html, "admin.html cache tokens not set")
     print("  PASS")
 
     print("\n" + "=" * 54)

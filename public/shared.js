@@ -32,6 +32,27 @@ const STORAGE_KEYS = {
   REG_ALERT_LAST_SEEN: "vkon_regalert_seen_v1"
 };
 
+// --- Single-use login hand-off -------------------------------------------------
+// A page load always starts at the sign-in screen: the portal is never restored just
+// because a session is sitting in storage (that is what made a refresh drop you inside
+// the console). The one exception is a hand-off from a login that is mid-navigation --
+// e.g. the admin form on the employee page bouncing to admin.html. Those mark a
+// one-time flag in sessionStorage; the landing page consumes it exactly once. A refresh
+// re-runs load with the flag already spent, so the login screen shows again.
+const AUTH_HANDOFF_KEY = "vkon_auth_handoff_v1";
+function markAuthHandoff() {
+  try { sessionStorage.setItem(AUTH_HANDOFF_KEY, "1"); } catch (e) {}
+}
+function consumeAuthHandoff() {
+  try {
+    if (sessionStorage.getItem(AUTH_HANDOFF_KEY)) {
+      sessionStorage.removeItem(AUTH_HANDOFF_KEY);
+      return true;
+    }
+  } catch (e) {}
+  return false;
+}
+
 // Default Company Geofence Coordinates
 const DEFAULT_OFFICE = {
   name: "VKON Automation Tech Park",

@@ -202,6 +202,7 @@ function initAuthSystem() {
       };
       sessionStorage.setItem(STORAGE_KEYS.CURRENT_SESSION, JSON.stringify(adminSessionData));
       localStorage.setItem(STORAGE_KEYS.CURRENT_SESSION, JSON.stringify(adminSessionData));
+      markAuthHandoff();
       showToast("Admin credentials recognized! Opening Executive Console...", "success");
       setTimeout(() => { window.location.href = "admin.html"; }, 300);
       return;
@@ -254,6 +255,7 @@ function initAuthSystem() {
         };
         sessionStorage.setItem(STORAGE_KEYS.CURRENT_SESSION, JSON.stringify(adminSessionData));
         localStorage.setItem(STORAGE_KEYS.CURRENT_SESSION, JSON.stringify(adminSessionData));
+        markAuthHandoff();
         window.location.href = "admin.html";
         return;
       }
@@ -310,7 +312,11 @@ function checkActiveSession() {
 
   const employees = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
 
-  if (!session || !session.username || session.role !== "employee") {
+  // A page load always begins at the sign-in screen; only a one-time hand-off from a
+  // login that is mid-navigation may skip it.
+  const handoff = consumeAuthHandoff();
+
+  if (!handoff || !session || !session.username || session.role !== "employee") {
     // If not logged in as employee, always show login screen and hide main dashboard
     authScreen.style.display = "flex";
     mainAppWrapper.style.display = "none";
