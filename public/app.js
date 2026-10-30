@@ -355,9 +355,16 @@ function loadEmployeeSession(emp) {
   employeeState.currentEmployee = emp;
   employeeState.officeSettings = getStore(STORAGE_KEYS.SETTINGS, DEFAULT_OFFICE);
 
-  // Update navbar display strictly for logged-in employee
+  // Update navbar display strictly for logged-in employee. The header shows an
+  // initials avatar rather than the photo, and the manager line is plain text:
+  // three lines of coloured profile metadata in the bar competed with the page.
   const curAvatar = document.getElementById("currentAvatar");
   if (curAvatar) curAvatar.src = emp.avatar;
+  const curInitials = document.getElementById("currentEmpInitials");
+  if (curInitials) {
+    const parts = String(emp.name || "").trim().split(/\s+/).filter(Boolean);
+    curInitials.textContent = ((parts[0] || "").charAt(0) + (parts.length > 1 ? parts[parts.length - 1].charAt(0) : "")).toUpperCase() || "--";
+  }
   const curEmpName = document.getElementById("currentEmpName");
   if (curEmpName) curEmpName.textContent = emp.name;
   const curEmpRole = document.getElementById("currentEmpRole");
@@ -366,13 +373,8 @@ function loadEmployeeSession(emp) {
   const mgrEl = document.getElementById("currentEmpManager");
   if (mgrEl) {
     const mgrName = (typeof resolveManagerName === "function") ? resolveManagerName(emp.id) : "";
-    if (mgrName) {
-      mgrEl.innerHTML = `<i class="fa-solid fa-user-tie"></i> Manager: <strong>${mgrName}</strong>`;
-      mgrEl.classList.remove("mgr-none");
-    } else {
-      mgrEl.innerHTML = `<i class="fa-solid fa-user-tie"></i> No manager assigned`;
-      mgrEl.classList.add("mgr-none");
-    }
+    mgrEl.textContent = mgrName ? `Manager: ${mgrName}` : "No manager assigned";
+    mgrEl.classList.toggle("mgr-none", !mgrName);
   }
   const calEmpName = document.getElementById("calendarEmpNameDisplay");
   if (calEmpName) calEmpName.textContent = emp.name;
@@ -385,8 +387,9 @@ function loadEmployeeSession(emp) {
   try { renderMyRegularisationsList(); } catch (e) { console.error("renderMyRegularisationsList err:", e); }
   try { renderMyRequests(); } catch (e) { console.error("renderMyRequests err:", e); }
   try { renderMyTasks(); } catch (e) { console.error("renderMyTasks err:", e); }
-  // Surface admin decisions (approvals, task assignments) as notifications.
-  try { syncAdminUpdates(emp.id); renderNotifications(emp.id); } catch (e) { console.error("notifications err:", e); }
+  // Decisions reach the employee through the My Requests approval trail and the
+  // nav pending count — the header bell was removed in the dashboard cleanup.
+  try { syncAdminUpdates(emp.id); } catch (e) { console.error("admin updates sync err:", e); }
   // Dashboard warning banner for unresolved past workdays (recomputed, not stored).
   try { renderRegAlertBanner(); } catch (e) { console.error("reg banner err:", e); }
   // Reveal the Team Requests manager surface only for employees with reports.
@@ -434,7 +437,6 @@ function initClock() {
       try { renderMonthlyCalendar(); } catch (e) { /* non-fatal */ }
       try { updatePunchStatus(); } catch (e) { /* non-fatal */ }
       try { renderRegAlertBanner(); } catch (e) { /* non-fatal */ }
-      try { if (employeeState.currentEmployee) renderNotifications(employeeState.currentEmployee.id); } catch (e) { /* non-fatal */ }
     }
   }
   update();
@@ -1394,6 +1396,31 @@ function getElapsedShiftMinutes(record) {
   }
 }
 
+// Paint the one status sentence in the Today card. `problem` is the only case
+// the line turns red, so red keeps meaning "something is wrong" everywhere else.
+// The status text element doubles as the badge container (id kept for the
+// holiday rule below, which hides the punch row and the status together).
+function _paintTodayCard(opts) {
+  const statusBox = document.getElementById("todayStatusBadge");
+  const statusText = document.getElementById("todayStatusText");
+  const punchRow = document.querySelector(".today-punch-row");
+  const geofence = document.getElementById("todayGeofenceRule");
+  if (statusText) statusText.textContent = opts.status || "";
+  if (statusBox) statusBox.classList.toggle("is-problem", !!opts.problem);
+  if (punchRow) punchRow.style.display = opts.punch ? "" : "none";
+  if (geofence) geofence.style.display = opts.punch ? "" : "none";
+  const hint = document.getElementById("longBtnStatusHint");
+  if (hint) hint.textContent = opts.status || "";
+}
+
+function _geofenceRuleText() {
+  const s = employeeState.officeSettings || (typeof DEFAULT_OFFICE !== "undefined" ? DEFAULT_OFFICE : null);
+  if (!s) return "";
+  const exempt = typeof s.geofenceEnforcement === "string" && /exempt/i.test(s.geofenceEnforcement);
+  if (exempt) return `Location is not enforced for you \u2014 a photo is still taken at ${s.name}.`;
+  return `Office geofence: within ${s.radius} m of ${s.name}, with a photo.`;
+}
+
 function updatePunchStatus() {
   if (!employeeState.currentEmployee) return;
   const todayKey = getTodayKey();
@@ -1414,13 +1441,15 @@ function updatePunchStatus() {
     todayRecord = undefined;
   }
 
-  // Req 2/3: on a holiday / non-working day, hide the Mark Present card and the
-  // "Ready to Punch"/"Not Punched In" status and show a holiday card instead.
+  // Req 2/3: on a holiday / non-working day, hide the punch row and the
+  // "Not punched in" status and show the holiday line inside the Today card.
   const isOffToday = (typeof isNonWorkingDay === "function") &&
     isNonWorkingDay(todayKey, employeeState.currentEmployee);
   const holidayCard = document.getElementById("holidayTodayCard");
   const markBar = document.querySelector(".mark-present-bar-wrapper");
   const statusBadge = document.getElementById("todayStatusBadge");
+  const geofenceEl = document.getElementById("todayGeofenceRule");
+  if (geofenceEl) geofenceEl.textContent = _geofenceRuleText();
   if (isOffToday) {
     if (markBar) markBar.style.display = "none";
     if (statusBadge) statusBadge.style.display = "none";
@@ -1435,8 +1464,8 @@ function updatePunchStatus() {
         const nx = (typeof getNextWorkingDay === "function") ? getNextWorkingDay(todayKey, employeeState.currentEmployee) : null;
         if (nx) {
           const label = nx.dateObj.toLocaleDateString("en-US", { timeZone: "Asia/Kolkata", weekday: "long", day: "numeric", month: "long" });
-          nextEl.innerHTML = `<i class="fa-solid fa-arrow-right"></i> Next working day: <strong>${label}</strong>`;
-        } else { nextEl.innerHTML = ""; }
+          nextEl.textContent = `Next working day: ${label}`;
+        } else { nextEl.textContent = ""; }
       }
       holidayCard.style.display = "";
     }
@@ -1446,55 +1475,40 @@ function updatePunchStatus() {
   if (markBar) markBar.style.display = "";
   if (statusBadge) statusBadge.style.display = "";
 
-  const todayDot = document.getElementById("todayDot");
-  const todayStatusText = document.getElementById("todayStatusText");
-  const punchStateLabel = document.getElementById("punchStateLabel");
-  const punchStateSub = document.getElementById("punchStateSub");
   const openInBtn = document.getElementById("openPunchInModalBtn");
   const openOutBtn = document.getElementById("openPunchOutModalBtn");
   const todayMetricsStrip = document.getElementById("todayMetricsStrip");
-  const longBtnPill = document.getElementById("longBtnStatusPill");
-  const longBtnHint = document.getElementById("longBtnStatusHint");
   const lockNotice = document.getElementById("punchOutLockNotice");
   const lockIcon = document.getElementById("shiftLockIcon");
   const lockText = document.getElementById("punchOutLockText");
   const punchOutSubText = document.getElementById("punchOutSubText");
 
+  // The card shows exactly one button, and it is the button the shift needs now.
+  function showPunch(which) {
+    if (openInBtn) openInBtn.style.display = (which === "in") ? "flex" : "none";
+    if (openOutBtn) {
+      openOutBtn.style.display = (which === "out") ? "flex" : "none";
+      openOutBtn.disabled = (which === "done");
+    }
+  }
+
   if (!todayRecord) {
-    if (todayDot) todayDot.className = "status-indicator-dot dot-pending";
-    if (todayStatusText) todayStatusText.textContent = "Today: Not Punched In";
-    if (punchStateLabel) punchStateLabel.textContent = "Status: Ready to Punch In";
-    if (punchStateSub) punchStateSub.textContent = "Camera opens only when you click the button below";
-    if (openInBtn) openInBtn.style.display = "flex";
-    if (openOutBtn) openOutBtn.style.display = "none";
+    _paintTodayCard({ status: "Not punched in", punch: true });
+    showPunch("in");
     if (todayMetricsStrip) todayMetricsStrip.style.display = "none";
     if (lockNotice) lockNotice.style.display = "none";
-    if (longBtnPill) {
-      longBtnPill.textContent = "Ready to Punch";
-      longBtnPill.className = "long-btn-status-pill pill-ready";
-    }
-    if (longBtnHint) {
-      longBtnHint.textContent = "Click to open attendance check-in card • Ready to Mark Present";
-    }
   } else if (todayRecord.status === "Present") {
-    if (todayMetricsStrip) todayMetricsStrip.style.display = "grid";
     const inDisp = document.getElementById("todayInTimeDisplay");
     if (inDisp) inDisp.textContent = todayRecord.checkInTime || "--:--";
     const outDisp = document.getElementById("todayOutTimeDisplay");
-    if (outDisp) outDisp.textContent = todayRecord.checkOutTime || "Active Shift";
+    if (outDisp) outDisp.textContent = todayRecord.checkOutTime || "Active";
     const matchDisp = document.getElementById("todayMatchScoreDisplay");
-    if (matchDisp) matchDisp.textContent = todayRecord.matchScore ? `${todayRecord.matchScore}%` : "Passed";
+    if (matchDisp) matchDisp.textContent = todayRecord.matchScore ? `${todayRecord.matchScore}%` : "Verified";
 
     if (!todayRecord.checkOutTime || todayRecord.checkOutTime === "-") {
-      if (todayDot) todayDot.className = "status-indicator-dot dot-present";
-      if (todayStatusText) todayStatusText.textContent = `Today: Present (Checked In at ${todayRecord.checkInTime})`;
-      if (punchStateLabel) punchStateLabel.textContent = `Active Shift (In at ${todayRecord.checkInTime})`;
-      if (punchStateSub) punchStateSub.textContent = "Click below to verify location & photograph to Punch Out";
-      if (openInBtn) openInBtn.style.display = "none";
-      if (openOutBtn) {
-        openOutBtn.style.display = "flex";
-        openOutBtn.disabled = false;
-      }
+      if (todayMetricsStrip) todayMetricsStrip.style.display = "flex";
+      _paintTodayCard({ status: `Punched in at ${todayRecord.checkInTime}`, punch: true });
+      showPunch("out");
 
       // Check Admin Minimum Shift Policy & Punch-out Restriction
       const minPolicy = getMinWorkDurationPolicy();
@@ -1514,17 +1528,10 @@ function updatePunchStatus() {
         }
         if (lockIcon) lockIcon.className = "fa-solid fa-lock text-warning";
         if (lockText) {
-          lockText.innerHTML = `<strong>Punch-Out Restricted:</strong> Policy requires at least <strong>${reqH}h ${reqM > 0 ? reqM + 'm' : '00m'}</strong> on duty before punch-out. Worked so far: <strong>${workedH}h ${String(workedM).padStart(2, '0')}m</strong>.`;
+          lockText.innerHTML = `<strong>Punch-out restricted:</strong> at least <strong>${reqH}h ${reqM > 0 ? reqM + 'm' : '00m'}</strong> on duty is required. Worked so far: <strong>${workedH}h ${String(workedM).padStart(2, '0')}m</strong>.`;
         }
         if (punchOutSubText) {
-          punchOutSubText.textContent = `Restricted: requires ${reqH}h ${reqM > 0 ? reqM + 'm' : '00m'} duty (${workedH}h ${workedM}m done)`;
-        }
-        if (longBtnPill) {
-          longBtnPill.textContent = `Shift Active (${workedH}h ${workedM}m)`;
-          longBtnPill.className = "long-btn-status-pill pill-in";
-        }
-        if (longBtnHint) {
-          longBtnHint.textContent = `Checked in at ${todayRecord.checkInTime} • Punch-out restricted until ${reqH}h completed`;
+          punchOutSubText.textContent = `Available after ${reqH}h ${reqM > 0 ? reqM + 'm' : '00m'} (worked ${workedH}h ${String(workedM).padStart(2, '0')}m)`;
         }
       } else {
         if (lockNotice) {
@@ -1533,51 +1540,23 @@ function updatePunchStatus() {
         }
         if (lockIcon) lockIcon.className = "fa-solid fa-lock-open text-success";
         if (lockText) {
-          lockText.innerHTML = `<strong>Minimum Shift Completed:</strong> Required <strong>${reqH}h ${reqM > 0 ? reqM + 'm' : '00m'}</strong> fulfilled. You are eligible to Punch Out.`;
+          lockText.innerHTML = `<strong>Minimum shift met:</strong> ${reqH}h ${reqM > 0 ? reqM + 'm' : '00m'} required, ${workedH}h ${String(workedM).padStart(2, '0')}m worked. You can punch out.`;
         }
         if (punchOutSubText) {
-          punchOutSubText.textContent = "Click to capture photo and complete today's shift";
-        }
-        if (longBtnPill) {
-          longBtnPill.textContent = "Ready to Punch Out";
-          longBtnPill.className = "long-btn-status-pill pill-ready";
-        }
-        if (longBtnHint) {
-          longBtnHint.textContent = `Shift complete (${reqH}h met) • Click to Punch Out`;
+          punchOutSubText.textContent = "Photo and location are checked when you punch out";
         }
       }
     } else {
-      todayDot.className = "status-indicator-dot dot-present";
-      todayStatusText.textContent = `Shift Complete (${todayRecord.checkInTime} - ${todayRecord.checkOutTime})`;
-      punchStateLabel.textContent = "Shift Completed for Today";
-      punchStateSub.textContent = `Total duration logged: ${todayRecord.duration}`;
-      openInBtn.style.display = "none";
-      openOutBtn.style.display = "flex";
-      openOutBtn.disabled = true;
+      if (todayMetricsStrip) todayMetricsStrip.style.display = "flex";
+      _paintTodayCard({ status: `Shift complete \u00b7 ${todayRecord.duration || "logged"}`, punch: false });
+      showPunch("done");
       if (lockNotice) lockNotice.style.display = "none";
-      if (longBtnPill) {
-        longBtnPill.textContent = "Shift Complete";
-        longBtnPill.className = "long-btn-status-pill pill-done";
-      }
-      if (longBtnHint) {
-        longBtnHint.textContent = `Shift completed (${todayRecord.checkInTime} - ${todayRecord.checkOutTime})`;
-      }
     }
   } else if (todayRecord.status === "WFH") {
-    todayDot.className = "status-indicator-dot dot-wfh";
-    todayStatusText.textContent = `Today: Work From Home (${todayRecord.checkInTime || "Approved"})`;
-    punchStateLabel.textContent = "Work From Home Logged";
-    punchStateSub.textContent = "Remote work assigned under weekly 2-day policy.";
-    openInBtn.style.display = "none";
-    openOutBtn.style.display = "none";
+    _paintTodayCard({ status: `Working from home${todayRecord.checkInTime ? ` since ${todayRecord.checkInTime}` : ""}`, punch: false });
+    showPunch("none");
+    if (todayMetricsStrip) todayMetricsStrip.style.display = "none";
     if (lockNotice) lockNotice.style.display = "none";
-    if (longBtnPill) {
-      longBtnPill.textContent = "WFH Today";
-      longBtnPill.className = "long-btn-status-pill pill-wfh";
-    }
-    if (longBtnHint) {
-      longBtnHint.textContent = "Work From Home active for today";
-    }
   }
 }
 
@@ -2328,17 +2307,14 @@ function closeActionCard(modalId) {
 }
 
 function initActionHubToggles() {
-  const btnMark = document.getElementById("btnToggleMarkPresent");
-  const btnLeave = document.getElementById("btnToggleApplyLeave");
-  const btnWfh = document.getElementById("btnToggleWfh");
+  // The Today card's quiet text links open the same three cards the old action
+  // hub had; only the primary punch action stays a button.
+  const links = Array.from(document.querySelectorAll(".today-link[data-modal]"));
+  links.forEach(btn => btn.addEventListener("click", () => openActionCard(btn.dataset.modal)));
 
   const closeMark = document.getElementById("closeCardMarkPresentBtn");
   const closeLeave = document.getElementById("closeCardApplyLeaveBtn");
   const closeWfh = document.getElementById("closeCardWfhBtn");
-
-  if (btnMark) btnMark.addEventListener("click", () => openActionCard("modalCardMarkPresent"));
-  if (btnLeave) btnLeave.addEventListener("click", () => openActionCard("modalCardApplyLeave"));
-  if (btnWfh) btnWfh.addEventListener("click", () => openActionCard("modalCardWfh"));
 
   if (closeMark) closeMark.addEventListener("click", () => closeActionCard("modalCardMarkPresent"));
   if (closeLeave) closeLeave.addEventListener("click", () => closeActionCard("modalCardApplyLeave"));
@@ -3453,8 +3429,10 @@ function renderMyRequests() {
 }
 
 // ============================================================================
-// 8c. NOTIFICATIONS & MY TASKS — the employee side of admin actions: approval
-// decisions arrive as bell notifications, and Task-board items get a real view.
+// 8c. ADMIN DECISIONS — the employee side of admin actions. Decisions are shown
+// where they belong: the approval trail on each My Requests card, and the
+// pending count on the nav item. (The header bell was removed as part of the
+// dashboard cleanup, so nothing renders a notification list any more.)
 // ============================================================================
 
 // Diff this employee's request statuses against the last seen snapshot and
@@ -3518,91 +3496,8 @@ function syncAdminUpdates(empId) {
   setStore(STORAGE_KEYS.ADMIN_DECISION_SNAP, snaps);
 }
 
-function notifTimeAgo(iso) {
-  const then = new Date(iso).getTime();
-  if (!then) return "";
-  const mins = Math.max(0, Math.round((Date.now() - then) / 60000));
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.round(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.round(hrs / 24)}d ago`;
-}
-
-function renderNotifications(empId) {
-  const badge = document.getElementById("notifBadge");
-  const listEl = document.getElementById("notifList");
-  const emptyEl = document.getElementById("notifEmpty");
-  if (!badge || !listEl) return;
-  if (!empId && employeeState.currentEmployee) empId = employeeState.currentEmployee.id;
-  if (!empId) return;
-
-  const items = getNotificationsFor(empId).slice().reverse(); // newest first
-  const notifUnread = items.filter(n => !n.read).length;
-  const alertInfo = renderNotifAlerts(empId);
-  const unread = notifUnread + alertInfo.unread;
-  badge.textContent = unread > 9 ? "9+" : String(unread);
-  badge.style.display = unread ? "" : "none";
-  if (emptyEl) emptyEl.style.display = (items.length || alertInfo.total) ? "none" : "";
-
-  const ICONS = { task: "fa-list-check", approved: "fa-circle-check", rejected: "fa-circle-xmark", cancelled: "fa-rotate-left", info: "fa-circle-info" };
-  listEl.innerHTML = items.map(n => `
-    <button type="button" class="notif-item notif-${n.kind}${n.read ? "" : " unread"}" data-link="${n.linkView || ""}">
-      <i class="fa-solid ${ICONS[n.kind] || ICONS.info}"></i>
-      <span class="ni-body">
-        <span class="ni-title">${n.title}</span>
-        <span class="ni-text">${n.text}</span>
-        <span class="ni-when">${notifTimeAgo(n.at)}</span>
-      </span>
-    </button>`).join("");
-}
-
-function initNotifications() {
-  const bell = document.getElementById("notifBellBtn");
-  const dd = document.getElementById("notifDropdown");
-  const markBtn = document.getElementById("notifMarkReadBtn");
-  const listEl = document.getElementById("notifList");
-  if (!bell || !dd) return;
-
-  bell.addEventListener("click", (e) => {
-    e.stopPropagation();
-    const open = dd.style.display !== "none";
-    dd.style.display = open ? "none" : "";
-    bell.setAttribute("aria-expanded", String(!open));
-    // Opening the panel marks the regularisation alerts as seen (their unread
-    // dots clear); the alert itself stays in the banner until the day resolves.
-    if (!open && employeeState.currentEmployee && typeof markRegAlertsSeen === "function") {
-      markRegAlertsSeen(employeeState.currentEmployee.id);
-      renderNotifications(employeeState.currentEmployee.id);
-    }
-  });
-  document.addEventListener("click", (e) => {
-    if (dd.style.display === "none") return;
-    if (!dd.contains(e.target) && e.target !== bell) { dd.style.display = "none"; bell.setAttribute("aria-expanded", "false"); }
-  });
-  if (markBtn) {
-    markBtn.addEventListener("click", () => {
-      if (employeeState.currentEmployee) {
-        markNotificationsRead(employeeState.currentEmployee.id);
-        if (typeof markRegAlertsSeen === "function") markRegAlertsSeen(employeeState.currentEmployee.id);
-        renderNotifications(employeeState.currentEmployee.id);
-      }
-    });
-  }
-  if (listEl) {
-    listEl.addEventListener("click", (e) => {
-      const item = e.target.closest(".notif-item");
-      if (!item) return;
-      const link = item.getAttribute("data-link");
-      dd.style.display = "none";
-      bell.setAttribute("aria-expanded", "false");
-      if (link && typeof window.switchPortalView === "function") window.switchPortalView(link);
-    });
-  }
-}
-
 // ============================================================================
-// 7c. REGULARISATION ALERTS (UI) — banner, notification panel, calendar pill.
+// 7c. REGULARISATION ALERTS (UI) — the dashboard list and the calendar pill.
 // The alerts themselves are computed by the pure shared function; nothing here
 // persists them. Only a per-employee "last seen" timestamp is stored.
 // ============================================================================
@@ -3635,13 +3530,19 @@ function _regAlertRowHtml(a, withButton) {
     </div>`;
 }
 
-// Dashboard warning banner (top of the Dashboard). Grouping + expandable list,
-// most urgent first (the shared function already sorts by urgency then date).
+// The dashboard list of unresolved days (there is no notification bell any
+// more). Grouping + expandable, most urgent first (the shared function already
+// sorts by urgency then date); rendering it is also what counts the days as seen.
 function renderRegAlertBanner() {
   const section = document.getElementById("sectionRegAlertBanner");
   if (!section) return;
   const emp = employeeState.currentEmployee;
   const alerts = emp ? _regAlertsFor(emp.id) : [];
+  // The list is the only place these days are surfaced now, so showing it is
+  // what clears the "new" state the bell used to own.
+  if (emp && typeof markRegAlertsSeen === "function") {
+    try { markRegAlertsSeen(emp.id); } catch (e) { /* non-fatal */ }
+  }
   if (!alerts.length) {
     section.classList.add("rab-hidden");
     const listEl = document.getElementById("regAlertBannerList");
@@ -3658,10 +3559,12 @@ function renderRegAlertBanner() {
       ? "1 day needs regularisation"
       : `${alerts.length} days need regularisation`;
   }
+  // One line of explanation, and it states the number that matters: how many of
+  // these are already past the payroll cut-off and therefore counted as LOP.
   if (sub) {
     sub.textContent = crit
-      ? `${crit} of ${alerts.length} ${crit === 1 ? "day has" : "days have"} passed the payroll cut-off and are already counted as LOP.`
-      : "Regularise before the payroll cut-off to avoid a full day of LOP.";
+      ? `${crit} of ${alerts.length} ${crit === 1 ? "day is" : "days are"} past the payroll cut-off and counted as loss of pay.`
+      : "Regularise before the payroll cut-off to avoid a full day of loss of pay.";
   }
 
   const listEl = document.getElementById("regAlertBannerList");
@@ -3861,23 +3764,8 @@ function initPortalSideNav() {
     if (burger) burger.setAttribute("aria-expanded", "false");
   }
 
-  // Policy summary: full inline row on Dashboard, collapsed info popover elsewhere.
-  const policyZone = document.getElementById("policyZone");
-  const policyToggle = document.getElementById("policyToggle");
-  function closePolicyPopover() {
-    if (policyZone) policyZone.classList.remove("open");
-    if (policyToggle) policyToggle.setAttribute("aria-expanded", "false");
-  }
-  if (policyToggle && policyZone) {
-    policyToggle.addEventListener("click", (e) => {
-      e.stopPropagation();
-      const open = policyZone.classList.toggle("open");
-      policyToggle.setAttribute("aria-expanded", open ? "true" : "false");
-    });
-    document.addEventListener("click", (e) => {
-      if (policyZone.classList.contains("open") && !policyZone.contains(e.target)) closePolicyPopover();
-    });
-  }
+  // Policy summary now lives inside the Today card as one small line, so the
+  // sub-bar popover is gone; nothing to bind here any more.
 
   function switchView(viewId) {
     links.forEach(l => l.classList.toggle("active", l.dataset.view === viewId));
@@ -3892,7 +3780,6 @@ function initPortalSideNav() {
       try { renderTeamRequests(); } catch (e) { console.error(e); }
     }
     document.body.classList.toggle("policy-collapsed", viewId !== "dashboard");
-    closePolicyPopover();
     const meta = VIEW_META[viewId];
     if (meta && titleEl && subEl) {
       titleEl.textContent = meta[0];
@@ -4111,7 +3998,8 @@ function setDashText(id, val) {
 }
 
 // ----------------------------------------------------------------------------
-// Dashboard: Upcoming Holidays panel (fills otherwise-empty dashboard space)
+// Dashboard: the next holiday, as a small card in the side column. Two entries
+// at most — the point is "what is coming and when", not a calendar listing.
 // ----------------------------------------------------------------------------
 function renderUpcomingHolidays() {
   const list = document.getElementById("upcomingHolidaysList");
@@ -4130,21 +4018,26 @@ function renderUpcomingHolidays() {
     .map(h => ({ name: h.name, type: h.type || "", dObj: new Date(h.date + "T00:00:00") }))
     .filter(h => h.dObj >= nowZero)
     .sort((a, b) => a.dObj - b.dObj)
-    .slice(0, 4);
+    .slice(0, 2);
   if (!upcoming.length) { list.innerHTML = ""; if (empty) empty.style.display = ""; return; }
   if (empty) empty.style.display = "none";
   list.innerHTML = upcoming.map(h => {
     const days = Math.round((h.dObj - nowZero) / 86400000);
-    const when = days === 0 ? "Today" : days === 1 ? "Tomorrow" : `in ${days} days`;
-    const dow = h.dObj.toLocaleDateString("en-US", { weekday: "short", timeZone: "Asia/Kolkata" });
-    const dm = h.dObj.toLocaleDateString("en-US", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" });
+    const when = days === 0 ? "Today" : days === 1 ? "Tomorrow" : `In ${days} days`;
+    const dm = h.dObj.toLocaleDateString("en-US", { weekday: "short", day: "numeric", month: "short", timeZone: "Asia/Kolkata" });
     const isRh = /restricted/i.test(h.type);
-    return `<li class="uh-item ${isRh ? "uh-rh" : "uh-declared"}">`
-      + `<span class="uh-date-badge"><span class="uh-dow">${dow}</span><span class="uh-dm">${dm}</span></span>`
-      + `<span class="uh-info"><span class="uh-name">${h.name}</span><span class="uh-type">${isRh ? "Restricted Holiday" : "Declared Holiday"}</span></span>`
-      + `<span class="uh-when">${when}</span>`
-      + `</li>`;
+    return `<div class="hn-item">`
+      + `<span class="hn-name">${h.name}</span>`
+      + `<span class="hn-when">${dm} &bull; ${when}</span>`
+      + `<span class="hn-tag">${isRh ? "Restricted holiday" : "Declared holiday"}</span>`
+      + `</div>`;
   }).join("");
+}
+
+// A 3px bar needs no colour of its own; the number beside it is the message.
+function _setBar(id, pct) {
+  const el = document.getElementById(id);
+  if (el) el.style.width = Math.max(0, Math.min(100, pct)) + "%";
 }
 
 function renderDashboardStats() {
@@ -4167,22 +4060,35 @@ function renderDashboardStats() {
 
   const weekKey = getWeekKey(now);
   const wfhUsed = (typeof countWfhUsedInWeek === "function") ? countWfhUsedInWeek(emp.id, weekKey) : 0;
-  const wfhRemaining = Math.max((typeof WEEKLY_WFH_ALLOWANCE !== "undefined" ? WEEKLY_WFH_ALLOWANCE : 2) - wfhUsed, 0);
+  const wfhAllowance = (typeof WEEKLY_WFH_ALLOWANCE !== "undefined" ? WEEKLY_WFH_ALLOWANCE : 2);
+  const wfhRemaining = Math.max(wfhAllowance - wfhUsed, 0);
 
   const quota = getEmployeeLeaveQuota(emp.id);
   const leavesUsed = calculatePersonalLeavesUsed(emp.id);
   const leaveRemaining = Math.max(quota.personalLeave - leavesUsed, 0);
 
+  const rhUsed = (typeof countRhUsedInMonth === "function") ? countRhUsedInMonth(emp.id, year, month) : 0;
+  const rhRemaining = Math.max(quota.restrictedLeave - rhUsed, 0);
+
   const monthName = employeeState.calendarCurrentDate.toLocaleDateString("en-US", { month: "long", timeZone: "Asia/Kolkata" });
 
+  // The two headline numbers, as plain figures.
   setDashText("dashStatDaysPresent", present);
   setDashText("dashStatPresentSub", monthName);
-  setDashText("dashStatWfh", `${wfhRemaining} left`);
-  setDashText("dashStatWfhSub", `${wfhUsed} used of ${typeof WEEKLY_WFH_ALLOWANCE !== "undefined" ? WEEKLY_WFH_ALLOWANCE : 2} this week`);
-  setDashText("dashStatLeaves", `${leaveRemaining} left`);
-  setDashText("dashStatLeaveSub", `${leavesUsed} used of ${quota.personalLeave} / year`);
   setDashText("dashStatHours", Math.round(hours));
   setDashText("dashStatHoursSub", monthName);
+
+  // One Balances card: leave, WFH and restricted holidays together, each with a
+  // thin bar. The text states the same thing the bar shows.
+  setDashText("dashStatLeaves", leaveRemaining);
+  setDashText("dashStatLeaveSub", `${leavesUsed} used of ${quota.personalLeave} a year`);
+  _setBar("balanceLeaveBar", quota.personalLeave ? (leavesUsed / quota.personalLeave) * 100 : 0);
+  setDashText("dashStatWfh", wfhRemaining);
+  setDashText("dashStatWfhSub", `${wfhUsed} used of ${wfhAllowance} this week`);
+  _setBar("balanceWfhBar", wfhAllowance ? (wfhUsed / wfhAllowance) * 100 : 0);
+  setDashText("balanceRhVal", rhRemaining);
+  setDashText("balanceRhSub", `${rhUsed} used of ${quota.restrictedLeave} this month`);
+  _setBar("balanceRhBar", quota.restrictedLeave ? (rhUsed / quota.restrictedLeave) * 100 : 0);
   try { renderUpcomingHolidays(); } catch (e) { console.error("renderUpcomingHolidays err:", e); }
 }
 
@@ -4196,7 +4102,6 @@ function bootEmployeePortal() {
   try { initTheme(); } catch (e) { console.error("Error in initTheme:", e); }
   try { initAuthSystem(); } catch (e) { console.error("Error in initAuthSystem:", e); }
   try { initPortalSideNav(); } catch (e) { console.error("Error in initPortalSideNav:", e); }
-    try { initNotifications(); } catch (e) { console.error("Error in initNotifications:", e); }
     try { initRegAlertBanner(); } catch (e) { console.error("Error in initRegAlertBanner:", e); }
   try { initActionHubToggles(); } catch (e) { console.error("Error in initActionHubToggles:", e); }
   try { initCalendarNav(); } catch (e) { console.error("Error in initCalendarNav:", e); }
