@@ -13,7 +13,7 @@ def verify_all():
         admin_html = f.read()
     with open("public/admin.js", "r", encoding="utf-8") as f:
         admin_js = f.read()
-    with open("public/styles.css", "r", encoding="utf-8") as f:
+    with open("public/calendar-refined.css", "r", encoding="utf-8") as f:
         css = f.read()
 
     # 1. getPresentDate in shared.js ensures Oct 12 is active present day
@@ -22,36 +22,35 @@ def verify_all():
     assert "const CURRENT_DATE = getPresentDate();" in shared or "CURRENT_DATE" in shared
     print("PASS: shared.js getPresentDate anchors Oct 12, 2026 as active present day.")
 
-    # 2. app.js calendarCurrentDate, getTodayKey, and renderMonthlyCalendar
+    # 2. app.js marks the present day with ONE indicator (filled circle on the number)
     assert "getTodayKey()" in app, "getTodayKey() missing in app.js"
-    assert "todayDateObj = (typeof getPresentDate === 'function') ? getPresentDate() : new Date();" in app or "getPresentDate" in app, "todayDateObj dynamic resolution missing in app.js"
-    assert "badge-today-active" in app, "badge-today-active missing in app.js"
-    assert "today-marker-chip" in app, "today-marker-chip missing in app.js"
-    assert "isToday ? '<span class=\"today-marker-chip\"" in app, "Today chip rendering in cell top row missing"
-    assert "Ready to Punch" in app, "Ready to Punch text missing in app.js"
-    print("PASS: app.js renders 'Today' chip, 'Today (Active)' badge, and 'Ready to Punch' on present day.")
+    assert "getPresentDate" in app, "getPresentDate dynamic resolution missing in app.js"
+    assert 'day-number${isToday ? " is-today" : ""}' in app, "single filled-circle today marker missing in app.js"
+    assert "today-marker-chip" not in app, "old per-cell Today chip should be gone from app.js"
+    assert "badge-today-active" not in app, "old 'Today (Active)' pill should be gone from app.js"
+    print("PASS: app.js shows today once, as a filled circle on the day number (no duplicate chip/pill).")
 
     # 3. Present Day must not be marked Absent
     assert "dayDate < nowZero" in app, "dayDate < nowZero check missing in app.js"
-    assert "nowZero = new Date(todayDateObj);" in app, "nowZero must use todayDateObj to prevent Day 12 being marked Absent"
-    print("PASS: Day 12 is protected from being marked absent before shift completion.")
+    assert "nowZero = new Date(todayDateObj);" in app, "nowZero must use todayDateObj to prevent today being marked Absent"
+    print("PASS: today is protected from being marked absent before shift completion.")
 
     # 4. Jump to today button
     assert "todayJumpBtn" in app, "todayJumpBtn handler missing in app.js"
     assert "getPresentDate" in app, "getPresentDate used in jump to today"
-    print("PASS: Jump to Today button accurately navigates to Present Day.")
+    print("PASS: Jump to Today button accurately navigates to the present day.")
 
-    # 5. Header indicator in index.html and app.js
-    assert "calendarTodayHeaderDate" in html, "calendarTodayHeaderDate missing in index.html"
-    assert "calendarTodayHeaderDate" in app, "calendarTodayHeaderDate update logic missing in app.js"
-    assert "Present Day:" in html, "Present Day label missing in index.html"
-    print("PASS: Calendar toolbar displays clear 'Present Day: Mon, 12 Oct 2026' chip.")
+    # 5. The duplicate 'Present Day' toolbar chip was intentionally dropped.
+    assert "calendarTodayHeaderDate" not in html, "redundant 'Present Day' chip still present in index.html"
+    assert "Present Day:" not in html, "'Present Day:' label should be removed from index.html"
+    print("PASS: Redundant 'Present Day' chip removed; today is shown by the highlighted cell + Jump to Today.")
 
-    # 6. CSS styles for all today elements
-    assert ".today-marker-chip" in css, ".today-marker-chip CSS missing in styles.css"
-    assert ".today-header-pill" in css, ".today-header-pill CSS missing in styles.css"
-    assert ".badge-today-active" in css, ".badge-today-active CSS missing in styles.css"
-    print("PASS: CSS styling for all today indicator elements verified.")
+    # 6. Refined calendar styling + legend merged into the summary chips
+    assert ".day-number.is-today" in css, ".day-number.is-today styling missing in calendar-refined.css"
+    assert ".cal-dot" in css, "minimal cell mark (.cal-dot) styling missing in calendar-refined.css"
+    assert "calendar-legend-bar" not in html, "legend row should be removed (merged into summary chips)"
+    assert "qs-dot" in html, "summary chips should carry legend dots (qs-dot) in index.html"
+    print("PASS: Refined calendar CSS verified and legend merged into the summary chips.")
 
     # 7. Admin Console fallback and calculations
     assert "October 12, 2026" in admin_html, "Admin HTML fallback date updated to October 12, 2026"

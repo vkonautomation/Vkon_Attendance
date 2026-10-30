@@ -33,8 +33,8 @@ def test_ist_implementation():
     print("PASS: Both Employee Portal and Admin Console live clocks run strictly on Indian Standard Time.")
 
     # 4. Cache-buster query parameters in HTML (current build token)
-    assert "shared.js?v=20261029_e8" in html, "index.html must have updated cache buster for fresh load"
-    assert "app.js?v=20261029_e8" in html, "app.js (which owns the IST clock) cache buster not bumped"
+    assert "shared.js?v=20261029_e9" in html, "index.html must have updated cache buster for fresh load"
+    assert "app.js?v=20261029_e9" in html, "app.js (which owns the IST clock) cache buster not bumped"
     print("PASS: index.html has fresh cache-buster parameters.")
 
     print("\n" + "=" * 50)

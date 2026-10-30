@@ -23,6 +23,7 @@
   <meta http-equiv="Expires" content="0">
   <link rel="stylesheet" href="styles.css?v=20261026_nm2">
   <link rel="stylesheet" href="regularisation-alerts.css?v=20261030_ra1">
+  <link rel="stylesheet" href="calendar-refined.css?v=20261030_cr1">
 </head>
 <body class="light-theme">
   
@@ -635,51 +636,44 @@
               <button id="todayJumpBtn" class="btn btn-ghost btn-sm">Jump to Today</button>
             </div>
             <div class="calendar-today-row">
-              <span class="calendar-subtitle">Attendance history & records for <strong id="calendarEmpNameDisplay" class="text-primary">Mukesh Sharma</strong></span>
-              <span id="calendarTodayHeaderDate" class="today-header-pill"><i class="fa-solid fa-calendar-day"></i> Present Day: Loading IST...</span>
-              <span id="calendarNeedsActionPill" class="needs-action-pill" style="display: none;"><i class="fa-solid fa-circle-exclamation"></i> <span id="calendarNeedsActionCount">0</span> need action</span>
+              <span class="calendar-subtitle">Attendance history &amp; records for <strong id="calendarEmpNameDisplay" class="emp-name-strong">Mukesh Sharma</strong></span>
+              <span id="calendarNeedsActionPill" class="needs-action-pill" style="display: none;"><span id="calendarNeedsActionCount">0</span> <span class="na-suffix">need regularisation</span></span>
+              <button type="button" id="bulkRegBtn" class="btn btn-primary btn-sm bulk-reg-btn" style="display: none;">Regularise all</button>
             </div>
           </div>
 
-          <!-- Calendar Metric Counters -->
+          <!-- Calendar Metric Counters (each chip doubles as the legend) -->
           <div class="calendar-quick-stats">
             <div class="quick-stat-badge stat-green">
+              <span class="qs-dot dot-present"></span>
               <span class="q-num" id="statsPresentCount">0</span>
-              <span class="q-label">Office Present</span>
+              <span class="q-label">Present</span>
             </div>
             <div class="quick-stat-badge stat-purple">
+              <span class="qs-dot dot-wfh"></span>
               <span class="q-num" id="statsWfhCount">0</span>
-              <span class="q-label">WFH Days</span>
+              <span class="q-label">WFH</span>
             </div>
             <div class="quick-stat-badge stat-amber">
+              <span class="qs-dot dot-leave"></span>
               <span class="q-num" id="statsLeaveCount">0</span>
-              <span class="q-label">Leaves & RH</span>
+              <span class="q-label">Leave</span>
             </div>
-            <div class="quick-stat-badge stat-rose">
+            <div class="quick-stat-badge stat-amber">
+              <span class="qs-dot dot-lop"></span>
               <span class="q-num" id="statsLopCount">0</span>
               <span class="q-label">Loss of Pay</span>
             </div>
             <div class="quick-stat-badge stat-red">
+              <span class="qs-dot dot-absent"></span>
               <span class="q-num" id="statsAbsentCount">0</span>
               <span class="q-label">Absent</span>
             </div>
             <div class="quick-stat-badge stat-slate">
+              <span class="qs-dot dot-notmarked"></span>
               <span class="q-num" id="statsNotMarkedCount">0</span>
               <span class="q-label">Not Marked</span>
             </div>
-          </div>
-
-          <!-- Legend -->
-          <div class="calendar-legend-bar">
-            <span class="legend-item"><span class="legend-dot dot-present"></span> Present</span>
-            <span class="legend-item"><span class="legend-dot dot-wfh"></span> WFH</span>
-            <span class="legend-item"><span class="legend-dot dot-leave"></span> Personal Leave</span>
-            <span class="legend-item"><span class="legend-dot dot-rh"></span> Restricted Leave</span>
-            <span class="legend-item"><span class="legend-dot dot-lop"></span> Loss of Pay</span>
-            <span class="legend-item"><span class="legend-dot dot-holiday"></span> Official Holiday</span>
-            <span class="legend-item"><span class="legend-dot dot-absent"></span> Absent</span>
-            <span class="legend-item"><span class="legend-dot dot-notmarked"></span> Not Marked</span>
-            <span class="legend-item"><span class="legend-dot dot-weekend"></span> Weekend</span>
           </div>
         </div>
 
@@ -999,6 +993,45 @@
     </div>
   </div>
 
+  <!-- Bulk "Regularise all" Modal (calendar toolbar) -->
+  <div class="bulk-reg-overlay" id="bulkRegModal" role="dialog" aria-modal="true" aria-labelledby="bulkRegTitle" style="display: none;">
+    <div class="bulk-reg-dialog glass-panel">
+      <div class="bulk-reg-head">
+        <h3 id="bulkRegTitle">Regularise <span id="bulkRegCount">0</span> day(s)</h3>
+        <p class="bulk-reg-sub">Pick the days and give one reason. Each becomes a separate request for review. Past cut-off days are skipped.</p>
+      </div>
+      <form id="bulkRegForm">
+        <div class="bulk-reg-dates" id="bulkRegDates"></div>
+        <label class="bulk-reg-field">
+          <span>Reason</span>
+          <textarea id="bulkRegReason" rows="2" placeholder="e.g. On field work / forgot to punch in"></textarea>
+        </label>
+        <div class="bulk-reg-grid">
+          <label class="bulk-reg-field">
+            <span>Type</span>
+            <select id="bulkRegType">
+              <option value="Missed Punch-In">Missed punch-in</option>
+              <option value="Missed Punch-Out">Missed punch-out</option>
+              <option value="Full Day Absent">Full day absent</option>
+            </select>
+          </label>
+          <label class="bulk-reg-field">
+            <span>In time</span>
+            <input type="time" id="bulkRegInTime" value="09:15">
+          </label>
+          <label class="bulk-reg-field">
+            <span>Out time</span>
+            <input type="time" id="bulkRegOutTime" value="18:15">
+          </label>
+        </div>
+        <div class="bulk-reg-actions">
+          <button type="button" class="btn btn-secondary" id="bulkRegCancel">Cancel</button>
+          <button type="submit" class="btn btn-primary">Submit all</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Day Details Modal (Opens when clicking any date on calendar) -->
   <div class="modal-backdrop" id="dayDetailModal" role="dialog" aria-modal="true" aria-hidden="true">
     <div class="modal-dialog glass-panel">
@@ -1062,12 +1095,12 @@
   <!-- The server adapter must be parsed before shared.js: shared.js asks it whether
        this browser reads shared state or only its own localStorage, and waits on it
        before seeding. Order here is load-bearing. -->
-  <script src="js/api.js?v=20261029_e8"></script>
-  <script src="js/password-change.js?v=20261029_e8"></script>
-  <script src="shared.js?v=20261029_e8"></script>
+  <script src="js/api.js?v=20261029_e9"></script>
+  <script src="js/password-change.js?v=20261029_e9"></script>
+  <script src="shared.js?v=20261029_e9"></script>
   <script src="js/confirm-decision-modal.js?v=20261023_apr1"></script>
-  <script src="js/day-popover.js?v=20261023_apr1"></script>
-  <script src="app.js?v=20261029_e8"></script>
+  <script src="js/day-popover.js?v=20261030_cr1"></script>
+  <script src="app.js?v=20261029_e9"></script>
   <script src="js/password-toggle.js?v=20261019_ui1"></script>
   <script src="js/data-transfer.js?v=20261023_apr2"></script>
 

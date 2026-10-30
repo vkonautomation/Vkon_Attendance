@@ -1,0 +1,142 @@
+/* ==========================================================================
+   REFINED CALENDAR (employee portal) — quiet normal days, loud exceptions.
+   Loaded AFTER styles.css so it overrides the old "every cell a pill" look.
+   The cell markup lives in app.js renderMonthlyCalendar; this file only paints.
+   ========================================================================== */
+:root {
+  --cr-present:  #10b981; /* green  */
+  --cr-wfh:      #a855f7; /* purple */
+  --cr-leave:    #f59e0b; /* amber  */
+  --cr-lop:      #e0861a; /* amber, deeper */
+  --cr-holiday:  #3b82f6; /* blue   */
+  --cr-absent:   #ef4444; /* red    */
+  --cr-notmarked:#f59e0b; /* amber glyph on a neutral outline */
+  --cr-neutral:  #cbd5e1;
+  --cr-ink:      #1f2937;
+}
+
+/* ---- one minimal mark per cell, replaces the full status pill ------------ */
+.calendar-day-cell .cell-content { margin-top: auto; }
+.cal-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  display: inline-block; vertical-align: middle;
+}
+.cal-glyph {
+  font-weight: 800; font-size: 0.95rem; line-height: 1;
+  display: inline-block;
+}
+.st-present    .cal-dot { background: var(--cr-present); }
+.st-wfh        .cal-dot { background: var(--cr-wfh); }
+.st-leave      .cal-dot { background: var(--cr-leave); }
+.st-holiday    .cal-dot { background: var(--cr-holiday); }
+.st-regpending .cal-dot { background: var(--cr-holiday); opacity: .65; }
+.st-inprogress .cal-dot { background: var(--cr-neutral); }
+.st-absent     .cal-glyph { color: var(--cr-absent); }
+.st-notmarked  .cal-glyph { color: var(--cr-notmarked); }
+
+/* thin left accent + a whisper of tint for the expected states */
+.st-present    { box-shadow: inset 3px 0 0 var(--cr-present); }
+.st-wfh        { box-shadow: inset 3px 0 0 var(--cr-wfh); }
+.st-leave      { box-shadow: inset 3px 0 0 var(--cr-leave); }
+.st-holiday    { box-shadow: inset 3px 0 0 var(--cr-holiday); }
+.st-regpending { box-shadow: inset 3px 0 0 var(--cr-neutral); }
+
+/* exceptions get the loud treatment; everything else stays neutral */
+.st-absent {
+  box-shadow: inset 0 0 0 2px var(--cr-absent);
+  background: rgba(239, 68, 68, .06);
+}
+.st-notmarked { box-shadow: inset 0 0 0 1.5px var(--cr-neutral); }
+
+/* weekends: no pill, just a soft grey wash and a muted date */
+body.light-theme .calendar-day-cell.is-weekend { background: #f4f5f7; }
+.calendar-day-cell.is-weekend .day-number { color: #9aa3b2; }
+
+/* previous / next month dates: kept but very faint */
+.calendar-day-cell.other-month { opacity: .35; }
+
+/* ---- "today" shown ONCE: a filled neutral circle on the number ----------- */
+.calendar-day-cell.is-today { background: transparent; box-shadow: none; }
+.calendar-day-cell.is-today .day-number.is-today {
+  background: var(--cr-ink);
+  color: #fff;
+  box-shadow: none;
+}
+body:not(.light-theme) .calendar-day-cell.is-today .day-number.is-today {
+  background: #e2e8f0; color: #0f172a;
+}
+
+/* ---- summary chips double as the legend --------------------------------- */
+.qs-dot {
+  width: 9px; height: 9px; border-radius: 50%;
+  display: inline-block; flex: 0 0 auto;
+}
+.qs-dot.dot-present  { background: var(--cr-present); }
+.qs-dot.dot-wfh      { background: var(--cr-wfh); }
+.qs-dot.dot-leave    { background: var(--cr-leave); }
+.qs-dot.dot-lop      { background: var(--cr-lop); }
+.qs-dot.dot-absent   { background: var(--cr-absent); }
+.qs-dot.dot-notmarked{ background: transparent; border: 1.5px solid var(--cr-neutral); }
+
+/* sentence case, not ALL CAPS */
+.quick-stat-badge .q-label { text-transform: none; letter-spacing: 0; }
+
+/* the employee name is dark text, not an error-red */
+.emp-name-strong { color: var(--cr-ink); font-weight: 700; }
+body:not(.light-theme) .emp-name-strong { color: #e6ebf4; }
+
+/* the "need regularisation" line reads like plain text, no symbol */
+.needs-action-pill {
+  text-transform: none; letter-spacing: 0;
+  display: inline-flex; align-items: center; gap: .3rem;
+}
+
+/* ---- day popover: exception action button -------------------------------- */
+.dp-actions { display: flex; gap: .4rem; margin-top: .65rem; }
+.dp-action {
+  border: none; cursor: pointer;
+  background: var(--color-primary, #f97316); color: #fff;
+  font-size: .74rem; font-weight: 700;
+  padding: .3rem .7rem; border-radius: 8px;
+}
+.dp-action:hover { filter: brightness(1.05); }
+
+/* ---- bulk "Regularise all" button + modal -------------------------------- */
+.bulk-reg-btn { white-space: nowrap; }
+.bulk-reg-overlay {
+  position: fixed; inset: 0; z-index: 2400;
+  background: rgba(2, 6, 23, .55);
+  display: flex; align-items: center; justify-content: center;
+  padding: 1rem;
+}
+.bulk-reg-dialog {
+  width: min(540px, 94vw); max-height: 88vh; overflow: auto;
+  background: #fff; border-radius: 16px; padding: 1.2rem 1.3rem;
+  box-shadow: 0 30px 70px -24px rgba(2, 6, 23, .55);
+}
+body:not(.light-theme) .bulk-reg-dialog { background: #0f172a; color: #e6ebf4; }
+.bulk-reg-head h3 { margin: 0; font-size: 1.05rem; }
+.bulk-reg-sub { margin: .35rem 0 .6rem; font-size: .8rem; color: #64748b; }
+.bulk-reg-dates {
+  display: flex; flex-wrap: wrap; gap: .4rem;
+  margin: .5rem 0 .8rem; max-height: 150px; overflow: auto;
+}
+.bulk-reg-date {
+  display: inline-flex; align-items: center; gap: .35rem;
+  padding: .3rem .55rem; border: 1px solid #e2e8f0; border-radius: 8px;
+  font-size: .8rem; cursor: pointer;
+}
+body:not(.light-theme) .bulk-reg-date { border-color: #24314a; }
+.bulk-reg-field { display: block; margin: .5rem 0; font-size: .8rem; }
+.bulk-reg-field > span { display: block; font-weight: 600; margin-bottom: .2rem; }
+.bulk-reg-field input, .bulk-reg-field textarea, .bulk-reg-field select {
+  width: 100%; box-sizing: border-box;
+  padding: .4rem .5rem; border: 1px solid #cbd5e1; border-radius: 8px;
+  font-size: .85rem; background: #fff; color: inherit;
+}
+body:not(.light-theme) .bulk-reg-field input,
+body:not(.light-theme) .bulk-reg-field textarea,
+body:not(.light-theme) .bulk-reg-field select { background: #111f38; border-color: #2b3a57; color: #e6ebf4; }
+.bulk-reg-grid { display: flex; gap: .6rem; flex-wrap: wrap; }
+.bulk-reg-grid .bulk-reg-field { flex: 1 1 120px; }
+.bulk-reg-actions { display: flex; justify-content: flex-end; gap: .6rem; margin-top: .9rem; }

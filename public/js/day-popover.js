@@ -62,6 +62,14 @@
       '<span class="dp-k">' + esc(label) + '</span><b class="dp-v">' + esc(val) + '</b></div>';
   }
 
+  function actionsHtml(p) {
+    if (!p.actions || !p.actions.length) return "";
+    return '<div class="dp-actions">' + p.actions.map(function (a) {
+      return '<button type="button" class="dp-action" data-action="' + esc(a.action) +
+        '" data-date="' + esc(p.dateStr) + '">' + esc(a.label) + '</button>';
+    }).join("") + '</div>';
+  }
+
   function buildHtml(p) {
     var chip = p.chipClass || "badge-neutral";
     var head = '<div class="dp-head">' +
@@ -75,7 +83,7 @@
       // Non-punch day (Absent / Not Marked / Weekend / Holiday / Leave / LoP):
       // status only, plus an optional one-line note.
       var note = p.detail ? '<div class="dp-note">' + esc(p.detail) + '</div>' : "";
-      return head + note;
+      return head + note + actionsHtml(p);
     }
 
     var inV = eff.checkIn || "\u2014";
@@ -103,7 +111,7 @@
         return '<span class="dp-tag">' + esc(t.label) + (t.reason ? ' &middot; ' + esc(t.reason) : '') + '</span>';
       }).join("") + '</div>';
     }
-    return head + body;
+    return head + body + actionsHtml(p);
   }
 
   function ensureEl() {
@@ -117,6 +125,16 @@
     // Keep the popover open while the pointer is inside it.
     el.addEventListener("pointerenter", function () { clearTimeout(closeTimer); });
     el.addEventListener("pointerleave", function () { scheduleHide(); });
+    // A control inside the popover asks the host to act on this day, then closes.
+    el.addEventListener("click", function (e) {
+      var btn = e.target && e.target.closest ? e.target.closest(".dp-action") : null;
+      if (!btn) return;
+      e.stopPropagation();
+      var action = btn.getAttribute("data-action");
+      var ds = { date: btn.getAttribute("data-date") };
+      hide();
+      if (typeof window.onDayPopoverAction === "function") window.onDayPopoverAction(action, ds);
+    });
     return el;
   }
 

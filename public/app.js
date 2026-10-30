@@ -488,36 +488,24 @@ function renderMonthlyCalendar() {
       .forEach(r => { regPendingMap[r.date] = r; });
   } catch (e) { console.warn("reg pending map err:", e); }
 
-  // A coloured classification pill for short-hours / override days.
-  const classificationPill = (record) => {
-    const c = record && record.dayClassification;
-    if (!c) return "";
-    const MAP = {
-      "Short hours - review": ["badge-shorthours", "fa-triangle-exclamation", "Short hours \u2013 review"],
-      "Short hours (LOP)": ["badge-shorthours", "fa-hourglass-half", "Short hours (LOP)"],
-      "Present (Override)": ["badge-override", "fa-user-shield", "Override"]
-    };
-    const m = MAP[c];
-    if (!m) return "";
-    return `<span class="day-badge-pill ${m[0]}" title="${c}"><i class="fa-solid ${m[1]}"></i> <span class="pill-text">${m[2]}</span></span>`;
-  };
-
   // todayKey = formatDateKey(new Date())
   const todayDateObj = (typeof getPresentDate === "function") ? getPresentDate() : new Date();
   const todayKey = formatDateKey(todayDateObj);
 
-  // Update calendar header today indicator strictly as per Indian Standard Time (IST)
-  const headerDateEl = document.getElementById("calendarTodayHeaderDate");
-  if (headerDateEl) {
-    const formattedIST = todayDateObj.toLocaleDateString("en-US", {
-      timeZone: "Asia/Kolkata",
-      weekday: "short",
-      day: "numeric",
-      month: "short",
-      year: "numeric"
-    });
-    headerDateEl.innerHTML = `<i class="fa-solid fa-calendar-day"></i> Present Day: ${formattedIST} (IST)`;
-  }
+  // Refined calendar: each day shows a minimal mark (quiet for normal states, loud
+  // for exceptions). Full detail + actions live in the hover/tap popover, not the cell.
+  const CAL_MARK = {
+    present:    { cls: "st-present",    mark: "dot" },
+    wfh:        { cls: "st-wfh",        mark: "dot" },
+    leave:      { cls: "st-leave",      mark: "dot" },
+    holiday:    { cls: "st-holiday",    mark: "dot" },
+    absent:     { cls: "st-absent",     mark: "x" },
+    notmarked:  { cls: "st-notmarked",  mark: "!" },
+    regpending: { cls: "st-regpending", mark: "dot" },
+    inprogress: { cls: "st-inprogress", mark: "dot" },
+    weekend:    { cls: "is-weekend",    mark: ""    },
+    blank:      { cls: "",              mark: ""    }
+  };
 
   let countPresent = 0;
   let countWfh = 0;
@@ -529,6 +517,14 @@ function renderMonthlyCalendar() {
   // ledger entry (nothing was ever recorded), but they ARE a whole day of LOP,
   // so the LOP tile must count them too.
   const closedLopDates = new Set();
+  // Days in the viewed month that still offer a regularisation (Not Marked or Absent
+  // before the payroll cut-off, no live request). Drives the "need regularisation"
+  // count on the summary and the bulk "Regularise all" button.
+  let monthActionable = 0;
+  const bulkEligibleDates = [];
+  const _cutOffDay = (typeof getAttendanceSettings === "function") ? (getAttendanceSettings() || {}).payrollCutOffDay : 1;
+  const _pastCut = (ds) => (typeof _isPastPayrollCutOff === "function") && _isPastPayrollCutOff(ds, _cutOffDay);
+  const _classificationNote = (rec) => (rec && rec.dayClassification) ? String(rec.dayClassification) : "";
 
   // Previous Month Padded Days
   for (let i = firstDayIndex - 1; i >= 0; i--) {
@@ -564,168 +560,112 @@ function renderMonthlyCalendar() {
     const declaredHoliday = (holidayOff || rhOff) && !workedOnHoliday ? hMatch : null;
 
     const cell = document.createElement("div");
-    cell.className = `calendar-day-cell ${isToday ? "is-today" : ""}`;
     cell.dataset.date = dateStr;
 
-    let badgeHtml = "";
+    let st = "blank";   // visual state key -> CAL_MARK (minimal cell mark)
     let popData = null; // payload for the details popover (kept out of the cell)
+    const nowZero = new Date(todayDateObj); nowZero.setHours(0, 0, 0, 0);
 
     if (declaredHoliday) {
-      const shortName = String(declaredHoliday.name).split(/\s+/)[0];
-      badgeHtml = `
-        <span class="day-badge-pill badge-holiday-day" title="${declaredHoliday.name}">
-          <i class="fa-solid fa-star"></i> <span class="pill-text">${shortName}</span>
-        </span>
-      `;
+      st = "holiday";
       popData = { dateStr, punch: false, statusLabel: declaredHoliday.name, chipClass: "badge-holiday-day", icon: "fa-star", detail: "Declared holiday" };
     } else if (workedOnHoliday) {
       const wReason = (typeof getHolidayWorkOverrides === "function" && getHolidayWorkOverrides()[`${_empId}_${dateStr}`] || {}).reason || "";
-      badgeHtml = `
-        <span class="day-badge-pill badge-holidaywork" title="Worked on holiday (${String(hMatch.name)})">
-          <i class="fa-solid fa-briefcase"></i> <span class="pill-text">Holiday\u2009Work</span>
-        </span>
-      `;
+      st = "present";
       popData = { dateStr, rec: record, punch: !!record, statusLabel: "Worked on holiday", chipClass: "badge-holidaywork", icon: "fa-briefcase", detail: String(hMatch.name) + (wReason ? " \u00b7 " + wReason : "") };
     } else if (isWeekend) {
-      badgeHtml = `<span class="day-badge-pill badge-weekend-day" title="Weekend"><i class="fa-solid fa-mug-hot"></i> Weekend</span>`;
+      st = "weekend";
       popData = { dateStr, punch: false, statusLabel: "Weekend", chipClass: "badge-weekend-day", icon: "fa-mug-hot", detail: "Weekly off" };
-    } else {
-      if (record) {
-        if (record.status === "Present" || record.status === "WFH") {
-          const isWfh = record.status === "WFH";
-          if (isOpenPunch(record)) {
-            // Checked in but not out yet: not a completed Present. Today it is
-            // still "In Progress"; a past day is finalized to Absent on load.
-            if (isToday) {
-              badgeHtml = `
-                <span class="day-badge-pill badge-inprogress" title="Checked in, awaiting check-out"><i class="fa-solid fa-hourglass-half"></i> In Progress</span>
-              `;
-              popData = { dateStr, rec: record, punch: true, statusLabel: "In Progress", chipClass: "badge-inprogress", icon: "fa-hourglass-half" };
-            } else {
-              countAbsent++;
-              badgeHtml = `
-                <span class="day-badge-pill badge-absent-day" title="Absent (no check-out recorded)"><i class="fa-solid fa-circle-xmark"></i> Absent</span>
-              `;
-              popData = { dateStr, punch: false, statusLabel: "Absent", chipClass: "badge-absent-day", icon: "fa-circle-xmark", detail: "Checked in but no check-out was recorded" };
-            }
-          } else if (isWfh) {
-            countWfh++;
-            badgeHtml = `
-              <span class="day-badge-pill badge-wfh-day" title="Work from Home"><i class="fa-solid fa-house-laptop"></i> WFH</span>
-              ${classificationPill(record)}
-            `;
-            popData = { dateStr, rec: record, punch: true, statusLabel: "WFH", chipClass: "badge-wfh-day", icon: "fa-house-laptop" };
+    } else if (record) {
+      if (record.status === "Present" || record.status === "WFH") {
+        const isWfh = record.status === "WFH";
+        if (isOpenPunch(record)) {
+          // Checked in but not out yet: not a completed Present. Today it is
+          // still "In Progress"; a past day is finalized to Absent on load.
+          if (isToday) {
+            st = "inprogress";
+            popData = { dateStr, rec: record, punch: true, statusLabel: "In Progress", chipClass: "badge-inprogress", icon: "fa-hourglass-half", detail: "Checked in, awaiting check-out" };
           } else {
-            countPresent++;
-            badgeHtml = `
-              <span class="day-badge-pill badge-present" title="Present"><i class="fa-solid fa-circle-check"></i> Present</span>
-              ${classificationPill(record)}
-            `;
-            popData = { dateStr, rec: record, punch: true, statusLabel: "Present", chipClass: "badge-present", icon: "fa-circle-check" };
+            countAbsent++;
+            st = "absent";
+            popData = { dateStr, punch: false, statusLabel: "Absent", chipClass: "badge-absent-day", icon: "fa-circle-xmark", detail: "Checked in but no check-out was recorded" };
+            if (!_pastCut(dateStr)) { monthActionable++; bulkEligibleDates.push(dateStr); popData.actions = [{ action: "regularise", label: "Regularise" }]; }
           }
-        } else if (record.status === "Loss of Pay") {
-          countLop++;
-          badgeHtml = `
-            <span class="day-badge-pill badge-lop-day" title="Loss of Pay (Approved)"><i class="fa-solid fa-hand-holding-dollar"></i> LoP</span>
-          `;
-          popData = { dateStr, punch: false, statusLabel: "Loss of Pay", chipClass: "badge-lop-day", icon: "fa-hand-holding-dollar", detail: "Approved unpaid day" };
-        } else if (record.status === "Holiday" || record.status === "Leave") {
-          countLeave++;
-          const isRh = record.locationType && record.locationType.includes("RH");
-          badgeHtml = `
-            <span class="day-badge-pill ${isRh ? 'badge-rh-day' : 'badge-leave-day'}" title="${isRh ? 'Restricted Holiday' : 'Leave'} (Approved)">
-              <i class="fa-solid ${isRh ? 'fa-calendar-check' : 'fa-umbrella-beach'}"></i> ${isRh ? 'RH' : 'Leave'}
-            </span>
-          `;
-          popData = { dateStr, punch: false, statusLabel: isRh ? "Restricted Holiday" : "Leave", chipClass: isRh ? 'badge-rh-day' : 'badge-leave-day', icon: isRh ? 'fa-calendar-check' : 'fa-umbrella-beach', detail: "Approved" };
-        } else if (record.status === "Absent") {
-          countAbsent++;
-          badgeHtml = `
-            <span class="day-badge-pill badge-absent-day" title="Absent"><i class="fa-solid fa-circle-xmark"></i> Absent</span>
-          `;
-          popData = { dateStr, punch: false, statusLabel: "Absent", chipClass: "badge-absent-day", icon: "fa-circle-xmark" };
+        } else if (isWfh) {
+          countWfh++;
+          st = "wfh";
+          popData = { dateStr, rec: record, punch: true, statusLabel: "WFH", chipClass: "badge-wfh-day", icon: "fa-house-laptop", detail: _classificationNote(record) };
+        } else {
+          countPresent++;
+          st = "present";
+          popData = { dateStr, rec: record, punch: true, statusLabel: "Present", chipClass: "badge-present", icon: "fa-circle-check", detail: _classificationNote(record) };
         }
-      } else {
-        // Only evaluate past working days that occurred on or after employee enrollment
-        const curEmp = employeeState.currentEmployee;
-        const empEnrolledDate = curEmp.enrolledAt ? new Date(curEmp.enrolledAt + "T00:00:00") : null;
-        const isNewEnrollee = curEmp.id !== "EMP001" && curEmp.id !== "EMP002";
-        const isBeforeEnrollment = (isNewEnrollee && !empEnrolledDate) || (empEnrolledDate && dayDate < empEnrolledDate);
-        const nowZero = new Date(todayDateObj);
-        nowZero.setHours(0, 0, 0, 0);
-
-        if (dayDate < nowZero && !isWeekend && !isBeforeEnrollment) {
-          if (regPendingMap[dateStr]) {
-            // Request submitted & awaiting admin review — not a plain "Not Marked"
-            badgeHtml = `
-              <span class="day-badge-pill badge-regpending" title="Regularisation ${regPendingMap[dateStr].id} submitted &mdash; awaiting admin review"><i class="fa-solid fa-hourglass-half"></i> Reg. Pending</span>
-              <button type="button" class="cell-reg-view" data-reg-date="${dateStr}" title="View your regularisation request for ${dateStr}"><i class="fa-solid fa-eye"></i> View request</button>
-            `;
-            popData = { dateStr, punch: false, statusLabel: "Reg. Pending", chipClass: "badge-regpending", icon: "fa-hourglass-half", detail: "Regularisation awaiting admin review" };
-          } else {
-            // No punch, no leave, no WFH, no pending request. If that month's
-            // payroll has already closed the day is a whole-day LOP and can no
-            // longer be regularised, so no action is offered.
-            countNotMarked++;
-            const cellCutOffDay = (typeof getAttendanceSettings === "function") ? (getAttendanceSettings() || {}).payrollCutOffDay : 1;
-            const cellPastCutOff = (typeof _isPastPayrollCutOff === "function") && _isPastPayrollCutOff(dateStr, cellCutOffDay);
-            if (cellPastCutOff) {
-              closedLopDates.add(dateStr);
-              badgeHtml = `
-              <span class="day-badge-pill badge-notmarked" title="Day closed with no record and past the payroll cut-off &mdash; counted as a whole day of LOP"><i class="fa-solid fa-circle-half-stroke"></i> Not Marked</span>
-              <span class="cell-lop-note" title="Payroll for that month has closed &mdash; the day is already counted as a whole day of LOP"><i class="fa-solid fa-circle-xmark"></i> Counted as LOP</span>
-            `;
-              popData = { dateStr, punch: false, statusLabel: "Not Marked", chipClass: "badge-notmarked", icon: "fa-circle-half-stroke", detail: "Payroll closed \u2014 counted as a whole day of LOP" };
-            } else {
-              badgeHtml = `
-              <span class="day-badge-pill badge-notmarked" title="Day closed with no record and no leave &mdash; raise a regularisation if you were working"><i class="fa-solid fa-circle-half-stroke"></i> Not Marked</span>
-              <button type="button" class="cell-reg-quick" data-reg-date="${dateStr}" title="Request regularisation for ${dateStr}"><i class="fa-solid fa-wand-magic-sparkles"></i> Regularise</button>
-            `;
-              popData = { dateStr, punch: false, statusLabel: "Not Marked", chipClass: "badge-notmarked", icon: "fa-circle-half-stroke", detail: "No punch or leave recorded" };
-            }
-          }
-        } else if (isToday && !declaredHoliday && !isWeekend) {
-          badgeHtml = `
-            <span class="day-badge-pill badge-today-active" title="Today &ndash; ready to punch in"><i class="fa-solid fa-clock"></i> Today (Active)</span>
-          `;
-          popData = { dateStr, punch: false, statusLabel: "Today", chipClass: "badge-today-active", icon: "fa-clock", detail: "Ready to punch in" };
-        } else if (dayDate > nowZero && !isWeekend && !isBeforeEnrollment) {
-          // Upcoming working day: tidy subtle placeholder (weekends are labelled above).
-          badgeHtml = `<span class="day-future-ph" title="Upcoming working day">&mdash;</span>`;
-          popData = null; // blank future day: no popover
-        }
+      } else if (record.status === "Loss of Pay") {
+        countLop++;
+        st = "leave";
+        popData = { dateStr, punch: false, statusLabel: "Loss of Pay", chipClass: "badge-lop-day", icon: "fa-hand-holding-dollar", detail: "Approved unpaid day" };
+      } else if (record.status === "Holiday" || record.status === "Leave") {
+        countLeave++;
+        const isRh = record.locationType && record.locationType.includes("RH");
+        st = "leave";
+        popData = { dateStr, punch: false, statusLabel: isRh ? "Restricted Leave" : "Personal Leave", chipClass: isRh ? 'badge-rh-day' : 'badge-leave-day', icon: isRh ? 'fa-calendar-check' : 'fa-umbrella-beach', detail: "Approved" };
+      } else if (record.status === "Absent") {
+        countAbsent++;
+        st = "absent";
+        popData = { dateStr, punch: false, statusLabel: "Absent", chipClass: "badge-absent-day", icon: "fa-circle-xmark", detail: "Marked absent" };
+        if (!_pastCut(dateStr)) { monthActionable++; bulkEligibleDates.push(dateStr); popData.actions = [{ action: "regularise", label: "Regularise" }]; }
       }
+    } else {
+      // No record on a weekday: only past, enrolled days need attention.
+      const curEmp = employeeState.currentEmployee;
+      const empEnrolledDate = curEmp.enrolledAt ? new Date(curEmp.enrolledAt + "T00:00:00") : null;
+      const isNewEnrollee = curEmp.id !== "EMP001" && curEmp.id !== "EMP002";
+      const isBeforeEnrollment = (isNewEnrollee && !empEnrolledDate) || (empEnrolledDate && dayDate < empEnrolledDate);
+
+      if (dayDate < nowZero && !isWeekend && !isBeforeEnrollment) {
+        if (regPendingMap[dateStr]) {
+          // Request submitted & awaiting review — not a plain "Not Marked".
+          st = "regpending";
+          popData = { dateStr, punch: false, statusLabel: "Reg. Pending", chipClass: "badge-regpending", icon: "fa-hourglass-half", detail: "Regularisation awaiting review", actions: [{ action: "view", label: "View request" }] };
+        } else {
+          // No punch, no leave, no WFH, no pending request. If that month's payroll
+          // has already closed the day is a whole-day LOP and can no longer be
+          // regularised, so no action is offered.
+          countNotMarked++;
+          st = "notmarked";
+          if (_pastCut(dateStr)) {
+            closedLopDates.add(dateStr);
+            popData = { dateStr, punch: false, statusLabel: "Not Marked", chipClass: "badge-notmarked", icon: "fa-circle-half-stroke", detail: "Payroll closed \u2014 counted as a whole day of LOP" };
+          } else {
+            monthActionable++; bulkEligibleDates.push(dateStr);
+            popData = { dateStr, punch: false, statusLabel: "Not Marked", chipClass: "badge-notmarked", icon: "fa-circle-half-stroke", detail: "No punch or leave recorded", actions: [{ action: "regularise", label: "Regularise" }] };
+          }
+        }
+      } else if (dayDate > nowZero && !isWeekend && !isBeforeEnrollment) {
+        // Upcoming working day: quiet blank cell, no popover.
+        popData = null; // blank future day: no popover
+      }
+      // Today with no record shows only as a filled circle on the number.
     }
 
+    const markDef = CAL_MARK[st] || CAL_MARK.blank;
+    let markHtml = "";
+    if (markDef.mark === "dot") markHtml = '<span class="cal-dot"></span>';
+    else if (markDef.mark) markHtml = '<span class="cal-glyph">' + markDef.mark + '</span>';
+
+    cell.className = `calendar-day-cell${markDef.cls ? " " + markDef.cls : ""}${isToday ? " is-today" : ""}`;
     cell.innerHTML = `
       <div class="cell-top-row">
-        <span class="day-number">${d}</span>
-        ${isToday ? '<span class="today-marker-chip"><i class="fa-solid fa-star"></i> Today</span>' : ''}
+        <span class="day-number${isToday ? " is-today" : ""}">${d}</span>
       </div>
-      <div class="cell-content">
-        ${badgeHtml}
-      </div>
+      <div class="cell-content">${markHtml}</div>
     `;
 
     cell.addEventListener("click", () => {
       openDayDetailsModal(dateStr, record, isWeekend, declaredHoliday);
     });
 
-    cell.querySelectorAll(".cell-reg-quick").forEach(btn => {
-      btn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        quickRegulariseDate(btn.dataset.regDate);
-      });
-    });
-
-    cell.querySelectorAll(".cell-reg-view").forEach(btn => {
-      btn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        openRegularisationForDate(btn.dataset.regDate, true);
-      });
-    });
-
-    // Details live in the hover/focus/tap popover, not in the cell itself.
+    // Details + actions live in the hover/focus/tap popover, not in the cell itself.
     if (popData && window.DayPopover) DayPopover.bind(cell, popData);
 
     grid.appendChild(cell);
@@ -764,15 +704,30 @@ function renderMonthlyCalendar() {
   const statNM = document.getElementById("statsNotMarkedCount");
   if (statNM) statNM.textContent = countNotMarked;
 
-  // Calendar header: how many past workdays still need a regularisation action.
+  // Summary: the "need regularisation" number now reflects THIS month's grid, so it
+  // agrees with the actionable cells the user actually sees (Not Marked + Absent that
+  // still offer a Regularise action). The 3-month alert list lives in the bell/banner.
   const naPill = document.getElementById("calendarNeedsActionPill");
   const naCount = document.getElementById("calendarNeedsActionCount");
-  if (naPill && naCount && employeeState.currentEmployee) {
-    const needAction = _regAlertsFor(employeeState.currentEmployee.id).length;
-    naCount.textContent = String(needAction);
-    naPill.style.display = needAction ? "" : "none";
+  if (naPill && naCount) {
+    naCount.textContent = String(monthActionable);
+    naPill.style.display = monthActionable ? "" : "none";
+    const naSuffix = naPill.querySelector(".na-suffix");
+    if (naSuffix) naSuffix.textContent = `need regularisation in ${monthNames[currentMonth]}`;
   } else if (naPill) {
     naPill.style.display = "none";
+  }
+
+  // Bulk action: show "Regularise all (N)" only when this month has eligible days.
+  _bulkRegEligible = bulkEligibleDates.slice();
+  const bulkBtn = document.getElementById("bulkRegBtn");
+  if (bulkBtn) {
+    if (bulkEligibleDates.length) {
+      bulkBtn.style.display = "";
+      bulkBtn.textContent = `Regularise all (${bulkEligibleDates.length})`;
+    } else {
+      bulkBtn.style.display = "none";
+    }
   }
 }
 
@@ -3046,6 +3001,104 @@ function openRegularisationForDate(dateStr) {
   }
 }
 
+// ============================================================================
+// REFINED CALENDAR ACTIONS — the day popover carries the per-day exception
+// actions (Regularise / View request); the calendar toolbar carries one bulk
+// "Regularise all" that submits every eligible day in this month at once.
+// ============================================================================
+var _bulkRegEligible = [];
+
+// A control inside the day popover asks for an action on a specific date.
+window.onDayPopoverAction = function (action, dataset) {
+  const dateStr = dataset && dataset.date;
+  if (!dateStr) return;
+  if (action === "regularise") quickRegulariseDate(dateStr);
+  else if (action === "view") openRegularisationForDate(dateStr, true);
+};
+
+function initRefinedCalendar() {
+  const bulkBtn = document.getElementById("bulkRegBtn");
+  const modal = document.getElementById("bulkRegModal");
+  if (!bulkBtn || !modal) return;
+  bulkBtn.addEventListener("click", openBulkRegModal);
+  const cancel = document.getElementById("bulkRegCancel");
+  if (cancel) cancel.addEventListener("click", () => { modal.style.display = "none"; });
+  modal.addEventListener("click", (e) => { if (e.target === modal) modal.style.display = "none"; });
+  const form = document.getElementById("bulkRegForm");
+  if (form) form.addEventListener("submit", submitBulkRegularise);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && modal.style.display === "flex") modal.style.display = "none";
+  });
+}
+
+function openBulkRegModal() {
+  const modal = document.getElementById("bulkRegModal");
+  const listEl = document.getElementById("bulkRegDates");
+  if (!modal || !listEl) return;
+  if (!_bulkRegEligible.length) { showToast("No days in this month can be regularised.", "info"); return; }
+  const reasonEl = document.getElementById("bulkRegReason");
+  if (reasonEl) reasonEl.value = "";
+  listEl.innerHTML = _bulkRegEligible.map(ds =>
+    `<label class="bulk-reg-date"><input type="checkbox" checked value="${ds}"><span class="bulk-reg-dnum">${ds}</span></label>`
+  ).join("");
+  const countEl = document.getElementById("bulkRegCount");
+  if (countEl) countEl.textContent = String(_bulkRegEligible.length);
+  modal.style.display = "flex";
+}
+
+function submitBulkRegularise(e) {
+  e.preventDefault();
+  const emp = employeeState.currentEmployee;
+  if (!emp) return;
+  const reasonEl = document.getElementById("bulkRegReason");
+  const trimmed = reasonEl ? String(reasonEl.value).trim() : "";
+  if (!trimmed) { showToast("Please enter a reason for these regularisations.", "warning"); return; }
+  const checked = Array.from(document.querySelectorAll('#bulkRegDates input[type="checkbox"]:checked')).map(i => i.value);
+  if (!checked.length) { showToast("Select at least one day to regularise.", "warning"); return; }
+
+  const missedSel = document.getElementById("bulkRegType");
+  const missedVal = missedSel ? missedSel.value : "Missed Punch-In";
+  const inEl = document.getElementById("bulkRegInTime");
+  const outEl = document.getElementById("bulkRegOutTime");
+  const inVal = (inEl && inEl.value) ? inEl.value : "09:15";
+  const outVal = (outEl && outEl.value) ? outEl.value : "18:15";
+  const cutOffDay = (typeof getAttendanceSettings === "function") ? (getAttendanceSettings() || {}).payrollCutOffDay : 1;
+
+  const allRegs = getStore(STORAGE_KEYS.REGULARISATIONS, []);
+  const created = [];
+  checked.forEach(dateStr => {
+    // Skip anything that has since passed cut-off or already has a live request.
+    if (typeof _isPastPayrollCutOff === "function" && _isPastPayrollCutOff(dateStr, cutOffDay)) return;
+    const live = allRegs.find(r => r.employeeId === emp.id && r.date === dateStr &&
+      (r.status === "Pending" || r.status === "Pending Manager" || r.status === "Pending Admin"));
+    if (live) return;
+    const newReq = {
+      id: `REG-${Date.now()}-${created.length}`,
+      employeeId: emp.id,
+      employeeName: emp.name,
+      date: dateStr,
+      missedType: missedVal,
+      inTime: inVal,
+      outTime: outVal,
+      reason: trimmed,
+      createdAt: formatDateKey(new Date())
+    };
+    Object.assign(newReq, routingForNewRequest("regularisation", emp.id));
+    allRegs.push(newReq);
+    created.push(dateStr);
+  });
+
+  if (!created.length) { showToast("Those days can no longer be regularised.", "warning"); return; }
+  setStore(STORAGE_KEYS.REGULARISATIONS, allRegs);
+
+  const modal = document.getElementById("bulkRegModal");
+  if (modal) modal.style.display = "none";
+  renderMyRegularisationsList();
+  try { renderMyRequests(); } catch (err) { console.error(err); }
+  try { renderMonthlyCalendar(); } catch (err) { console.error(err); }
+  showToast(`${created.length} regularisation request${created.length === 1 ? "" : "s"} submitted to Admin!`, "success");
+}
+
 function renderMyRegularisationsList() {
   if (!employeeState.currentEmployee) return;
   const empId = employeeState.currentEmployee.id;
@@ -4151,6 +4204,7 @@ function bootEmployeePortal() {
   try { initVerificationModal(); } catch (e) { console.error("Error in initVerificationModal:", e); }
   try { initWfhBox(); } catch (e) { console.error("Error in initWfhBox:", e); }
   try { initAttendanceRegularisation(); } catch (e) { console.error("Error in initAttendanceRegularisation:", e); }
+  try { initRefinedCalendar(); } catch (e) { console.error("Error in initRefinedCalendar:", e); }
 
   try { checkActiveSession(); } catch (e) { console.error("Error in checkActiveSession:", e); }
 
