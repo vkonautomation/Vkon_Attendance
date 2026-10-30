@@ -54,7 +54,9 @@ export async function POST(req: NextRequest): Promise<Response> {
 
     const body = expectObject(await readJsonBody(req, config().maxBodyBytes.roster));
     const cmd: NewEmployee = {
-      employeeCode: requireString(body, "employeeCode", 64),
+      // The portal code is assigned by the server from the database when the browser leaves it
+      // out, so a roster document that lags the employees table can't guess a taken code.
+      employeeCode: optionalString(body, "employeeCode", 64),
       username: requireString(body, "username", 64),
       name: requireString(body, "name", 128),
       email: optionalString(body, "email", 254),

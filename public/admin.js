@@ -1347,7 +1347,6 @@ function initEnrollmentForm() {
       return;
     }
 
-    const newId = `EMP${String(employees.length + 1).padStart(3, "0")}`;
     const enrolledAt = (joinDateInput && joinDateInput.value) ? joinDateInput.value : formatDateKey(new Date());
     const managerId = newMgrSel ? newMgrSel.value : "";
 
@@ -1360,9 +1359,13 @@ function initEnrollmentForm() {
     const api = window.VKON_API;
     const serverBacked = !!(api && api.isServerBacked && api.isServerBacked());
     let oneTimePassword = null;
+    // Who numbers the portal code depends on who can see every account. In server mode that is
+    // the database, since the shared roster document may be missing rows the browser would then
+    // collide with: the browser omits the code and takes back the one the server assigned. In
+    // local mode the document is the only store, so the browser numbers it off its own length.
+    let newId;
     if (serverBacked) {
       const res = await api.createRosterEmployee({
-        employeeCode: newId,
         username: username,
         name: name,
         jobTitle: role,
@@ -1380,6 +1383,11 @@ function initEnrollmentForm() {
         return;
       }
       oneTimePassword = res.oneTimePassword;
+      newId = (res.employee && res.employee.id)
+        ? res.employee.id
+        : `EMP${String(employees.length + 1).padStart(3, "0")}`;
+    } else {
+      newId = `EMP${String(employees.length + 1).padStart(3, "0")}`;
     }
 
     const newEmp = {

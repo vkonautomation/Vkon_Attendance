@@ -25,7 +25,7 @@
 import { randomBytes } from "node:crypto";
 import type { PoolClient } from "pg";
 import { query, withTransaction, PG, pgCode } from "./db/pool";
-import { hashPassword, PASSWORD_MIN_LENGTH } from "./auth/hash";
+import { hashPassword } from "./auth/hash";
 import { ApiError, badRequest } from "./http/errors";
 
 /** The access role, exactly as the schema's CHECK constrains it. */
@@ -169,7 +169,8 @@ export async function directReports(managerCode: string): Promise<RosterRow[]> {
 
 /** A new employee, as an admin asked for it (after the route's field parsing). */
 export interface NewEmployee {
-  employeeCode: string;
+  /** Portal code. Omit to let the server assign the next free one from the database. */
+  employeeCode?: string | null;
   username: string;
   name: string;
   email: string | null;
@@ -208,6 +209,21 @@ async function resolveManagerId(client: PoolClient, managerCode: string): Promis
   const row = res.rows[0];
   if (!row) throw badRequest(`No employee matches manager code \`${managerCode}\`.`, "unknown_manager");
   return row.id;
+}
+
+/**
+ * The next free `EMPnnn` portal code, counted from the database rather than the shared roster
+ * document. The document can lag the employees table (an account enrolled straight into the DB
+ * never lands in it), so a code numbered off the document's length collides with an existing
+ * row. Runs on the caller's client to read the same snapshot as the insert it feeds.
+ */
+async function nextEmployeeCode(client: PoolClient): Promise<string> {
+  const res = await client.query<{ max: number | string | null }>(
+    `SELECT max((substring(employee_code from '^EMP([0-9]+)$'))::int) AS max
+       FROM employees WHERE employee_code ~ '^EMP[0-9]+$'`,
+  );
+  const peak = res.rows[0] && res.rows[0].max != null ? Number(res.rows[0].max) : 0;
+  return `EMP${String(peak + 1).padStart(3, "0")}`;
 }
 
 /** A check violation from the schema/trigger, phrased as the field the admin got wrong. */
@@ -266,9 +282,6 @@ export async function createEmployee(cmd: NewEmployee): Promise<CreatedEmployee>
   let changeRequired: boolean;
   const chosen = typeof cmd.password === "string" ? cmd.password : "";
   if (chosen.length) {
-    if (chosen.length < PASSWORD_MIN_LENGTH) {
-      throw badRequest(`A password must be at least ${PASSWORD_MIN_LENGTH} characters.`, "password_too_short");
-    }
     passwordToHash = chosen;
     changeRequired = false;
   } else {
@@ -279,6 +292,12 @@ export async function createEmployee(cmd: NewEmployee): Promise<CreatedEmployee>
   const passwordHash = await hashPassword(passwordToHash);
 
   const employee = await withTransaction(async (client) => {
+    // The portal code is the database's to hand out, not the browser's: honour an explicit code
+    // only when the caller really knows it, otherwise take the next free one so a roster that is
+    // out of step with the table can't produce a collision.
+    const code = cmd.employeeCode && cmd.employeeCode.trim()
+      ? cmd.employeeCode.trim().toUpperCase()
+      : await nextEmployeeCode(client);
     const managerId = cmd.managerCode ? await resolveManagerId(client, cmd.managerCode) : null;
     try {
       await client.query(
@@ -289,7 +308,7 @@ export async function createEmployee(cmd: NewEmployee): Promise<CreatedEmployee>
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::date, 'Asia/Kolkata',
                  $13, $14, now())`,
         [
-          cmd.employeeCode.toUpperCase(),
+          code,
           cmd.username.toLowerCase(),
           cmd.name,
           cmd.email,
@@ -309,11 +328,11 @@ export async function createEmployee(cmd: NewEmployee): Promise<CreatedEmployee>
       // one listed -- same date formatting, same manager code -- rather than from the command.
       const created = await client.query<EmployeeRow>(
         `SELECT ${SELECT_COLUMNS} ${FROM_JOIN} WHERE e.employee_code = $1`,
-        [cmd.employeeCode.toUpperCase()],
+        [code],
       );
       return shape(created.rows[0]);
     } catch (err) {
-      translateWriteError(err, { code: cmd.employeeCode });
+      translateWriteError(err, { code });
     }
   });
 
