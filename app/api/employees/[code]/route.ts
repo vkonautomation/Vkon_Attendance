@@ -24,7 +24,7 @@ import { boolField, enumField, isoDateField, numOrNullField } from "@/lib/http/f
 import { errorResponse, forbidden } from "@/lib/http/errors";
 import { clientIp } from "@/lib/http/request";
 import { recordAudit } from "@/lib/db/audit";
-import { updateEmployee, type AccessRole, type EmployeePatch } from "@/lib/roster";
+import { updateEmployee, deleteEmployee, type AccessRole, type EmployeePatch } from "@/lib/roster";
 
 export const dynamic = "force-dynamic";
 
@@ -84,5 +84,41 @@ export async function PATCH(
     return json({ employee: updated });
   } catch (err) {
     return errorResponse(err, "PATCH /api/employees/[code]");
+  }
+}
+
+/**
+ * Remove an employee for good. This is the delete the roster screen's trash button calls: the
+ * sign-in account goes and, with it, the cascaded attendance/leave/WFH/regularisation rows, so
+ * the `EMPnnn` is freed and the next enrolment reuses it. Admin-only and same-origin like the
+ * PATCH. The audit trail keeps the departed employee's past entries (actor nulled) and gains one
+ * recording who removed them.
+ */
+export async function DELETE(
+  req: NextRequest,
+  context: { params: Promise<{ code: string }> },
+): Promise<Response> {
+  try {
+    assertSameOrigin(req);
+    const session = await requireSession(req);
+    if (session.role !== "admin") {
+      throw forbidden("Only an administrator may remove employees.");
+    }
+
+    const { code } = await context.params;
+    const removed = await deleteEmployee(code);
+
+    await recordAudit({
+      actorEmployeeId: session.employeeId,
+      action: "roster.delete",
+      entityType: "employee",
+      entityId: removed,
+      detail: {},
+      ip: clientIp(req),
+    });
+
+    return json({ removed });
+  } catch (err) {
+    return errorResponse(err, "DELETE /api/employees/[code]");
   }
 }

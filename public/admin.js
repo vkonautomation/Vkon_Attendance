@@ -1099,11 +1099,20 @@ function renderRosterTable() {
 
   // Attach Delete Listeners
   tbody.querySelectorAll(".delete-emp-btn").forEach(btn => {
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", async () => {
       const id = btn.dataset.id;
       const _delEmp = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES).find(e => e.id === id);
       const _delLabel = _delEmp ? `${_delEmp.name} (${id})` : id;
-      if (confirm(`Remove employee ${_delLabel}?\n\nThis permanently deletes their roster entry and cannot be undone.`)) {
+      if (confirm(`Remove employee ${_delLabel}?\n\nThis permanently deletes their sign-in account and all their history, and cannot be undone.`)) {
+        // In server mode the roster is more than a document: dropping the on-screen entry alone
+        // would leave the sign-in account (and its EMP id) alive in the database, so the number
+        // could never be reused. Remove the account first and only drop the row if that succeeds,
+        // keeping the list and the database in step.
+        const api = window.VKON_API;
+        if (api && api.isServerBacked && api.isServerBacked()) {
+          const res = await api.deleteRosterEmployee(id);
+          if (!res.ok) { showToast(res.message || "Could not remove the account.", "error"); return; }
+        }
         let emps = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
         emps = emps.filter(e => e.id !== id);
         setStore(STORAGE_KEYS.EMPLOYEES, emps);

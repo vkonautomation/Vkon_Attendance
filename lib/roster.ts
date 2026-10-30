@@ -212,18 +212,23 @@ async function resolveManagerId(client: PoolClient, managerCode: string): Promis
 }
 
 /**
- * The next free `EMPnnn` portal code, counted from the database rather than the shared roster
- * document. The document can lag the employees table (an account enrolled straight into the DB
- * never lands in it), so a code numbered off the document's length collides with an existing
- * row. Runs on the caller's client to read the same snapshot as the insert it feeds.
+ * The lowest unused `EMPnnn` portal code, counted from the database rather than the shared
+ * roster document. The document can lag the employees table, so a code numbered off the
+ * document's length can collide with an existing row; and a number must never be handed out twice
+ * while its account still exists. Taking the smallest free number keeps the roster dense and lets
+ * a removed employee's number go to the next person. Runs on the caller's client so it reads the
+ * same snapshot as the insert it feeds.
  */
 async function nextEmployeeCode(client: PoolClient): Promise<string> {
-  const res = await client.query<{ max: number | string | null }>(
-    `SELECT max((substring(employee_code from '^EMP([0-9]+)$'))::int) AS max
-       FROM employees WHERE employee_code ~ '^EMP[0-9]+$'`,
+  const res = await client.query<{ next: number | string | null }>(
+    `SELECT COALESCE(MIN(n), 1) AS next
+       FROM generate_series(1, 100000) AS n
+      WHERE NOT EXISTS (
+        SELECT 1 FROM employees WHERE employee_code = 'EMP' || lpad(n::text, 3, '0')
+      )`,
   );
-  const peak = res.rows[0] && res.rows[0].max != null ? Number(res.rows[0].max) : 0;
-  return `EMP${String(peak + 1).padStart(3, "0")}`;
+  const next = res.rows[0] && res.rows[0].next != null ? Number(res.rows[0].next) : 1;
+  return `EMP${String(next).padStart(3, "0")}`;
 }
 
 /** A check violation from the schema/trigger, phrased as the field the admin got wrong. */
@@ -399,6 +404,30 @@ export async function updateEmployee(code: string, patch: EmployeePatch): Promis
     } catch (err) {
       translateWriteError(err, { code: upper });
     }
+  });
+}
+
+/**
+ * Remove an employee outright. This is the delete the roster screen promises: the account and
+ * everything hanging off it go, so the person can no longer sign in and their `EMPnnn` is freed
+ * for the next enrolment (see nextEmployeeCode). Attendance, leave, WFH, regularisation and
+ * notification rows all `ON DELETE CASCADE` (0003/0004); the audit trail keeps its entries with
+ * the actor nulled (0005), so removing a departed employee never rewrites history.
+ */
+export async function deleteEmployee(code: string): Promise<string> {
+  const upper = code.toUpperCase();
+  return withTransaction(async (client) => {
+    const exists = await client.query<{ id: string }>(
+      `SELECT id FROM employees WHERE employee_code = $1`,
+      [upper],
+    );
+    if (!exists.rows[0]) throw new ApiError(404, `There is no employee \`${upper}\`.`, { reason: "no_such_employee" });
+    try {
+      await client.query(`DELETE FROM employees WHERE employee_code = $1`, [upper]);
+    } catch (err) {
+      translateWriteError(err, { code: upper });
+    }
+    return upper;
   });
 }
 

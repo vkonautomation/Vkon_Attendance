@@ -417,6 +417,28 @@ window.VKON_API = (function () {
     }
   }
 
+  /**
+   * Remove an employee's sign-in account for good, so the roster list and the database agree and
+   * the freed `EMPnnn` can be reused. Server-mode only, like createRosterEmployee; the caller
+   * still removes the roster-document entry afterwards, so this must succeed before that does.
+   */
+  async function deleteRosterEmployee(code) {
+    if (mode !== "server" || !authenticated) {
+      return { ok: false, code: "no_session", message: "Sign in as an administrator to remove employees." };
+    }
+    try {
+      await request("/employees/" + encodeURIComponent(code), { method: "DELETE" });
+      return { ok: true };
+    } catch (err) {
+      return {
+        ok: false,
+        status: err.status,
+        code: (err.body && err.body.reason) || "error",
+        message: err.message || "Could not remove the sign-in account.",
+      };
+    }
+  }
+
   function currentSession() { return session; }
   function isServerBacked() { return mode === "server"; }
   function isLocalOnly() { return mode === "local"; }
@@ -437,6 +459,7 @@ window.VKON_API = (function () {
     handles, read, write, flush, pull,
     punch, login, logout, changePassword, boot,
     createRosterEmployee,
+    deleteRosterEmployee,
     currentSession, isServerBacked, isProbing, isLocalOnly, pendingPunchCount,
     needsPasswordChange,
     onConflict: (fn) => { conflictHandler = fn; },
