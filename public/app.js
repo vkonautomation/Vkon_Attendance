@@ -3567,33 +3567,18 @@ function _regAlertsFor(empId) {
   } catch (e) { console.warn("reg alerts err:", e); return []; }
 }
 
-// Icon + text per urgency (never colour alone).
-function _regAlertUrgency(urgency) {
-  if (urgency === "critical") return { icon: "fa-circle-xmark", word: "Counted as LOP" };
-  if (urgency === "warning") return { icon: "fa-hourglass-half", word: "days left" };
-  return { icon: "fa-circle-info", word: "Open" };
-}
-
-function _regAlertChip(a) {
-  if (a.pastCutOff) return `<i class="fa-solid fa-circle-xmark"></i> Counted as LOP`;
-  const d = Math.max(0, a.daysLeft);
-  if (d <= 0) return `<i class="fa-solid fa-hourglass-half"></i> Due today`;
-  return `<i class="fa-solid fa-hourglass-half"></i> ${d} day${d === 1 ? "" : "s"} left`;
-}
-
+// One clean row per day: the sentence, and the action. No icons, no chips -- the message already
+// names the date, the status and the deadline, so a coloured border carries the remaining urgency.
 function _regAlertRowHtml(a, withButton) {
-  const u = _regAlertUrgency(a.urgency);
+  const action = withButton && !a.pastCutOff
+    ? `<button type="button" class="btn btn-xs btn-primary rab-reg-btn" data-reg-date="${a.dateStr}">Regularise</button>`
+    : (withButton && a.pastCutOff
+        ? `<span class="rab-locked" title="Payroll for that month has closed &mdash; this day is already counted as LOP and can no longer be regularised.">Cut-off passed</span>`
+        : "");
   return `
     <div class="rab-item rab-${a.urgency}">
-      <span class="rab-item-icon"><i class="fa-solid ${u.icon}"></i></span>
-      <div class="rab-item-main">
-        <span class="rab-item-msg">${a.message}</span>
-        <span class="rab-item-meta">
-          <span class="rab-chip rab-chip-${a.urgency}">${_regAlertChip(a)}</span>
-          <span class="rab-status">${a.statusLabel}</span>
-        </span>
-      </div>
-      ${withButton && !a.pastCutOff ? `<button type="button" class="btn btn-xs btn-primary rab-reg-btn" data-reg-date="${a.dateStr}"><i class="fa-solid fa-wand-magic-sparkles"></i> Regularise</button>` : (withButton && a.pastCutOff ? `<span class="rab-locked" title="Payroll for that month has closed &mdash; the day is already counted as LOP, so it can no longer be regularised"><i class="fa-solid fa-lock"></i> Cut-off passed</span>` : "")}
+      <span class="rab-item-msg">${a.message}</span>
+      ${action}
     </div>`;
 }
 
@@ -3635,8 +3620,8 @@ function renderRegAlertBanner() {
       if (alerts.length > REG_ALERT_COLLAPSED) {
         expand.style.display = "";
         expand.innerHTML = regAlertsExpanded
-          ? `<i class="fa-solid fa-chevron-up"></i> <span>Show less</span>`
-          : `<i class="fa-solid fa-chevron-down"></i> <span>Show all ${alerts.length} days</span>`;
+          ? `<span>Show less</span>`
+          : `<span>Show all ${alerts.length} days</span>`;
       } else { expand.style.display = "none"; }
     }
   }
@@ -3653,15 +3638,12 @@ function renderNotifAlerts(empId) {
   const lastSeen = (typeof getRegAlertLastSeen === "function") ? getRegAlertLastSeen(empId) : null;
   const seenT = lastSeen ? new Date(lastSeen).getTime() : 0;
   const isUnread = a => !seenT || new Date(a.occurredAt).getTime() > seenT;
-  box.innerHTML = `<div class="na-group-head"><i class="fa-solid fa-triangle-exclamation"></i> ${alerts.length} day${alerts.length === 1 ? "" : "s"} need regularisation</div>` +
+  box.innerHTML = `<div class="na-group-head">${alerts.length} day${alerts.length === 1 ? "" : "s"} need regularisation</div>` +
     alerts.map(a => {
-      const u = _regAlertUrgency(a.urgency);
       const inner = `
-          <i class="fa-solid ${u.icon}"></i>
           <span class="ni-body">
             <span class="ni-title">${a.dateStr}</span>
             <span class="ni-text">${a.message}</span>
-            <span class="rab-chip rab-chip-${a.urgency}">${_regAlertChip(a)}</span>
           </span>`;
       // Past the cut-off the day is already counted as LOP: show it for
       // information only and never open the regularisation form from it.

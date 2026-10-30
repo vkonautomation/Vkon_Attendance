@@ -1,0 +1,81 @@
+/*
+ * public/regularisation-alerts.css
+ *
+ * A calmer, icon-free presentation of the regularisation warnings (the dashboard banner and the
+ * notifications dropdown). Loaded AFTER styles.css so these rules win over the older, louder
+ * treatment there: the alarming yellow box, the Font Awesome icons, the coloured chips and the
+ * heavy left borders are all replaced with a plain, neutral notification-list look. The alert data
+ * and markup live in app.js; this file only restyles them. Light theme is the base, and the
+ * `body:not(.light-theme)` blocks carry the dark/glass theme, matching the convention in styles.css.
+ */
+
+/* --- Dashboard banner: a quiet card, not a warning box --- */
+.reg-alert-banner {
+  border: 1px solid #e6e8ec;
+  background: #ffffff;
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+body:not(.light-theme) .reg-alert-banner {
+  background: rgba(148, 163, 184, 0.06);
+  border-color: rgba(148, 163, 184, 0.18);
+  box-shadow: none;
+}
+.rab-title { color: #1f2937; font-weight: 700; }
+body:not(.light-theme) .rab-title { color: #e2e8f0; }
+.rab-sub { color: #6b7280; }
+body:not(.light-theme) .rab-sub { color: #94a3b8; }
+
+/* --- One clean row per day: the sentence, and the action on the right --- */
+.rab-item {
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid #eef1f5;
+  border-left: 3px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 0.7rem 0.9rem;
+}
+.rab-item.rab-info     { border-left-color: #93c5fd; }
+.rab-item.rab-warning  { border-left-color: #fcd34d; }
+.rab-item.rab-critical { border-left-color: #fca5a5; }
+body:not(.light-theme) .rab-item {
+  background: rgba(148, 163, 184, 0.08);
+  border-color: rgba(148, 163, 184, 0.14);
+}
+.rab-item-msg {
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: #334155;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+body:not(.light-theme) .rab-item-msg { color: #cbd5e1; }
+
+/* Past the cut-off the day is settled: say so in plain muted text, not a red pill. */
+.rab-locked {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: #94a3b8;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+body:not(.light-theme) .rab-locked { color: #94a3b8; }
+
+/* Expand / collapse: a plain text link, no chevron. */
+.rab-expand { color: #475569; font-weight: 600; }
+body:not(.light-theme) .rab-expand { color: #cbd5e1; }
+
+/* --- Notifications dropdown: a tidy list, no icons --- */
+.na-group-head {
+  color: #64748b;
+  background: #f8fafc;
+  font-weight: 700;
+}
+body:not(.light-theme) .na-group-head {
+  color: #94a3b8;
+  background: rgba(148, 163, 184, 0.08);
+}
+.na-item { align-items: flex-start; }
+.na-item:hover { background: #f1f5f9; }
+body:not(.light-theme) .na-item:hover { background: rgba(148, 163, 184, 0.10); }

@@ -22,6 +22,7 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <link rel="stylesheet" href="styles.css?v=20261026_nm2">
+  <link rel="stylesheet" href="regularisation-alerts.css?v=20261030_ra1">
 </head>
 <body class="light-theme">
   
@@ -223,14 +224,13 @@
       <!-- ================= REGULARISATION WARNING BANNER (top of Dashboard) ================= -->
       <section class="portal-view reg-alert-banner rab-hidden" id="sectionRegAlertBanner" data-portal-view="dashboard" aria-live="polite">
         <div class="rab-head">
-          <span class="rab-icon"><i class="fa-solid fa-triangle-exclamation"></i></span>
           <div class="rab-titles">
             <strong class="rab-title" id="regAlertBannerTitle">Days need regularisation</strong>
             <span class="rab-sub" id="regAlertBannerSub">Unresolved absences count as a full day of LOP once the payroll cut-off passes.</span>
           </div>
         </div>
         <div class="rab-list" id="regAlertBannerList"></div>
-        <button type="button" class="rab-expand" id="regAlertBannerExpand" style="display: none;"><i class="fa-solid fa-chevron-down"></i> <span>Show all</span></button>
+        <button type="button" class="rab-expand" id="regAlertBannerExpand" style="display: none;"><span>Show all</span></button>
       </section>
       
       <!-- ================= TOP SECTION: EMPLOYEE ACTION HUB (BEFORE CALENDAR) ================= -->
@@ -1062,12 +1062,12 @@
   <!-- The server adapter must be parsed before shared.js: shared.js asks it whether
        this browser reads shared state or only its own localStorage, and waits on it
        before seeding. Order here is load-bearing. -->
-  <script src="js/api.js?v=20261029_e7"></script>
-  <script src="js/password-change.js?v=20261029_e7"></script>
-  <script src="shared.js?v=20261029_e7"></script>
+  <script src="js/api.js?v=20261029_e8"></script>
+  <script src="js/password-change.js?v=20261029_e8"></script>
+  <script src="shared.js?v=20261029_e8"></script>
   <script src="js/confirm-decision-modal.js?v=20261023_apr1"></script>
   <script src="js/day-popover.js?v=20261023_apr1"></script>
-  <script src="app.js?v=20261029_e7"></script>
+  <script src="app.js?v=20261029_e8"></script>
   <script src="js/password-toggle.js?v=20261019_ui1"></script>
   <script src="js/data-transfer.js?v=20261023_apr2"></script>
 
