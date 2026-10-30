@@ -24,7 +24,6 @@
   <link rel="stylesheet" href="styles.css?v=20261026_nm2">
   <link rel="stylesheet" href="regularisation-alerts.css?v=20261030_ra1">
   <link rel="stylesheet" href="calendar-refined.css?v=20261030_cr1">
-      <link rel="stylesheet" href="dashboard-refined.css?v=20261030_dr1">
 </head>
 <body class="light-theme">
   
@@ -168,15 +167,34 @@
         <p class="admin-view-sub" id="portalViewSub">Your day at a glance &bull; punch in, leave &amp; WFH</p>
       </div>
 
-      <!-- Notifications live in the My Requests nav badge and the regularisation
-           list on this dashboard, so the header carries no bell. -->
+      <!-- Realtime Clock Widget -->
+      <div class="realtime-clock" id="liveClockWidget">
+        <div class="clock-time" id="clockTime">--:--:--</div>
+        <div class="clock-date" id="clockDate">Loading date...</div>
+      </div>
 
-      <!-- User Profile: initials avatar plus quiet name / role / manager text -->
+      <!-- Notifications: admin decisions & task assignments land here -->
+      <div class="nav-notifications">
+        <button type="button" class="icon-btn notif-bell-btn" id="notifBellBtn" title="Notifications" aria-label="Notifications" aria-expanded="false" aria-controls="notifDropdown">
+          <i class="fa-regular fa-bell"></i>
+          <span class="notif-badge" id="notifBadge" style="display: none;">0</span>
+        </button>
+        <div class="notif-dropdown glass-panel" id="notifDropdown" style="display: none;">
+          <div class="notif-head">
+            <span class="notif-title"><i class="fa-solid fa-bell"></i> Notifications</span>
+            <button type="button" class="btn btn-ghost btn-sm" id="notifMarkReadBtn">Mark all read</button>
+          </div>
+          <div class="notif-alerts" id="notifAlerts"></div>
+          <div class="notif-list" id="notifList"></div>
+          <p class="notif-empty" id="notifEmpty" style="display: none;"><i class="fa-regular fa-bell-slash"></i> No notifications yet &mdash; admin approvals and task assignments will appear here.</p>
+        </div>
+      </div>
+
+      <!-- User Profile -->
       <div class="nav-controls">
         <!-- Logged-in Employee Display (Only changes upon true login) -->
         <div class="employee-chip" id="employeeChip">
-          <img src="" alt="" class="chip-avatar" id="currentAvatar" aria-hidden="true">
-          <span class="chip-initials" id="currentEmpInitials" aria-hidden="true">--</span>
+          <img src="" alt="Avatar" class="chip-avatar" id="currentAvatar">
           <div class="chip-info">
             <span class="chip-name" id="currentEmpName">Mukesh Sharma</span>
             <span class="chip-role" id="currentEmpRole">Senior Full-Stack Engineer</span>
@@ -186,135 +204,152 @@
       </div>
     </header>
 
+    <!-- Sub-bar: Policy Summary (full inline row on Dashboard; collapsed to an info popover on other pages) -->
+    <div class="sub-bar">
+      <div class="policy-zone" id="policyZone">
+        <button type="button" class="policy-toggle" id="policyToggle" aria-expanded="false" aria-controls="policyBadgesRow">
+          <i class="fa-solid fa-circle-info"></i> <span>Policy summary</span>
+        </button>
+        <div class="policy-badges-row" id="policyBadgesRow">
+          <span class="policy-chip chip-present"><i class="fa-solid fa-location-dot"></i> Office Geofence: <strong>&le; 500m</strong> &bull; Photo Check</span>
+          <span class="policy-chip chip-wfh"><i class="fa-solid fa-house-laptop"></i> Hybrid Policy: <strong id="headerWfhQuota">2 Days / Week</strong></span>
+          <span class="policy-chip chip-leave"><i class="fa-solid fa-calendar-days"></i> Annual Leave: <strong id="headerLeaveQuota">14 Days / Year</strong></span>
+          <span class="policy-chip chip-rh"><i class="fa-solid fa-calendar-check"></i> Restricted Holidays: <strong id="headerRhQuota">2 / Month</strong></span>
+        </div>
+      </div>
+    </div>
+
     <!-- Main Content: Single Unified Window -->
     <main class="main-content" id="portalTop">
 
-      <!-- ================= DASHBOARD (two columns: today on the left, balances on the right) ========= -->
-      <div class="portal-view dashboard-grid" id="sectionDashboard" data-portal-view="dashboard">
-       <div class="dashboard-col dashboard-col-main">
+      <!-- ================= REGULARISATION WARNING BANNER (top of Dashboard) ================= -->
+      <section class="portal-view reg-alert-banner rab-hidden" id="sectionRegAlertBanner" data-portal-view="dashboard" aria-live="polite">
+        <div class="rab-head">
+          <div class="rab-titles">
+            <strong class="rab-title" id="regAlertBannerTitle">Days need regularisation</strong>
+            <span class="rab-sub" id="regAlertBannerSub">Unresolved absences count as a full day of LOP once the payroll cut-off passes.</span>
+          </div>
+        </div>
+        <div class="rab-list" id="regAlertBannerList"></div>
+        <button type="button" class="rab-expand" id="regAlertBannerExpand" style="display: none;"><span>Show all</span></button>
+      </section>
       
-        <!-- ONE Today card: clock, the punch status line, and a single primary action -->
-        <section class="today-card glass-panel">
-          <div class="today-card-head">
-            <h2 class="today-card-title">Today</h2>
-            <div class="today-clock" id="liveClockWidget">
-              <span class="clock-time" id="clockTime">--:--:--</span>
-              <span class="clock-date" id="clockDate">Loading date...</span>
-            </div>
-          </div>
-
-          <!-- The status is one plain sentence; the colour is never the only signal -->
-          <p class="today-status" id="todayStatusBadge" role="status" aria-live="polite">
-            <span class="today-status-text" id="todayStatusText">Not punched in</span>
-          </p>
-
-          <!-- Holiday / non-working-day line (replaces the punch row on a holiday) -->
-          <div class="holiday-today-card" id="holidayTodayCard" role="status" style="display: none;">
-            <div class="holiday-today-body">
-              <span class="holiday-today-name" id="holidayTodayName">Today is a holiday</span>
-              <span class="holiday-today-msg" id="holidayTodayMsg">Today is a holiday. No check-in needed.</span>
-              <span class="holiday-today-next" id="holidayTodayNext"></span>
-            </div>
-          </div>
-
-          <!-- The one primary action, plus the rule it has to satisfy -->
-          <div class="mark-present-bar-wrapper">
-            <div class="today-punch-row">
-              <button type="button" id="openPunchInModalBtn" class="btn-punch punch-in today-punch-btn">
-                <span class="punch-main">Punch in</span>
-                <span class="punch-sub" id="todayPunchInSub">Photo and location are checked when you punch in</span>
-              </button>
-              <button type="button" id="openPunchOutModalBtn" class="btn-punch punch-out today-punch-btn" style="display: none;">
-                <span class="punch-main">Punch out</span>
-                <span class="punch-sub" id="punchOutSubText">Photo and location are checked when you punch out</span>
-              </button>
-            </div>
-            <p class="today-geofence" id="todayGeofenceRule">Office geofence: within 500 m of the office, with a photo.</p>
-            <!-- Punch-out restriction (minimum shift policy) reads as one line here -->
-            <div id="punchOutLockNotice" class="shift-lock-banner" style="display: none;">
-              <div style="flex: 1;">
-                <span id="punchOutLockText">Minimum shift duration policy active.</span>
-                <i class="fa-solid fa-lock text-warning" id="shiftLockIcon" style="display: none;"></i>
-              </div>
-            </div>
-            <div class="today-times" id="todayMetricsStrip" style="display: none;">
-              <span class="today-time"><span class="today-time-lbl">In</span> <span class="today-time-val" id="todayInTimeDisplay">--:--</span></span>
-              <span class="today-time"><span class="today-time-lbl">Out</span> <span class="today-time-val" id="todayOutTimeDisplay">--:--</span></span>
-              <span class="today-time"><span class="today-time-lbl">Location</span> <span class="today-time-val" id="todayMatchScoreDisplay">Verified</span></span>
-            </div>
-          </div>
-
-          <!-- Everything else is a quiet text link, not another coloured bar -->
-          <div class="today-links">
-            <button type="button" id="btnToggleApplyLeave" class="today-link" data-modal="modalCardApplyLeave">Apply for leave</button>
-            <button type="button" id="btnToggleWfh" class="today-link" data-modal="modalCardWfh">Request WFH</button>
-            <button type="button" id="btnToggleMarkPresent" class="today-link" data-modal="modalCardMarkPresent">Punch details</button>
-          </div>
-        </section>
-
-        <!-- Two plain number cards. No icon tiles, no colour. -->
-        <div class="dash-numbers">
-          <div class="dash-number-card">
-            <span class="dash-number-lbl">Days present</span>
-            <span class="dash-number-val" id="dashStatDaysPresent">0</span>
-            <span class="dash-number-sub" id="dashStatPresentSub">this month</span>
-          </div>
-          <div class="dash-number-card">
-            <span class="dash-number-lbl">Hours logged</span>
-            <span class="dash-number-val" id="dashStatHours">0</span>
-            <span class="dash-number-sub" id="dashStatHoursSub">this month</span>
+      <!-- ================= TOP SECTION: EMPLOYEE ACTION HUB (BEFORE CALENDAR) ================= -->
+      <section class="employee-action-hub portal-view" id="sectionActions" data-portal-view="dashboard">
+        
+        <div class="action-hub-heading">
+          <h2><i class="fa-solid fa-bolt"></i> Today&rsquo;s Actions</h2>
+          <span class="action-hub-sub">Check in, book WFH or apply for leave &mdash; everything lands on your calendar instantly.</span>
+          <!-- Prominent color-coded status badge (dot class is driven by app.js) -->
+          <div class="today-status-badge" id="todayStatusBadge" aria-live="polite">
+            <span class="status-indicator-dot dot-pending" id="todayDot"></span>
+            <span class="status-text font-bold" id="todayStatusText">Today: Not Punched In</span>
           </div>
         </div>
 
-        <!-- Days that still need a regularisation: a plain list with dividers.
-             Only the "Cut-off passed" label is red, so it is the one signal. -->
-        <section class="reg-list-card rab-hidden" id="sectionRegAlertBanner" aria-live="polite">
-          <h3 class="card-title">Regularisation</h3>
-          <p class="reg-list-count" id="regAlertBannerTitle">No days need regularisation</p>
-          <p class="reg-list-note" id="regAlertBannerSub">Unresolved absences count as a full day of LOP once the payroll cut-off passes.</p>
-          <div class="rab-list" id="regAlertBannerList"></div>
-          <button type="button" class="rab-expand" id="regAlertBannerExpand" style="display: none;"><span>Show all</span></button>
-        </section>
-       </div>
+        <!-- 1. Long Button from Left to Right: Mark Present -->
+        <div class="mark-present-bar-wrapper">
+          <button type="button" id="btnToggleMarkPresent" class="btn-long-mark-present">
+            <div class="long-btn-content">
+              <span class="long-btn-icon"><i class="fa-solid fa-camera"></i></span>
+              <div class="long-btn-text">
+                <span class="long-btn-title">Mark Present (Check-In / Punch-Out)</span>
+                <span class="long-btn-sub" id="longBtnStatusHint">Click to open attendance check-in card &bull; Status: Ready</span>
+              </div>
+            </div>
+            <div class="long-btn-badge-group">
+              <span class="long-btn-status-pill" id="longBtnStatusPill">Ready</span>
+              <i class="fa-solid fa-arrow-up-right-from-square open-card-icon" id="arrowMarkPresent"></i>
+            </div>
+          </button>
+        </div>
 
-       <div class="dashboard-col dashboard-col-side">
-        <!-- One Balances card: three rows, each with a thin bar -->
-        <section class="balances-card glass-panel">
-          <h3 class="card-title">Balances</h3>
-          <div class="balance-row">
-            <div class="balance-line">
-              <span class="balance-lbl">Annual leave</span>
-              <span class="balance-val" id="dashStatLeaves">14 left</span>
-            </div>
-            <span class="balance-bar"><span class="balance-fill fill-leave" id="balanceLeaveBar"></span></span>
-            <span class="balance-sub" id="dashStatLeaveSub">0 used of 14 a year</span>
+        <!-- Holiday / non-working-day card (replaces the Mark Present card on a holiday) -->
+        <div class="holiday-today-card" id="holidayTodayCard" role="status" style="display: none;">
+          <div class="holiday-today-icon"><i class="fa-solid fa-umbrella-beach"></i></div>
+          <div class="holiday-today-body">
+            <span class="holiday-today-name" id="holidayTodayName">Today is a holiday</span>
+            <span class="holiday-today-msg" id="holidayTodayMsg">Today is a holiday. No check-in needed.</span>
+            <span class="holiday-today-next" id="holidayTodayNext"></span>
           </div>
-          <div class="balance-row">
-            <div class="balance-line">
-              <span class="balance-lbl">WFH this week</span>
-              <span class="balance-val" id="dashStatWfh">2 left</span>
-            </div>
-            <span class="balance-bar"><span class="balance-fill fill-wfh" id="balanceWfhBar"></span></span>
-            <span class="balance-sub" id="dashStatWfhSub">0 used of 2 this week</span>
-          </div>
-          <div class="balance-row">
-            <div class="balance-line">
-              <span class="balance-lbl">Restricted holidays</span>
-              <span class="balance-val" id="balanceRhVal">2 left</span>
-            </div>
-            <span class="balance-bar"><span class="balance-fill fill-rh" id="balanceRhBar"></span></span>
-            <span class="balance-sub" id="balanceRhSub">0 used of 2 this month</span>
-          </div>
-        </section>
+        </div>
 
-        <!-- Next holiday only: name, date, what it is, how far off -->
-        <section class="holiday-next-card glass-panel" id="sectionUpcomingHolidays">
-          <h3 class="card-title">Next holiday</h3>
-          <div class="hn-body" id="upcomingHolidaysList"></div>
-          <p class="hn-empty" id="upcomingHolidaysEmpty" style="display: none;">No upcoming holidays declared.</p>
-        </section>
-       </div>
-      </div>
+        <!-- 2. Single Row with Two Buttons: Apply for Leave and Work From Home -->
+        <div class="action-sub-buttons-row">
+          <button type="button" id="btnToggleApplyLeave" class="btn-sub-action btn-sub-leave">
+            <div class="sub-btn-content">
+              <i class="fa-solid fa-umbrella-beach"></i>
+              <div class="sub-btn-texts">
+                <span class="sub-title">Apply for Leave</span>
+                <span class="sub-meta" id="leaveBtnSubMeta">Personal &bull; Restricted &bull; Loss of Pay</span>
+              </div>
+            </div>
+            <i class="fa-solid fa-arrow-up-right-from-square open-card-icon" id="arrowLeave"></i>
+          </button>
+
+          <button type="button" id="btnToggleWfh" class="btn-sub-action btn-sub-wfh">
+            <div class="sub-btn-content">
+              <i class="fa-solid fa-house-laptop"></i>
+              <div class="sub-btn-texts">
+                <span class="sub-title">Work From Home</span>
+                <span class="sub-meta" id="wfhBtnSubMeta">Request WFH (Subject to Admin Approval)</span>
+              </div>
+            </div>
+            <i class="fa-solid fa-arrow-up-right-from-square open-card-icon" id="arrowWfh"></i>
+          </button>
+        </div>
+
+      </section>
+
+      <!-- ================= DASHBOARD: PERSONAL STATS CARDS ================= -->
+      <section class="portal-view dashboard-stats-section" id="sectionDashboardStats" data-portal-view="dashboard">
+        <div class="dash-stats-grid">
+          <div class="dash-stat-card stat-present">
+            <div class="dash-stat-icon"><i class="fa-solid fa-user-check"></i></div>
+            <div class="dash-stat-body">
+              <span class="dash-stat-value" id="dashStatDaysPresent">0</span>
+              <span class="dash-stat-label">Days Present</span>
+              <span class="dash-stat-sub" id="dashStatPresentSub">This month</span>
+            </div>
+          </div>
+          <div class="dash-stat-card stat-wfh">
+            <div class="dash-stat-icon"><i class="fa-solid fa-house-laptop"></i></div>
+            <div class="dash-stat-body">
+              <span class="dash-stat-value" id="dashStatWfh">0 / 2</span>
+              <span class="dash-stat-label">WFH This Week</span>
+              <span class="dash-stat-sub" id="dashStatWfhSub">2 remaining</span>
+            </div>
+          </div>
+          <div class="dash-stat-card stat-leave">
+            <div class="dash-stat-icon"><i class="fa-solid fa-umbrella-beach"></i></div>
+            <div class="dash-stat-body">
+              <span class="dash-stat-value" id="dashStatLeaves">14</span>
+              <span class="dash-stat-label">Paid Leaves Left</span>
+              <span class="dash-stat-sub" id="dashStatLeaveSub">of 14 / year</span>
+            </div>
+          </div>
+          <div class="dash-stat-card stat-hours">
+            <div class="dash-stat-icon"><i class="fa-solid fa-clock"></i></div>
+            <div class="dash-stat-body">
+              <span class="dash-stat-value" id="dashStatHours">0</span>
+              <span class="dash-stat-label">Hours Logged</span>
+              <span class="dash-stat-sub" id="dashStatHoursSub">This month</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= DASHBOARD: UPCOMING HOLIDAYS ================= -->
+      <section class="portal-view upcoming-holidays-section" id="sectionUpcomingHolidays" data-portal-view="dashboard">
+        <div class="uh-card glass-panel">
+          <div class="uh-head">
+            <h3><i class="fa-solid fa-gift"></i> Upcoming Holidays</h3>
+            <span class="uh-sub">Company &amp; restricted holidays still ahead of today</span>
+          </div>
+          <ul class="uh-list" id="upcomingHolidaysList"></ul>
+          <p class="uh-empty" id="upcomingHolidaysEmpty" style="display: none;"><i class="fa-regular fa-calendar"></i> No upcoming holidays declared.</p>
+        </div>
+      </section>
 
       <!-- ================= MODAL CARD 1: MARK PRESENT ================= -->
       <div class="modal-backdrop" id="modalCardMarkPresent" role="dialog" aria-modal="true" aria-hidden="true">
@@ -331,11 +366,63 @@
           </div>
 
           <div class="modal-body">
-            <!-- The clock, the status and the punch buttons all live in the Today
-                 card; this card only carries the policy that explains them. -->
+            <!-- Status Card Overview -->
+            <div class="punch-status-card">
+              <div class="punch-status-icon" id="punchStatusIconBox">
+                <i class="fa-solid fa-building-circle-check"></i>
+              </div>
+              <div class="punch-status-details">
+                <span class="punch-state-label" id="punchStateLabel">Status: Ready to Punch In</span>
+                <span class="punch-state-sub" id="punchStateSub">Camera opens upon clicking below. Snapshot is submitted for verification.</span>
+              </div>
+            </div>
+
+            <!-- Punch-Out Restriction Notice (Lock Banner) -->
+            <div id="punchOutLockNotice" class="shift-lock-banner" style="display: none;">
+              <i class="fa-solid fa-lock text-warning" id="shiftLockIcon"></i>
+              <div style="flex: 1;">
+                <span id="punchOutLockText">Minimum shift duration policy active.</span>
+              </div>
+            </div>
+
+            <!-- Today's Attendance Metrics (If punched) -->
+            <div class="today-metrics-strip" id="todayMetricsStrip" style="display: none;">
+              <div class="m-col">
+                <span class="m-lbl">Check-In</span>
+                <span class="m-val text-success font-mono" id="todayInTimeDisplay">--:--</span>
+              </div>
+              <div class="m-col">
+                <span class="m-lbl">Check-Out</span>
+                <span class="m-val font-mono" id="todayOutTimeDisplay">Active</span>
+              </div>
+              <div class="m-col">
+                <span class="m-lbl">Location Status</span>
+                <span class="m-val text-success font-mono" id="todayMatchScoreDisplay">Verified</span>
+              </div>
+            </div>
+
             <div class="privacy-note-box">
               <i class="fa-solid fa-camera text-primary"></i>
               <span>Live camera prompt captures your photo and marks your attendance immediately. Captured photos are retained for 24 hours in the Admin Console.</span>
+            </div>
+
+            <!-- Buttons that trigger Verification Modal -->
+            <div class="punch-btn-wrapper">
+              <button id="openPunchInModalBtn" class="btn-punch punch-in btn-block">
+                <i class="fa-solid fa-fingerprint"></i>
+                <div class="punch-text">
+                  <span class="punch-main">MARK PRESENT (CHECK-IN)</span>
+                  <span class="punch-sub">Click to capture live photo and mark present</span>
+                </div>
+              </button>
+
+              <button id="openPunchOutModalBtn" class="btn-punch punch-out btn-block" style="display: none;">
+                <i class="fa-solid fa-right-from-bracket"></i>
+                <div class="punch-text">
+                  <span class="punch-main">PUNCH OUT (CLOCK-OUT)</span>
+                  <span class="punch-sub" id="punchOutSubText">Click to capture photo and complete today's shift</span>
+                </div>
+              </button>
             </div>
           </div>
         </div>
@@ -1008,12 +1095,12 @@
   <!-- The server adapter must be parsed before shared.js: shared.js asks it whether
        this browser reads shared state or only its own localStorage, and waits on it
        before seeding. Order here is load-bearing. -->
-  <script src="js/api.js?v=20261030_e10"></script>
-  <script src="js/password-change.js?v=20261030_e10"></script>
-  <script src="shared.js?v=20261030_e10"></script>
+  <script src="js/api.js?v=20261029_e9"></script>
+  <script src="js/password-change.js?v=20261029_e9"></script>
+  <script src="shared.js?v=20261029_e9"></script>
   <script src="js/confirm-decision-modal.js?v=20261023_apr1"></script>
   <script src="js/day-popover.js?v=20261030_cr1"></script>
-  <script src="app.js?v=20261030_e10"></script>
+  <script src="app.js?v=20261029_e9"></script>
   <script src="js/password-toggle.js?v=20261019_ui1"></script>
   <script src="js/data-transfer.js?v=20261023_apr2"></script>
 

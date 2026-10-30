@@ -25,7 +25,6 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <link rel="stylesheet" href="styles.css?v=20261026_nm2">
-  <link rel="stylesheet" href="dashboard-refined.css?v=20261030_dr1">
 </head>
 <body class="light-theme admin-page">
 
@@ -218,46 +217,50 @@
         <div class="admin-panel glass-panel">
           <div class="panel-header-toolbar">
             <div class="toolbar-title-group">
-              <h2>Today at a glance</h2>
+              <h2><i class="fa-solid fa-gauge-high text-primary"></i> Today At A Glance</h2>
               <p class="subtitle">Live company snapshot for <strong id="dashDateLabel">--</strong> (IST)</p>
             </div>
           </div>
 
-          <!-- Plain number cards: the figure is the point, so no icon tiles -->
           <div class="kpi-grid">
             <div class="kpi-card">
+              <div class="kpi-icon icon-bg-green"><i class="fa-solid fa-user-check"></i></div>
               <div class="kpi-data">
-                <span class="kpi-num" id="dashStatPresent">0</span>
-                <span class="kpi-lbl">In today (office + remote)</span>
+                <span class="kpi-num text-success" id="dashStatPresent">0</span>
+                <span class="kpi-lbl">In Today (Office + Remote)</span>
               </div>
             </div>
             <div class="kpi-card">
+              <div class="kpi-icon icon-bg-amber"><i class="fa-solid fa-clock"></i></div>
               <div class="kpi-data">
                 <span class="kpi-num" id="dashStatLate">0</span>
-                <span class="kpi-lbl">Late check-ins</span>
+                <span class="kpi-lbl">Late Check-Ins</span>
               </div>
             </div>
             <div class="kpi-card">
+              <div class="kpi-icon icon-bg-purple"><i class="fa-solid fa-umbrella-beach"></i></div>
               <div class="kpi-data">
                 <span class="kpi-num" id="dashStatLeave">0</span>
-                <span class="kpi-lbl">On leave / holiday</span>
+                <span class="kpi-lbl">On Leave / Holiday</span>
               </div>
             </div>
             <div class="kpi-card">
+              <div class="kpi-icon icon-bg-blue"><i class="fa-solid fa-inbox"></i></div>
               <div class="kpi-data">
                 <span class="kpi-num" id="dashStatPending">0</span>
-                <span class="kpi-lbl">Requests awaiting you</span>
+                <span class="kpi-lbl">Requests Awaiting You</span>
               </div>
             </div>
             <div class="kpi-card">
+              <div class="kpi-icon icon-bg-rose"><i class="fa-solid fa-triangle-exclamation"></i></div>
               <div class="kpi-data">
                 <span class="kpi-num" id="dashStatUnresolved">0</span>
-                <span class="kpi-lbl">Unresolved days (team)</span>
+                <span class="kpi-lbl">Unresolved Days (Team)</span>
               </div>
             </div>
           </div>
 
-          <h3 class="dash-sub-heading">Check-ins today</h3>
+          <h3 class="dash-sub-heading"><i class="fa-solid fa-right-to-bracket"></i> Check-Ins Today</h3>
           <div class="table-responsive master-table-wrap">
             <table class="data-table">
               <thead>
@@ -266,11 +269,11 @@
               <tbody id="dashTodayTableBody"></tbody>
             </table>
           </div>
-          <p class="dash-empty-note" id="dashEmptyToday" style="display: none;">Nobody has punched in yet today &mdash; the list fills up as the team checks in.</p>
+          <p class="dash-empty-note" id="dashEmptyToday" style="display: none;"><i class="fa-solid fa-mug-hot"></i> Nobody has punched in yet today &mdash; the list fills up as the team checks in.</p>
 
-          <h3 class="dash-sub-heading">Latest requests</h3>
+          <h3 class="dash-sub-heading"><i class="fa-solid fa-inbox"></i> Latest Requests</h3>
           <div class="dash-request-list" id="dashRecentRequests"></div>
-          <p class="dash-empty-note" id="dashEmptyRequests" style="display: none;">Nothing pending &mdash; you are all caught up.</p>
+          <p class="dash-empty-note" id="dashEmptyRequests" style="display: none;"><i class="fa-regular fa-face-smile"></i> Nothing pending &mdash; you are all caught up.</p>
         </div>
       </section>
 
@@ -1689,12 +1692,12 @@
   <!-- The server adapter must be parsed before shared.js: shared.js asks it whether
        this browser reads shared state or only its own localStorage, and waits on it
        before seeding. Order here is load-bearing. -->
-  <script src="js/api.js?v=20261030_e10"></script>
-  <script src="js/password-change.js?v=20261030_e10"></script>
-  <script src="shared.js?v=20261030_e10"></script>
+  <script src="js/api.js?v=20261029_e9"></script>
+  <script src="js/password-change.js?v=20261029_e9"></script>
+  <script src="shared.js?v=20261029_e9"></script>
   <script src="js/confirm-decision-modal.js?v=20261023_apr1"></script>
   <script src="js/day-popover.js?v=20261030_cr1"></script>
-  <script src="admin.js?v=20261030_e10"></script>
+  <script src="admin.js?v=20261029_e9"></script>
   <script src="js/password-toggle.js?v=20261019_ui1"></script>
   <script src="js/data-transfer.js?v=20261023_apr2"></script>
 </body>
