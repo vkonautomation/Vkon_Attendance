@@ -69,14 +69,24 @@ function checkAdminAuth() {
       // this one only ever shows before sign-in, so it describes the server rather
       // than claiming a sign-in that has not happened.
       const modeBadge = document.getElementById("adminAuthModeBadge");
+      const modeBadgeWrap = document.querySelector(".auth-quick-fill-wrap");
       function paintAdminAuthBadge() {
         if (!modeBadge) return;
+        // Until /api/health has answered the mode is unknown; guessing would flash
+        // the wrong claim, so keep the pill hidden (mirrors the employee portal).
+        if (window.VKON_API && VKON_API.isProbing && VKON_API.isProbing()) return;
+        if (modeBadgeWrap) modeBadgeWrap.style.display = "";
         if (serverBacked()) {
-          modeBadge.textContent = "Attendance server \u2014 sign in required";
+          modeBadge.innerHTML = '<i class="fa-solid fa-shield-halved"></i> Attendance server &mdash; sign in required';
         } else if (typeof demoAuthEnabled === "function" && demoAuthEnabled()) {
-          modeBadge.textContent = "Demo mode \u2014 not authenticated";
+          modeBadge.innerHTML = '<i class="fa-solid fa-flask"></i> Demo mode &mdash; not authenticated';
         } else {
-          modeBadge.textContent = "Sign-in disabled";
+          modeBadge.innerHTML = '<i class="fa-solid fa-lock"></i> Sign-in disabled';
+        }
+        // One-tap admin fill is a demo affordance only; hide it against a real server.
+        if (quickBtn) {
+          const allowed = !serverBacked() && (typeof demoAuthEnabled !== "function" || demoAuthEnabled());
+          quickBtn.style.display = allowed ? "" : "none";
         }
       }
       paintAdminAuthBadge();
