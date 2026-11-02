@@ -2719,6 +2719,18 @@ function renderRegularisationCalendar() {
   }
 
   // 3. Current Month Days
+  // Each restricted state shows the SAME glyph as its legend chip at the top of
+  // the calendar, so a cell "matches the logo" (icon + colour) it represents.
+  const regCellIcons = {
+    "reg-cutoff": "fa-circle-xmark",        // LOP (Cut-off Passed)
+    "reg-weekend": "fa-mug-hot",            // Weekend
+    "reg-holiday": "fa-star",               // Declared holiday
+    "reg-wfh": "fa-house-laptop",           // WFH Allotted
+    "reg-present": "fa-circle-check",       // Full Present
+    "reg-leave": "fa-umbrella-beach",       // On Leave
+    "reg-already-applied": "fa-hourglass-half", // Reg. Pending
+    "reg-future": "fa-clock"                // Future / Today
+  };
   for (let d = 1; d <= totalDaysInMonth; d++) {
     const dayDate = new Date(viewYear, viewMonth, d);
     const dayOfWeek = dayDate.getDay();
@@ -2824,9 +2836,11 @@ function renderRegularisationCalendar() {
     if (isRestricted) {
       cell.className = `reg-cal-cell reg-restricted ${restrictionType}`;
       cell.title = `${dateStr}: ${restrictionReason}`;
+      const regIcon = regCellIcons[restrictionType];
+      const regIconHtml = regIcon ? `<i class="fa-solid ${regIcon}" aria-hidden="true"></i> ` : "";
       cell.innerHTML = `
         <span class="cell-day-num">${d}</span>
-        <span class="cell-mini-pill">${badgeText}</span>
+        <span class="cell-mini-pill">${regIconHtml}${badgeText}</span>
       `;
     } else {
       // Eligible Missed Day!
@@ -2834,7 +2848,7 @@ function renderRegularisationCalendar() {
       cell.title = `Click to select ${dateStr} for Attendance Regularisation`;
       cell.innerHTML = `
         <span class="cell-day-num">${d}</span>
-        <span class="cell-mini-pill ${isSelected ? 'pill-selected' : ''}">${isSelected ? '<i class="fa-solid fa-circle-check"></i> Selected' : '<i class="fa-solid fa-triangle-exclamation"></i> Missed'}</span>
+        <span class="cell-mini-pill ${isSelected ? 'pill-selected' : ''}">${isSelected ? '<i class="fa-solid fa-circle-check"></i> Selected' : '<i class="fa-solid fa-circle-dot"></i> Missed'}</span>
       `;
 
       cell.addEventListener("click", () => {
