@@ -3699,6 +3699,9 @@ function renderRegAlertBanner() {
 // the recipient address and permission are enforced again on the server (/api/notify), so
 // a tampered or stale client copy cannot mail anybody else. The localStorage claim stops two
 // tabs (or a tab re-rendering on every pull) from re-firing the same day's warning.
+// In-flight guard so the banner re-rendering on a tab switch never fires two
+// requests for the same employee/day while one is still pending.
+var _regEmailInFlight = Object.create(null);
 function _maybeEmailRegWarnings(emp, alerts) {
   if (!emp || !Array.isArray(alerts)) return;
   const crit = alerts.filter(a => a.pastCutOff);
@@ -3707,12 +3710,15 @@ function _maybeEmailRegWarnings(emp, alerts) {
   if (!api || typeof api.notify !== "function" || !api.isServerBacked || !api.isServerBacked()) return;
 
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
-  const markerKey = "vkon_reg_email_sent_v1";
+  const markerKey = "vkon_reg_email_sent_v2";
   let marker = null;
   try { marker = localStorage.getItem(markerKey); } catch (e) { return; }
   let claim = {};
   try { claim = marker ? JSON.parse(marker) : {}; } catch (e) { claim = {}; }
   if (String(claim[emp.id] || "") === today) return;
+
+  const flightKey = emp.id + "|" + today;
+  if (_regEmailInFlight[flightKey]) return;
 
   const subject = `Attendance: ${crit.length} ${crit.length === 1 ? "day has" : "days have"} passed the payroll cut-off`;
   const text =
@@ -3721,11 +3727,19 @@ function _maybeEmailRegWarnings(emp, alerts) {
     crit.map(a => `  - ${a.message}`).join("\n") +
     `\n\nPlease review these in the VKON attendance portal.\n`;
 
-  // Claim the day before sending so a slow or failing SMTP call cannot turn every re-render
-  // into another request. If the send does not go out today, the next portal-day retries.
-  claim[emp.id] = today;
-  try { localStorage.setItem(markerKey, JSON.stringify(claim)); } catch (e) { /* best effort */ }
-  try { Promise.resolve(api.notify({ employeeId: emp.id, subject, text })).catch(() => { /* silent */ }); } catch (e) { /* silent */ }
+  // Claim the day only once the server confirms it actually sent (or already sent
+  // today). A failed attempt -- bad SMTP, no address on file yet -- must not burn
+  // the whole day, so the next portal open retries rather than waiting for tomorrow.
+  _regEmailInFlight[flightKey] = true;
+  Promise.resolve(api.notify({ employeeId: emp.id, subject, text }))
+    .then((res) => {
+      if (res && (res.sent === true || res.reason === "already_sent_today")) {
+        claim[emp.id] = today;
+        try { localStorage.setItem(markerKey, JSON.stringify(claim)); } catch (e) { /* best effort */ }
+      }
+    })
+    .catch(() => { /* silent; retried on the next render */ })
+    .then(() => { delete _regEmailInFlight[flightKey]; });
 }
 
 // Compact alert rows inside the notifications dropdown; returns the unread

@@ -85,8 +85,10 @@ def verify_all():
     print("\n[B] Regularisation warning reaches the employee's Gmail:")
     need("_maybeEmailRegWarnings" in app and "api.notify" in app,
          "app.js emails the past-cut-off regularisation warnings")
-    need("vkon_reg_email_sent_v1" in app and "Asia/Kolkata" in app,
+    need("vkon_reg_email_sent_v2" in app and "Asia/Kolkata" in app,
          "email send is throttled once per portal-day (IST) client-side")
+    need("res.sent === true" in app and "_regEmailInFlight" in app,
+         "the day is claimed only after the server confirms a send (a failed attempt retries)")
     need("isServerBacked" in app,
          "email send only runs server-backed (no transport in a demo browser)")
     # ---- B2. api.js exposes notify() -> POST /notify ----------------------
@@ -123,8 +125,8 @@ def verify_all():
 
     # ---- shared cache token bumped for this build -------------------------
     print("\n[Cache] shared cache-buster token bumped:")
-    need("20261102_en1" in index_html, "index.html cache token bumped to en1")
-    need("20261102_en1" in admin_html, "admin.html cache token bumped to en1")
+    need("20261102_en2" in index_html, "index.html cache token bumped to en2")
+    need("20261102_en2" in admin_html, "admin.html cache token bumped to en2")
     need("20261029_e9" not in index_html and "20261029_e9" not in admin_html,
          "old e9 token fully replaced in both pages")
 
