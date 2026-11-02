@@ -439,6 +439,23 @@ window.VKON_API = (function () {
     }
   }
 
+  /**
+   * Ask the server to email one notification to an employee's own address. Best-effort and
+   * silent: this is a background courtesy (a regularisation warning that should also reach
+   * the person's Gmail), so it never surfaces an error to the person and never throws. The
+   * recipient address is resolved server-side from the roster; here we only name the employee
+   * code plus the subject/body. Server-mode only -- a local/demo browser has no mail transport.
+   */
+  async function notify(payload) {
+    if (mode !== "server" || !authenticated) return { ok: false, code: "no_session" };
+    try {
+      const res = await request("/notify", { method: "POST", body: JSON.stringify(payload) });
+      return { ok: true, sent: !!(res && res.sent), reason: res && res.reason };
+    } catch (err) {
+      return { ok: false, status: err.status, code: (err.body && err.body.reason) || "error", message: err.message };
+    }
+  }
+
   function currentSession() { return session; }
   function isServerBacked() { return mode === "server"; }
   function isLocalOnly() { return mode === "local"; }
@@ -460,6 +477,7 @@ window.VKON_API = (function () {
     punch, login, logout, changePassword, boot,
     createRosterEmployee,
     deleteRosterEmployee,
+    notify,
     currentSession, isServerBacked, isProbing, isLocalOnly, pendingPunchCount,
     needsPasswordChange,
     onConflict: (fn) => { conflictHandler = fn; },

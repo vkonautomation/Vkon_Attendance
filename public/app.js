@@ -374,6 +374,16 @@ function loadEmployeeSession(emp) {
       mgrEl.classList.add("mgr-none");
     }
   }
+  // The employee's own Gmail / phone as the admin recorded it, so a person can see where
+  // their regularisation warnings will be sent. Hidden when neither is on file.
+  const contactEl = document.getElementById("currentEmpContact");
+  if (contactEl) {
+    const bits = [];
+    if (emp.email) bits.push(`<i class="fa-regular fa-envelope"></i> ${emp.email}`);
+    if (emp.phone) bits.push(`<i class="fa-solid fa-phone"></i> ${emp.phone}`);
+    contactEl.innerHTML = bits.join(" &bull; ");
+    contactEl.style.display = bits.length ? "" : "none";
+  }
   const calEmpName = document.getElementById("calendarEmpNameDisplay");
   if (calEmpName) calEmpName.textContent = emp.name;
 
@@ -3678,6 +3688,44 @@ function renderRegAlertBanner() {
       } else { expand.style.display = "none"; }
     }
   }
+
+  // Also reach the person's Gmail: the past-cut-off LOP warnings are the ones that carry a
+  // real pay consequence, and a warning nobody opened the portal to see protects no one.
+  try { _maybeEmailRegWarnings(emp, alerts); } catch (e) { console.warn("reg email err:", e); }
+}
+
+// Email the past-cut-off regularisation warnings to the employee's own Gmail once per
+// portal-day (IST). Best-effort and silent: it runs only server-backed, never throws, and
+// the recipient address and permission are enforced again on the server (/api/notify), so
+// a tampered or stale client copy cannot mail anybody else. The localStorage claim stops two
+// tabs (or a tab re-rendering on every pull) from re-firing the same day's warning.
+function _maybeEmailRegWarnings(emp, alerts) {
+  if (!emp || !Array.isArray(alerts)) return;
+  const crit = alerts.filter(a => a.pastCutOff);
+  if (!crit.length) return;
+  const api = window.VKON_API;
+  if (!api || typeof api.notify !== "function" || !api.isServerBacked || !api.isServerBacked()) return;
+
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  const markerKey = "vkon_reg_email_sent_v1";
+  let marker = null;
+  try { marker = localStorage.getItem(markerKey); } catch (e) { return; }
+  let claim = {};
+  try { claim = marker ? JSON.parse(marker) : {}; } catch (e) { claim = {}; }
+  if (String(claim[emp.id] || "") === today) return;
+
+  const subject = `Attendance: ${crit.length} ${crit.length === 1 ? "day has" : "days have"} passed the payroll cut-off`;
+  const text =
+    `Hello ${emp.name || ""},\n\n` +
+    `${crit.length} of your attendance ${crit.length === 1 ? "day has" : "days have"} passed the payroll cut-off and ${crit.length === 1 ? "is" : "are"} counted as Loss of Pay (LOP):\n\n` +
+    crit.map(a => `  - ${a.message}`).join("\n") +
+    `\n\nPlease review these in the VKON attendance portal.\n`;
+
+  // Claim the day before sending so a slow or failing SMTP call cannot turn every re-render
+  // into another request. If the send does not go out today, the next portal-day retries.
+  claim[emp.id] = today;
+  try { localStorage.setItem(markerKey, JSON.stringify(claim)); } catch (e) { /* best effort */ }
+  try { Promise.resolve(api.notify({ employeeId: emp.id, subject, text })).catch(() => { /* silent */ }); } catch (e) { /* silent */ }
 }
 
 // Compact alert rows inside the notifications dropdown; returns the unread

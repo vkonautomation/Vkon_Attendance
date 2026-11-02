@@ -82,6 +82,24 @@ export interface AppConfig {
    *  with a confusing error rather than a capacity setting. */
   dbPoolMax: number;
   dbStatementTimeoutMs: number;
+
+  /**
+   * Outbound notification email (the /api/notify route). Off by default: with no
+   * credentials supplied the whole feature is inert rather than half-configured, and
+   * production boots fine -- a portal that cannot mail is a portal that still works.
+   * Gmail is the assumed provider (smtp.gmail.com over an App Password); the numbers
+   * are ordinary SMTP knobs, nothing Gmail-specific, so a different host is a config
+   * change and not a code change.
+   */
+  mail: {
+    enabled: boolean;
+    host: string;
+    port: number;
+    secure: boolean;
+    user: string;
+    pass: string;
+    from: string;
+  };
 }
 
 const DEFAULTS = {
@@ -113,6 +131,11 @@ const DEFAULTS = {
   // an account is protected, not how long a person is locked out -- a success clears it.
   rateLimitMaxFailures: 5,
   rateLimitWindowMinutes: 15,
+  // Gmail's submission endpoints. 465 is implicit-TLS (secure), 587 is STARTTLS; the
+  // `secure` knob defaults off the port below so an operator setting only SMTP_PORT=
+  // 587 does not also have to remember to flip SMTP_SECURE.
+  smtpHost: "smtp.gmail.com",
+  smtpPort: 465,
 };
 
 function num(raw: string | undefined, fallback: number, min: number, max: number, name: string): number {
@@ -181,6 +204,23 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     },
     dbPoolMax: num(env.DB_POOL_MAX, DEFAULTS.dbPoolMax, 1, 20, "DB_POOL_MAX"),
     dbStatementTimeoutMs: num(env.DB_STATEMENT_TIMEOUT_MS, DEFAULTS.dbStatementTimeoutMs, 500, 120000, "DB_STATEMENT_TIMEOUT_MS"),
+    mail: (() => {
+      const port = num(env.SMTP_PORT, DEFAULTS.smtpPort, 1, 65535, "SMTP_PORT");
+      const user = (env.SMTP_USER || "").trim();
+      // Off unless explicitly enabled AND a sender is configured: enabling mail with a
+      // blank password would only fail later, at the first send, in front of a person
+      // waiting for an email. Fail-closed and quiet is the right default.
+      const enabled = bool(env.MAIL_ENABLED, false, "MAIL_ENABLED") && !!user && !!(env.SMTP_PASS || "").trim();
+      return {
+        enabled,
+        host: (env.SMTP_HOST || DEFAULTS.smtpHost).trim(),
+        port,
+        secure: bool(env.SMTP_SECURE, port === 465, "SMTP_SECURE"),
+        user,
+        pass: (env.SMTP_PASS || "").trim(),
+        from: (env.SMTP_FROM || user).trim(),
+      };
+    })(),
   };
 }
 

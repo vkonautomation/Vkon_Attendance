@@ -1060,6 +1060,7 @@ function renderRosterTable() {
           <span class="font-bold">${emp.name}</span>
           <span class="table-sub">${emp.role} &bull; <strong class="text-primary">${emp.department}</strong></span>
           <span class="table-sub roster-manager-line"><i class="fa-solid fa-user-tie"></i> Manager: <strong>${(typeof resolveManagerName === "function" && resolveManagerName(emp.id)) || "&mdash; None &mdash;"}</strong></span>
+          ${(emp.email || emp.phone) ? `<span class="table-sub roster-contact-line">${emp.email ? `<i class="fa-regular fa-envelope"></i> ${emp.email}` : ""}${emp.email && emp.phone ? " &bull; " : ""}${emp.phone ? `<i class="fa-solid fa-phone"></i> ${emp.phone}` : ""}</span>` : ""}
           <span class="table-sub font-mono">ID: ${emp.id}</span>
         </div>
       </td>
@@ -1136,6 +1137,10 @@ function openEditEmployeeModal(empId) {
   document.getElementById("editEmpRole").value = emp.role;
   document.getElementById("editEmpUsername").value = emp.username;
   document.getElementById("editEmpPassword").value = emp.password || "";
+  const emailInput = document.getElementById("editEmpEmail");
+  if (emailInput) emailInput.value = emp.email || "";
+  const phoneInput = document.getElementById("editEmpPhone");
+  if (phoneInput) phoneInput.value = emp.phone || "";
   document.getElementById("editEmpGeofenceRule").value = emp.geofenceEnforcement || "required";
   const joinInput = document.getElementById("editEmpJoinDate");
   if (joinInput) joinInput.value = emp.enrolledAt || "";
@@ -1237,6 +1242,10 @@ function initEditEmployeeModal() {
     const role = document.getElementById("editEmpRole").value.trim();
     const username = document.getElementById("editEmpUsername").value.trim().toLowerCase();
     const password = document.getElementById("editEmpPassword").value.trim();
+    const emailEl = document.getElementById("editEmpEmail");
+    const phoneEl = document.getElementById("editEmpPhone");
+    const email = emailEl ? emailEl.value.trim() : "";
+    const phone = phoneEl ? phoneEl.value.trim() : "";
     const geofenceRule = document.getElementById("editEmpGeofenceRule").value;
     const joinInput = document.getElementById("editEmpJoinDate");
     const joinDate = joinInput ? joinInput.value : "";
@@ -1251,6 +1260,8 @@ function initEditEmployeeModal() {
       emp.role = role;
       emp.username = username;
       emp.password = password;
+      if (emailEl) emp.email = email;
+      if (phoneEl) emp.phone = phone;
       emp.geofenceEnforcement = geofenceRule;
       if (joinDate) emp.enrolledAt = joinDate;
       // Never allow an employee to manage themselves.
@@ -1344,6 +1355,10 @@ function initEnrollmentForm() {
     const password = document.getElementById("newEmpPassword").value.trim();
     const geofenceRule = document.getElementById("newEmpGeofenceRule").value;
     const joinDateInput = document.getElementById("newEmpJoinDate");
+    const emailEl = document.getElementById("newEmpEmail");
+    const phoneEl = document.getElementById("newEmpPhone");
+    const email = emailEl ? emailEl.value.trim() : "";
+    const phone = phoneEl ? phoneEl.value.trim() : "";
     const newMgrSel = document.getElementById("newEmpManager");
 
     // A password is optional in this build: while none is stored, the temporary
@@ -1406,6 +1421,8 @@ function initEnrollmentForm() {
       password: serverBacked ? "" : password,
       role: role,
       department: dept,
+      email: email,
+      phone: phone,
       geofenceEnforcement: geofenceRule,
       managerId: managerId,
       avatar: adminCapturedMasterPhoto || previewImg.src,

@@ -111,6 +111,21 @@ export async function getServerRevision(): Promise<number> {
   return row ? Number(row.revision) : 0;
 }
 
+/**
+ * Read one shared document's value, or null if it has never been published.
+ *
+ * This is the server's authoritative copy of the same `vkon_*` store the browser holds,
+ * so a route that must resolve something about a person (an email address, for the
+ * notify path) reads it here rather than trusting a value in the request body. A
+ * `never`-class key returns null: the read-suppression that keeps the credential store
+ * out of the browser projection is the same rule here, so this is not a way around it.
+ */
+export async function readDocument<T = unknown>(key: string): Promise<T | null> {
+  if (classifyDocument(key) === "never") return null;
+  const row = await queryOne<{ value: T }>("SELECT value FROM state_documents WHERE key = $1", [key]);
+  return row ? row.value : null;
+}
+
 export interface PutDocumentInput {
   key: string;
   value: unknown;
