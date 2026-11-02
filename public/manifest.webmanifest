@@ -1,0 +1,17 @@
+{
+  "name": "VKON Attendance Portal",
+  "short_name": "VKON",
+  "description": "VKON Smart Attendance Portal: GPS check-in, leave and WFH requests, monthly calendar, and regularisation.",
+  "id": "/index.html",
+  "start_url": "/index.html",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#ea580c",
+  "icons": [
+    { "src": "/assets/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/assets/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/assets/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
