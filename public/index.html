@@ -31,7 +31,7 @@
   <meta http-equiv="Expires" content="0">
   <link rel="stylesheet" href="styles.css?v=20261026_nm2">
   <link rel="stylesheet" href="regularisation-alerts.css?v=20261030_ra1">
-  <link rel="stylesheet" href="calendar-refined.css?v=20261102_cr2">
+  <link rel="stylesheet" href="calendar-refined.css?v=20261102_cr3">
 </head>
 <body class="light-theme">
   
@@ -200,16 +200,21 @@
 
       <!-- User Profile -->
       <div class="nav-controls">
-        <!-- Logged-in Employee Display (Only changes upon true login) -->
-        <div class="employee-chip" id="employeeChip">
-          <img src="" alt="Avatar" class="chip-avatar" id="currentAvatar">
-          <div class="chip-info">
-            <span class="chip-name" id="currentEmpName">Mukesh Sharma</span>
-            <span class="chip-role" id="currentEmpRole">Senior Full-Stack Engineer</span>
+        <!-- Logged-in Employee profile: compact dark pill; click to open details -->
+        <details class="employee-chip profile-pill" id="employeeChip">
+          <summary class="chip-toggle">
+            <div class="chip-info">
+              <span class="chip-name" id="currentEmpName">Mukesh Sharma</span>
+              <span class="chip-role" id="currentEmpRole">Senior Full-Stack Engineer</span>
+            </div>
+            <img src="" alt="Avatar" class="chip-avatar" id="currentAvatar">
+            <i class="fa-solid fa-chevron-down chip-caret" aria-hidden="true"></i>
+          </summary>
+          <div class="chip-dropdown">
             <span class="chip-manager" id="currentEmpManager"></span>
             <span class="chip-contact" id="currentEmpContact" style="display:none;"></span>
           </div>
-        </div>
+        </details>
       </div>
     </header>
 

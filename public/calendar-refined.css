@@ -197,3 +197,45 @@ body.light-theme .reg-cal-cell.reg-restricted.reg-holiday {
 body.light-theme .reg-cal-cell.reg-restricted.reg-already-applied {
   background: rgba(234, 88, 12, 0.07) !important; border-color: rgba(234, 88, 12, 0.22) !important;
 }
+
+/* ==========================================================================
+   NAVBAR PROFILE CHIP — compact dark pill (name + role, avatar, chevron).
+   Manager / email / phone move into a click-to-open dropdown (native <details>,
+   so no JS change is needed). Loaded after styles.css; !important guards the
+   old white expanded card.
+   ========================================================================== */
+body .employee-chip#employeeChip {
+  position: relative; display: block; width: auto; max-width: none; height: auto;
+  margin: 0; padding: 0; background: #14171A !important; color: #fff !important;
+  border: 1px solid #23282e !important; border-radius: 999px !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .25) !important;
+}
+body .employee-chip .chip-toggle {
+  display: flex; align-items: center; gap: .6rem;
+  padding: .35rem .55rem .35rem 1.05rem; cursor: pointer; list-style: none;
+}
+body .employee-chip .chip-toggle::-webkit-details-marker { display: none; }
+body .employee-chip .chip-info { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.25; }
+body .employee-chip .chip-name { color: #fff; font-weight: 700; font-size: .9rem; }
+body .employee-chip .chip-role { color: #aeb4bb; font-weight: 500; font-size: .74rem; }
+body .employee-chip .chip-avatar {
+  width: 34px; height: 34px; border-radius: 50%; object-fit: cover;
+  background: #d9b48f; color: #14171A; font-weight: 700; flex: 0 0 auto;
+}
+body .employee-chip .chip-caret { color: #aeb4bb; font-size: .78rem; transition: transform .15s ease; }
+body .employee-chip[open] .chip-caret { transform: rotate(180deg); }
+body .employee-chip .chip-dropdown {
+  position: absolute; top: calc(100% + .5rem); right: 0; z-index: 90;
+  min-width: 240px; background: #fff; color: #14171A;
+  border: 1px solid #E3E4E1; border-radius: 10px; box-shadow: 0 10px 30px rgba(0, 0, 0, .16);
+  padding: .8rem 1rem; display: flex; flex-direction: column; gap: .4rem;
+}
+body .employee-chip .chip-manager { color: #475569; font-size: .85rem; }
+body .employee-chip .chip-manager strong { color: #14171A; }
+body .employee-chip .chip-manager i { color: #ea580c; margin-right: .3rem; }
+body .employee-chip .chip-contact { color: #334155; font-size: .85rem; }
+body .employee-chip .chip-contact i { color: #ea580c; margin-right: .3rem; }
+@media (max-width: 560px) {
+  body .employee-chip .chip-info { display: none; }
+  body .employee-chip .chip-toggle { padding-left: .5rem; }
+}
