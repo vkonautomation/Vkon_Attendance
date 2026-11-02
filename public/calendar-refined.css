@@ -140,3 +140,60 @@ body:not(.light-theme) .bulk-reg-field select { background: #111f38; border-colo
 .bulk-reg-grid { display: flex; gap: .6rem; flex-wrap: wrap; }
 .bulk-reg-grid .bulk-reg-field { flex: 1 1 120px; }
 .bulk-reg-actions { display: flex; justify-content: flex-end; gap: .6rem; margin-top: .9rem; }
+
+/* ---- Regularisation mini-calendar: keep per-state pill colours in LIGHT mode --
+   styles.css has a blanket `body.light-theme .reg-restricted .cell-mini-pill`
+   rule that flattens every pill to grey, so light mode lost the state colours
+   that dark mode (and the legend chips) still show. These per-type overrides are
+   more specific (one extra class) and load after styles.css, so they win. They
+   reuse the exact legend palette, so a cell now matches its legend chip in BOTH
+   themes. */
+body.light-theme .reg-cal-cell.reg-restricted.reg-cutoff .cell-mini-pill {
+  background: rgba(220, 38, 38, 0.12); color: #dc2626;
+}
+body.light-theme .reg-cal-cell.reg-restricted.reg-weekend .cell-mini-pill {
+  background: rgba(148, 163, 184, 0.18); color: #64748b;
+}
+body.light-theme .reg-cal-cell.reg-restricted.reg-present .cell-mini-pill {
+  background: rgba(16, 185, 129, 0.14); color: #059669;
+}
+body.light-theme .reg-cal-cell.reg-restricted.reg-wfh .cell-mini-pill {
+  background: rgba(168, 85, 247, 0.14); color: #9333ea;
+}
+body.light-theme .reg-cal-cell.reg-restricted.reg-leave .cell-mini-pill {
+  background: rgba(245, 158, 11, 0.16); color: #b45309;
+}
+body.light-theme .reg-cal-cell.reg-restricted.reg-holiday .cell-mini-pill {
+  background: rgba(59, 130, 246, 0.14); color: #2563eb;
+}
+body.light-theme .reg-cal-cell.reg-restricted.reg-already-applied .cell-mini-pill {
+  background: rgba(234, 88, 12, 0.14); color: #ea580c;
+}
+body.light-theme .reg-cal-cell.reg-restricted.reg-future .cell-mini-pill {
+  background: rgba(100, 116, 139, 0.12); color: #64748b;
+}
+
+/* Same per-state tint on the CELL body in light mode (dark mode already tints
+   via styles.css). Line ~9997 forces every light cell white with !important, so
+   these match it with !important at higher specificity. */
+body.light-theme .reg-cal-cell.reg-restricted.reg-cutoff {
+  background: rgba(220, 38, 38, 0.06) !important; border-color: rgba(220, 38, 38, 0.22) !important;
+}
+body.light-theme .reg-cal-cell.reg-restricted.reg-weekend {
+  background: rgba(148, 163, 184, 0.08) !important; border-color: rgba(148, 163, 184, 0.22) !important;
+}
+body.light-theme .reg-cal-cell.reg-restricted.reg-present {
+  background: rgba(16, 185, 129, 0.07) !important; border-color: rgba(16, 185, 129, 0.22) !important;
+}
+body.light-theme .reg-cal-cell.reg-restricted.reg-wfh {
+  background: rgba(168, 85, 247, 0.07) !important; border-color: rgba(168, 85, 247, 0.22) !important;
+}
+body.light-theme .reg-cal-cell.reg-restricted.reg-leave {
+  background: rgba(245, 158, 11, 0.08) !important; border-color: rgba(245, 158, 11, 0.22) !important;
+}
+body.light-theme .reg-cal-cell.reg-restricted.reg-holiday {
+  background: rgba(59, 130, 246, 0.07) !important; border-color: rgba(59, 130, 246, 0.22) !important;
+}
+body.light-theme .reg-cal-cell.reg-restricted.reg-already-applied {
+  background: rgba(234, 88, 12, 0.07) !important; border-color: rgba(234, 88, 12, 0.22) !important;
+}
