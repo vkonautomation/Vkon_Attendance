@@ -57,6 +57,16 @@ const nextConfig = {
   // and lets the container receive its environment from the orchestrator instead.
   output: "standalone",
 
+  // The /api/notify path requires nodemailer, but the send is conditional (lib/mail.ts
+  // builds the transport only when SMTP is configured), so Next's standalone file-tracer
+  // does not always see a static path to nodemailer and leaves it out of the standalone
+  // node_modules -- a MODULE_NOT_FOUND at the first real send. Pin it in explicitly so
+  // every standalone build ships it, not just the ones where the tracer happens to follow
+  // the import. nodemailer itself has no runtime dependencies, so this is the whole tree.
+  outputFileTracingIncludes: {
+    "/api/notify": ["./node_modules/nodemailer/**"],
+  },
+
   // Default false in Next 16; stated because shipping them would hand the browser
   // a map that reconstructs the server's TypeScript.
   productionBrowserSourceMaps: false,
