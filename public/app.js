@@ -2775,13 +2775,6 @@ function renderRegularisationCalendar() {
       restrictionType = "reg-future";
       badgeText = "Today";
       restrictionReason = "Today is still open \u2014 you can regularise from the next day";
-    } else if (isPastCutOff) {
-      isRestricted = true;
-      restrictionType = "reg-cutoff";
-      badgeText = "LOP";
-      restrictionReason = "Payroll for that month has closed \u2014 counted as a whole day of LOP";
-      // A closed day must never stay selected as if it were regularisable.
-      if (regCalendarState.selectedDateStr === dateStr) regCalendarState.selectedDateStr = "";
     } else if (isWeekend) {
       isRestricted = true;
       restrictionType = "reg-weekend";
@@ -2812,6 +2805,17 @@ function renderRegularisationCalendar() {
       restrictionType = "reg-already-applied";
       badgeText = "Reg. Pending";
       restrictionReason = "Regularisation already requested";
+    } else if (isPastCutOff) {
+      // Only an UNRESOLVED working day becomes a whole-day LOP once payroll
+      // closes. Present / WFH / Leave / Weekend / Holiday / already-regularised
+      // days are classified by their real state above, so they are never
+      // mislabeled "LOP" just because the month's cut-off has passed.
+      isRestricted = true;
+      restrictionType = "reg-cutoff";
+      badgeText = "LOP";
+      restrictionReason = "Payroll for that month has closed \u2014 counted as a whole day of LOP";
+      // A closed day must never stay selected as if it were regularisable.
+      if (regCalendarState.selectedDateStr === dateStr) regCalendarState.selectedDateStr = "";
     }
 
     const cell = document.createElement("div");
