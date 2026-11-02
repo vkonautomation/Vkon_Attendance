@@ -19,7 +19,7 @@
  * taps it, so nobody is swapped mid-punch.
  */
 
-const VERSION = "20261102_en4";
+const VERSION = "20261102_en5";
 const SHELL_CACHE = "vkon-shell-" + VERSION;
 const RUNTIME_CACHE = "vkon-runtime-" + VERSION;
 
@@ -74,14 +74,18 @@ self.addEventListener("fetch", (event) => {
 
   const url = new URL(req.url);
 
-  // Rule 1: leave the API entirely to the browser + the app's own offline queue.
-  if (url.origin === self.location.origin && url.pathname.startsWith("/api/")) return;
+  // Only ever manage SAME-ORIGIN requests. Third-party assets (Font Awesome on
+  // cdnjs, Google Fonts, unpkg/Leaflet, remote images) go straight to the browser.
+  // Intercepting them here meant their opaque cross-origin responses could never
+  // be cached, and a failed re-fetch was rethrown -- which blanked the login field
+  // icons and the eye button. The browser loads them natively and correctly.
+  if (url.origin !== self.location.origin) return;
 
-  // Only manage same-origin + already-cached-able cross-origin GETs.
-  const sameOrigin = url.origin === self.location.origin;
+  // Rule 1: leave the API entirely to the browser + the app's own offline queue.
+  if (url.pathname.startsWith("/api/")) return;
 
   // Rule 2: HTML / navigations -> network-first with cache fallback.
-  if (sameOrigin && (req.mode === "navigate" || url.pathname === "/" || url.pathname.endsWith(".html"))) {
+  if (req.mode === "navigate" || url.pathname === "/" || url.pathname.endsWith(".html")) {
     event.respondWith(networkFirst(req));
     return;
   }
@@ -92,7 +96,7 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Rule 4: everything else -> network-first with cache fallback.
+  // Rule 4: everything else same-origin -> network-first with cache fallback.
   event.respondWith(networkFirst(req));
 });
 
