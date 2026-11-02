@@ -378,11 +378,11 @@ function loadEmployeeSession(emp) {
   // their regularisation warnings will be sent. Hidden when neither is on file.
   const contactEl = document.getElementById("currentEmpContact");
   if (contactEl) {
-    const bits = [];
-    if (emp.email) bits.push(`<i class="fa-regular fa-envelope"></i> ${emp.email}`);
-    if (emp.phone) bits.push(`<i class="fa-solid fa-phone"></i> ${emp.phone}`);
-    contactEl.innerHTML = bits.join(" &bull; ");
-    contactEl.style.display = bits.length ? "" : "none";
+    const rows = [];
+    if (emp.email) rows.push(`<span class="contact-row"><i class="fa-regular fa-envelope"></i> ${emp.email}</span>`);
+    if (emp.phone) rows.push(`<span class="contact-row"><i class="fa-solid fa-phone"></i> ${emp.phone}</span>`);
+    contactEl.innerHTML = rows.join("");
+    contactEl.style.display = rows.length ? "" : "none";
   }
   const calEmpName = document.getElementById("calendarEmpNameDisplay");
   if (calEmpName) calEmpName.textContent = emp.name;

@@ -233,7 +233,8 @@ body .employee-chip .chip-dropdown {
 body .employee-chip .chip-manager { color: #475569; font-size: .85rem; }
 body .employee-chip .chip-manager strong { color: #14171A; }
 body .employee-chip .chip-manager i { color: #ea580c; margin-right: .3rem; }
-body .employee-chip .chip-contact { color: #334155; font-size: .85rem; }
+body .employee-chip .chip-contact { color: #334155; font-size: .85rem; display: flex; flex-direction: column; gap: .25rem; }
+body .employee-chip .chip-contact .contact-row { display: flex; align-items: center; gap: .4rem; }
 body .employee-chip .chip-contact i { color: #ea580c; margin-right: .3rem; }
 @media (max-width: 560px) {
   body .employee-chip .chip-info { display: none; }
