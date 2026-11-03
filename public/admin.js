@@ -306,6 +306,27 @@ function initAdminTabs() {
 // 2. TAB 1: MONTHLY ATTENDANCE MASTER SHEET & TO-DATE RATE (OCT 1 - 8)
 // ============================================================================
 
+// Build the Attendance-sheet month dropdown live from the real current month.
+// It used to be hardcoded in admin.html, which is how it drifted: October stayed
+// tagged "(Current)" after the calendar moved on. A rolling window (two months
+// back, the current month, one ahead) is generated each load, the actual current
+// month carries the "(Current)" suffix, and it is selected by default.
+function populateReportMonthSelect() {
+  const sel = document.getElementById("reportMonthSelect");
+  if (!sel) return;
+  const now = (typeof getPresentDate === "function") ? getPresentDate() : new Date();
+  const cur = now.getMonth();
+  const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  const idxs = [];
+  for (let m = cur - 2; m <= cur + 1; m++) {
+    if (m >= 0 && m <= 11) idxs.push(m);
+  }
+  sel.innerHTML = idxs.map(m => {
+    const label = `${monthNames[m]} ${now.getFullYear()}` + (m === cur ? " (Current)" : "");
+    return `<option value="${m}"${m === cur ? " selected" : ""}>${label}</option>`;
+  }).join("");
+}
+
 function renderMonthlyReport() {
   const monthSelect = document.getElementById("reportMonthSelect");
   const selectedMonth = parseInt(monthSelect.value, 10); // 0-indexed month
@@ -3757,6 +3778,7 @@ function startAdminConsole() {
   initAdminTabs();
   initMasterTableSearch();
   initExtraModules();
+  populateReportMonthSelect();
   renderMonthlyReport();
   renderRosterTable();
   initEnrollmentForm();
