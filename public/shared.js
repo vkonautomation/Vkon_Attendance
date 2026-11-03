@@ -393,7 +393,8 @@ const DEFAULT_SHORT_LEAVE_SETTINGS = {
   graceMinutes: 15,
   lateFrom: "shiftStart",
   // Holidays / non-working-day policy.
-  treatWeekendsAsNonWorking: false,
+  // Weekends are always non-working; the old toggle is ignored.
+  treatWeekendsAsNonWorking: true,
   holidayWorkMode: "compoff" // "compoff" | "extrapay"
 };
 
@@ -1563,7 +1564,8 @@ function isNonWorkingDay(date, employee) {
         nonWorking = true; // Declared Holiday is mandatory off for everyone
       }
     }
-    if (!nonWorking && s.treatWeekendsAsNonWorking && isWeekend) nonWorking = true;
+    // Weekends are always non-working (Sat/Sun punch disabled).
+    if (!nonWorking && isWeekend) nonWorking = true;
     if (!nonWorking) return false;
 
     // Req 6 exception: an approved worked-on-holiday override reopens the day.

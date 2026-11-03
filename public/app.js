@@ -1436,11 +1436,15 @@ function updatePunchStatus() {
     if (statusBadge) statusBadge.style.display = "none";
     if (holidayCard) {
       const _h = (typeof findHolidayForDate === "function") ? findHolidayForDate(todayKey) : null;
+      const _dow = new Date(todayKey + "T00:00:00").getDay();
+      const _isWeekend = _dow === 0 || _dow === 6;
       const nameEl = document.getElementById("holidayTodayName");
       const msgEl = document.getElementById("holidayTodayMsg");
       const nextEl = document.getElementById("holidayTodayNext");
-      if (nameEl) nameEl.textContent = _h ? _h.name : "Non-working day";
-      if (msgEl) msgEl.textContent = "Today is a holiday. No check-in needed.";
+      if (nameEl) nameEl.textContent = _h ? _h.name : (_isWeekend ? "Weekend" : "Non-working day");
+      if (msgEl) msgEl.textContent = _h
+        ? "Today is a holiday. No check-in needed."
+        : (_isWeekend ? "Today is a weekend. No check-in needed." : "Today is a non-working day. No check-in needed.");
       if (nextEl) {
         const nx = (typeof getNextWorkingDay === "function") ? getNextWorkingDay(todayKey, employeeState.currentEmployee) : null;
         if (nx) {
@@ -2148,7 +2152,7 @@ async function handleConfirmVerification() {
   if (employeeState.currentEmployee && typeof punchBlockedReason === "function") {
     const _blocked = punchBlockedReason(employeeState.currentEmployee.id, getTodayKey());
     if (_blocked) {
-      showToast(`Punch rejected: ${_blocked} is a holiday \u2014 no check-in is permitted.`, "error");
+      showToast(`Punch rejected: ${_blocked} is a non-working day \u2014 no check-in is permitted.`, "error");
       playSound("error");
       closeVerificationModal();
       return;
