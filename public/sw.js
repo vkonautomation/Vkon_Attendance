@@ -19,7 +19,7 @@
  * taps it, so nobody is swapped mid-punch.
  */
 
-const VERSION = "20261102_en9";
+const VERSION = "20261102_en10";
 const SHELL_CACHE = "vkon-shell-" + VERSION;
 const RUNTIME_CACHE = "vkon-runtime-" + VERSION;
 

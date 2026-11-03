@@ -691,7 +691,60 @@ function getLopDatesForMonth(empId, monthStr) {
 // This normalises legacy stored entries that carried a 0.5 fraction (half-day LOP
 // was removed by policy) and collapses any duplicate same-day sources to one day.
 function computeLopDaysForMonth(empId, monthStr) {
-  return getLopDatesForMonth(empId, monthStr).size;
+  return getLopDatesForMonthComplete(empId, monthStr).size;
+}
+
+// The COMPLETE set of LOP dates for an employee in a 'YYYY-MM' month, and the
+// single source of truth shared by the employee calendar and the admin payroll so
+// the two can never disagree. It is the LOP ledger (approved unpaid leave, excess-
+// leave conversion, auto short-hours) PLUS working days that closed past the
+// payroll cut-off with no punch / leave / WFH / pending regularisation -- the
+// "Not Marked after cut-off" days the calendar already shows as whole-day LOP but
+// that never get a ledger row.
+function getLopDatesForMonthComplete(empId, monthStr) {
+  const dates = getLopDatesForMonth(empId, monthStr); // ledger Set, safe to mutate
+  if (!empId || !/^\d{4}-\d{2}$/.test(monthStr)) return dates;
+  try {
+    const s = getAttendanceSettings();
+    const cutOffDay = s.payrollCutOffDay;
+    const records = getStore(STORAGE_KEYS.RECORDS, {});
+    const employees = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
+    const emp = employees.find(e => e.id === empId);
+    const enrolled = (emp && emp.enrolledAt) ? new Date(emp.enrolledAt + "T00:00:00") : null;
+    const isNewEnrollee = empId !== "EMP001" && empId !== "EMP002";
+    // A regularisation awaiting review means the day is being fixed, not "Not Marked".
+    const regPending = {};
+    getStore(STORAGE_KEYS.REGULARISATIONS, [])
+      .filter(r => r.employeeId === empId && (r.status === "Pending" || r.status === "Pending Manager" || r.status === "Pending Admin"))
+      .forEach(r => { regPending[r.date] = true; });
+
+    const todayStr = (typeof getPresentDate === "function") ? formatDateKey(getPresentDate()) : formatDateKey(getNowIST());
+    const nowZero = new Date(todayStr + "T00:00:00");
+    const parts = monthStr.split("-");
+    const y = Number(parts[0]), m = Number(parts[1]);
+    const daysInMonth = new Date(y, m, 0).getDate();
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dayDate = new Date(y, m - 1, d);
+      const dow = dayDate.getDay();
+      if (dow === 0 || dow === 6) continue;          // weekend is never LOP
+      if (!(dayDate < nowZero)) continue;            // only strictly past days
+      const key = formatDateKey(dayDate);
+      if (records[`${empId}_${key}`]) continue;      // any punch / leave / WFH record
+      if (regPending[key]) continue;                 // regularisation in review
+      if ((isNewEnrollee && !enrolled) || (enrolled && dayDate < enrolled)) continue; // before enrolment
+      const h = (typeof findHolidayForDate === "function") ? findHolidayForDate(key) : null;
+      if (h) {
+        if (typeof isWorkedOnHoliday === "function" && isWorkedOnHoliday(empId, key)) continue; // reopened
+        const off = h.type !== "Restricted Holiday" ||
+          (typeof hasApprovedRestrictedLeaveOnDate === "function" && hasApprovedRestrictedLeaveOnDate(empId, key));
+        if (off) continue;                            // holiday / approved restricted leave
+      }
+      if (typeof _isPastPayrollCutOff === "function" && _isPastPayrollCutOff(key, cutOffDay)) {
+        dates.add(key);                               // closed unmarked day = whole-day LOP
+      }
+    }
+  } catch (e) { /* fall back to the ledger-only set */ }
+  return dates;
 }
 
 // Expand an approved leave range into LOP day objects. Weekends / declared

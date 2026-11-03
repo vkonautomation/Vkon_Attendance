@@ -690,20 +690,16 @@ function renderMonthlyCalendar() {
   if (statL) statL.textContent = countLeave;
     const statLop = document.getElementById("statsLopCount");
     if (statLop) {
-      // Prefer the authoritative LOP day count for the month: the LOP ledger
-      // plus the closed unresolved days (already whole-day LOP, no ledger row).
+      // Single source of truth shared with the admin payroll: the LOP ledger plus
+      // the closed unmarked days (whole-day LOP that has no ledger row).
       let lopVal = countLop;
       try {
-        if (employeeState.currentEmployee && typeof computeLopDaysForMonth === "function") {
+        if (employeeState.currentEmployee) {
           const ms = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}`;
-          const ledgerDates = (typeof getLopDatesForMonth === "function")
-            ? getLopDatesForMonth(employeeState.currentEmployee.id, ms)
-            : null;
-          if (ledgerDates) {
-            closedLopDates.forEach(d => ledgerDates.add(d));
-            lopVal = ledgerDates.size;
-          } else {
-            lopVal = computeLopDaysForMonth(employeeState.currentEmployee.id, ms) + closedLopDates.size;
+          if (typeof getLopDatesForMonthComplete === "function") {
+            lopVal = getLopDatesForMonthComplete(employeeState.currentEmployee.id, ms).size;
+          } else if (typeof computeLopDaysForMonth === "function") {
+            lopVal = computeLopDaysForMonth(employeeState.currentEmployee.id, ms);
           }
         }
       } catch (e) { /* fall back to record count */ }
