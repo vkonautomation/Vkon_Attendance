@@ -267,6 +267,11 @@
             </div>
           </div>
 
+          <div id="dashHolidayBanner" style="display: none; align-items: center; gap: .6rem; margin: 0 0 1rem; padding: .7rem 1rem; border-radius: 10px; background: #fff7ed; border: 1px solid #fdba74; color: #9a3412; font-weight: 600;">
+            <i class="fa-solid fa-umbrella-beach" style="color: #ea580c;"></i>
+            <span id="dashHolidayBannerText">Today is a company holiday.</span>
+          </div>
+
           <h3 class="dash-sub-heading"><i class="fa-solid fa-right-to-bracket"></i> Check-Ins Today</h3>
           <div class="table-responsive master-table-wrap">
             <table class="data-table">
@@ -468,7 +473,7 @@
               <div class="kpi-icon icon-bg-green"><i class="fa-solid fa-user-check"></i></div>
               <div class="kpi-data">
                 <span class="kpi-num text-success" id="kpiAvgAttendance">--%</span>
-                <span class="kpi-lbl" id="kpiAvgAttLabel">To-Date Rate (Oct 1-8)</span>
+                <span class="kpi-lbl" id="kpiAvgAttLabel">To-Date Attendance Rate</span>
                               <span class="kpi-delta" id="kpiAvgAttDelta"></span>
               </div>
             </div>
@@ -476,7 +481,7 @@
               <div class="kpi-icon icon-bg-purple"><i class="fa-solid fa-business-time"></i></div>
               <div class="kpi-data">
                 <span class="kpi-num text-primary" id="kpiTotalHours">0 hrs</span>
-                <span class="kpi-lbl">Total Work Hours</span>
+                <span class="kpi-lbl">Total Work Hours &middot; This Month</span>
                               <span class="kpi-delta" id="kpiHoursDelta"></span>
               </div>
             </div>
@@ -1723,13 +1728,13 @@
   <!-- The server adapter must be parsed before shared.js: shared.js asks it whether
        this browser reads shared state or only its own localStorage, and waits on it
        before seeding. Order here is load-bearing. -->
-  <script src="js/api.js?v=20261102_en10"></script>
-  <script src="js/password-change.js?v=20261102_en10"></script>
-  <script src="shared.js?v=20261102_en10"></script>
+  <script src="js/api.js?v=20261102_en11"></script>
+  <script src="js/password-change.js?v=20261102_en11"></script>
+  <script src="shared.js?v=20261102_en11"></script>
   <script src="js/confirm-decision-modal.js?v=20261023_apr1"></script>
   <script src="js/day-popover.js?v=20261030_cr1"></script>
-  <script src="admin.js?v=20261102_en10"></script>
+  <script src="admin.js?v=20261102_en11"></script>
   <script src="js/password-toggle.js?v=20261019_ui1"></script>
-  <script src="js/pwa.js?v=20261102_en10"></script>
+  <script src="js/pwa.js?v=20261102_en11"></script>
 </body>
 </html>

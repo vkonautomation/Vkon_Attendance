@@ -125,8 +125,8 @@ def verify_all():
 
     # ---- shared cache token bumped for this build -------------------------
     print("\n[Cache] shared cache-buster token bumped:")
-    need("20261102_en10" in index_html, "index.html cache token bumped to en7")
-    need("20261102_en10" in admin_html, "admin.html cache token bumped to en7")
+    need("20261102_en11" in index_html, "index.html cache token bumped to en7")
+    need("20261102_en11" in admin_html, "admin.html cache token bumped to en7")
     need("20261029_e9" not in index_html and "20261029_e9" not in admin_html,
          "old e9 token fully replaced in both pages")
 

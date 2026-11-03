@@ -437,6 +437,14 @@ function renderMonthlyReport() {
     companyTotalHours += empTotalHours;
     const attended = presentCount + wfhCount + 0.5 * halfCount;
 
+    // Align the sheet's "LOP Days" with Payroll & the employee calendar: the LOP
+    // ledger PLUS auto-LOP closed days (unmarked past the payroll cut-off), so all
+    // three read one source instead of only counting recorded "Loss of Pay" rows.
+    if (typeof getLopDatesForMonthComplete === "function") {
+      const _lopMonth = `${currentYear}-${String(selectedMonth + 1).padStart(2, "0")}`;
+      lopCount = getLopDatesForMonthComplete(emp.id, _lopMonth).size;
+    }
+
     // Per-employee to-date rate (used only for row sorting / employee detail).
     const rate = expectedDays > 0 ? Math.round((closedAttended / expectedDays) * 100) : null;
 
@@ -569,7 +577,7 @@ function renderMonthlyReport() {
   const rateLabelEl = document.getElementById("kpiAvgAttLabel");
   document.getElementById("kpiAvgAttendance").textContent = `${Math.min(avgAttendance, 100)}%`;
   if (rateLabelEl) {
-    rateLabelEl.textContent = `To-Date Rate \u00b7 up to ${rateMonth} ${todayDay}`;
+    rateLabelEl.textContent = `To-Date Attendance Rate \u00b7 up to ${rateMonth} ${todayDay}`;
     const rateCard = rateLabelEl.closest(".kpi-card");
     if (rateCard) rateCard.setAttribute("title", "Team rate = \u03a3(Present + WFH + \u00bd\u00d7Half-day) \u00f7 \u03a3(closed working days \u2212 holidays \u2212 approved leave). Today is shown separately and not counted.");
   }
@@ -3289,17 +3297,32 @@ function renderDashboard() {
   setTextSafe("dashStatLeave", onLeave);
   setTextSafe("dashStatPending", pending);
 
-  // How many employees still have an actionable absence BEFORE the payroll
-  // cut-off (days already past the cut-off are counted as LOP, not "unresolved").
-  let unresolvedEmployees = 0;
+  // "Unresolved Days (Team)" = the TOTAL count of open, still-actionable absence
+  // days across the team BEFORE the payroll cut-off (a day already past the
+  // cut-off is LOP, not unresolved). Counts days, not employees.
+  let unresolvedDays = 0;
   const dashSettings = (typeof getAttendanceSettings === "function") ? getAttendanceSettings() : null;
   employees.forEach(emp => {
     try {
       const al = (typeof getRegularisationAlerts === "function") ? getRegularisationAlerts(emp, now, dashSettings) : [];
-      if (al && al.some(a => !a.pastCutOff)) unresolvedEmployees++;
+      if (al) unresolvedDays += al.filter(a => !a.pastCutOff).length;
     } catch (e) { /* non-fatal */ }
   });
-  setTextSafe("dashStatUnresolved", unresolvedEmployees);
+  setTextSafe("dashStatUnresolved", unresolvedDays);
+
+  // A declared company holiday is not stored per-employee, so "On Leave / Holiday"
+  // would read 0 while the whole office is actually off. Show an explicit banner.
+  const todayHoliday = (typeof findHolidayForDate === "function") ? findHolidayForDate(todayKey) : null;
+  const hBanner = document.getElementById("dashHolidayBanner");
+  const hText = document.getElementById("dashHolidayBannerText");
+  if (hBanner) {
+    if (todayHoliday) {
+      if (hText) hText.textContent = `Today is a company holiday \u2014 ${todayHoliday.name}. The office is closed; no check-ins expected.`;
+      hBanner.style.display = "flex";
+    } else {
+      hBanner.style.display = "none";
+    }
+  }
 
   const tbody = document.getElementById("dashTodayTableBody");
   if (tbody) {
@@ -3412,11 +3435,26 @@ function computePayrollLine(emp, monthStr) {
   };
 }
 
+// Latest 'YYYY-MM' that actually has attendance data (any punch record). Used so
+// the Payroll view opens on a populated month instead of an empty "current" one.
+function _latestMonthWithData() {
+  const records = getStore(STORAGE_KEYS.RECORDS, {});
+  let maxMonth = "";
+  Object.keys(records).forEach(k => {
+    const sep = k.indexOf("_");
+    if (sep < 0) return;
+    const m = k.slice(sep + 1, sep + 8); // YYYY-MM from the YYYY-MM-DD date key
+    if (m.length === 7 && m > maxMonth) maxMonth = m;
+  });
+  return maxMonth;
+}
+
 function currentPayrollMonth() {
   const monthEl = document.getElementById("payrollMonthInput");
   const now = (typeof getPresentDate === "function") ? getPresentDate() : new Date();
   const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  if (monthEl && !monthEl.value) monthEl.value = defaultMonth;
+  // Prefer the most recent month that has data; fall back to the calendar month.
+  if (monthEl && !monthEl.value) monthEl.value = _latestMonthWithData() || defaultMonth;
   return (monthEl && monthEl.value) ? monthEl.value : defaultMonth;
 }
 
