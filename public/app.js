@@ -4354,12 +4354,41 @@ function renderDashboardStats() {
 // 10. BOOTSTRAP
 // ============================================================================
 
+// Desktop rail expand/collapse. Toggles the .is-collapsed class on the sidebar,
+// swaps the toggle icon (angles-left <-> angles-right) and its accessible label,
+// and remembers the choice. At or below the drawer breakpoint the CSS hides the
+// button and ignores the class, so the mobile off-canvas menu is untouched.
+function initSidebarCollapse() {
+  const btn = document.getElementById("sidebarCollapseBtn");
+  const sidebar = document.querySelector(".admin-sidebar");
+  if (!btn || !sidebar) return;
+  const KEY = "vkon_sidebar_collapsed";
+  const icon = btn.querySelector("i");
+  function apply(collapsed) {
+    sidebar.classList.toggle("is-collapsed", collapsed);
+    btn.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    const label = collapsed ? "Expand menu" : "Collapse menu";
+    btn.setAttribute("aria-label", label);
+    btn.title = label;
+    if (icon) icon.className = collapsed ? "fa-solid fa-angles-right" : "fa-solid fa-angles-left";
+  }
+  let collapsed = false;
+  try { collapsed = localStorage.getItem(KEY) === "1"; } catch (e) { /* non-fatal */ }
+  apply(collapsed);
+  btn.addEventListener("click", () => {
+    collapsed = !collapsed;
+    apply(collapsed);
+    try { localStorage.setItem(KEY, collapsed ? "1" : "0"); } catch (e) { /* non-fatal */ }
+  });
+}
+
 function bootEmployeePortal() {
   try { initClock(); } catch (e) { console.error("Error in initClock:", e); }
   try { if (window.DayPopover) DayPopover.init(); } catch (e) { console.error("Error in DayPopover.init:", e); }
   try { initTheme(); } catch (e) { console.error("Error in initTheme:", e); }
   try { initAuthSystem(); } catch (e) { console.error("Error in initAuthSystem:", e); }
   try { initPortalSideNav(); } catch (e) { console.error("Error in initPortalSideNav:", e); }
+  try { initSidebarCollapse(); } catch (e) { console.error("Error in initSidebarCollapse:", e); }
     try { initNotifications(); } catch (e) { console.error("Error in initNotifications:", e); }
     try { initRegAlertBanner(); } catch (e) { console.error("Error in initRegAlertBanner:", e); }
   try { initActionHubToggles(); } catch (e) { console.error("Error in initActionHubToggles:", e); }

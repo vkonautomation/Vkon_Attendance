@@ -32,6 +32,46 @@
   <link rel="stylesheet" href="styles.css?v=20261026_nm2">
   <link rel="stylesheet" href="regularisation-alerts.css?v=20261030_ra2">
   <link rel="stylesheet" href="calendar-refined.css?v=20261102_cr3">
+  <style>
+  /* Sidebar expand/collapse toggle. Desktop rail only (>900px): at or below the
+     portal breakpoint the sidebar is an off-canvas drawer, so the toggle and the
+     collapsed width are suppressed to avoid interfering with it. Loaded after
+     styles.css so these rules win. */
+  .sidebar-brand { position: relative; }
+  .admin-sidebar { transition: width .2s ease; }
+  .sidebar-mark { display: none; width: 36px; height: 36px; border-radius: 9px; }
+  .sidebar-collapse-toggle {
+    position: absolute; top: 1.15rem; right: .9rem;
+    width: 30px; height: 30px; border-radius: 8px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: rgba(255,255,255,.06); color: #c6d1cb;
+    border: 1px solid rgba(255,255,255,.12); cursor: pointer;
+    font-size: .95rem; line-height: 1; transition: background .15s ease, color .15s ease;
+  }
+  .sidebar-collapse-toggle:hover { background: rgba(255,255,255,.14); color: #fff; }
+  @media (max-width: 900px) { .sidebar-collapse-toggle { display: none !important; } }
+  @media (min-width: 901px) {
+    .admin-sidebar.is-collapsed { width: 78px; }
+    .admin-sidebar.is-collapsed .sidebar-brand { align-items: center; padding-left: .5rem; padding-right: .5rem; }
+    .admin-sidebar.is-collapsed .brand-logo-wrap,
+    .admin-sidebar.is-collapsed .brand-text { display: none; }
+    .admin-sidebar.is-collapsed .sidebar-mark { display: block; }
+    .admin-sidebar.is-collapsed .sidebar-collapse-toggle { position: static; margin-top: .55rem; }
+    .admin-sidebar.is-collapsed .side-nav-label { display: none; }
+    .admin-sidebar.is-collapsed .admin-side-nav { padding-left: .5rem; padding-right: .5rem; }
+    .admin-sidebar.is-collapsed .nav-tab,
+    .admin-sidebar.is-collapsed .portal-nav-link { justify-content: center; gap: 0; padding-left: 0; padding-right: 0; font-size: 0; }
+    .admin-sidebar.is-collapsed .nav-tab i,
+    .admin-sidebar.is-collapsed .portal-nav-link i { font-size: 1.15rem; width: auto; }
+    .admin-sidebar.is-collapsed .badge-bubble,
+    .admin-sidebar.is-collapsed .nav-badge,
+    .admin-sidebar.is-collapsed .dept-nav-list,
+    .admin-sidebar.is-collapsed .dept-add-btn { display: none; }
+    .admin-sidebar.is-collapsed .sidebar-footer { flex-direction: column; align-items: center; gap: .5rem; }
+    .admin-sidebar.is-collapsed .sidebar-logout-btn { font-size: 0; gap: 0; padding-left: 0; padding-right: 0; justify-content: center; }
+    .admin-sidebar.is-collapsed .sidebar-logout-btn i { font-size: 1rem; }
+  }
+  </style>
 </head>
 <body class="light-theme">
   
@@ -116,11 +156,15 @@
           <img src="assets/vkon-logo-dark.png" alt="Vkon Automation" class="sidebar-wordmark vkon-logo-dark">
           <img src="assets/vkon-logo-light.png" alt="Vkon Automation" class="sidebar-wordmark vkon-logo-light">
         </div>
+        <img src="assets/vkon-icon.svg" alt="VKON" class="sidebar-mark" aria-hidden="true">
         <div class="brand-text">
           <span class="badge-sub"><span class="label-tech">Attendance Portal</span></span>
         </div>
         <button type="button" class="portal-drawer-close" id="portalDrawerCloseBtn" aria-label="Close menu">
           <i class="fa-solid fa-xmark"></i>
+        </button>
+        <button type="button" class="sidebar-collapse-toggle" id="sidebarCollapseBtn" aria-expanded="true" aria-label="Collapse menu" title="Collapse menu">
+          <i class="fa-solid fa-angles-left" aria-hidden="true"></i>
         </button>
       </div>
 
@@ -1110,14 +1154,14 @@
   <!-- The server adapter must be parsed before shared.js: shared.js asks it whether
        this browser reads shared state or only its own localStorage, and waits on it
        before seeding. Order here is load-bearing. -->
-  <script src="js/api.js?v=20261102_en21"></script>
-  <script src="js/password-change.js?v=20261102_en21"></script>
-  <script src="shared.js?v=20261102_en21"></script>
+  <script src="js/api.js?v=20261102_en22"></script>
+  <script src="js/password-change.js?v=20261102_en22"></script>
+  <script src="shared.js?v=20261102_en22"></script>
   <script src="js/confirm-decision-modal.js?v=20261023_apr1"></script>
   <script src="js/day-popover.js?v=20261030_cr1"></script>
-  <script src="app.js?v=20261102_en21"></script>
+  <script src="app.js?v=20261102_en22"></script>
   <script src="js/password-toggle.js?v=20261019_ui1"></script>
-  <script src="js/pwa.js?v=20261102_en21"></script>
+  <script src="js/pwa.js?v=20261102_en22"></script>
 
   <!-- Present Day & Migration Guarantee -->
   <script>
