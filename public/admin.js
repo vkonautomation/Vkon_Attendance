@@ -565,9 +565,9 @@ function renderMonthlyReport() {
       <td>
         <div class="table-emp-cell">
           <img src="${emp.avatar}" alt="${emp.name}" class="table-avatar">
-          <div>
-            <span class="font-bold">${emp.name}</span>
-            <span class="table-sub">${emp.role}</span>
+          <div class="emp-name-role">
+            <span class="emp-name">${emp.name}</span>
+            <span class="emp-role">${emp.role}</span>
           </div>
         </div>
       </td>

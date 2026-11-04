@@ -33,6 +33,16 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <link rel="stylesheet" href="styles.css?v=20261026_nm2">
+
+  <style>
+    /* Employees roster — tidy, one-by-one name/role cell that stays identical under
+       browser zoom. Loaded after styles.css so it wins; scoped to this cell only. */
+    .table-emp-cell { align-items: center; gap: .6rem; }
+    .table-emp-cell .table-avatar { width: 38px; height: 38px; flex: 0 0 auto; border-radius: 50%; object-fit: cover; }
+    .emp-name-role { display: flex; flex-direction: column; gap: .12rem; min-width: 0; line-height: 1.2; text-align: left; }
+    .emp-name { font-weight: 700; font-size: .9rem; color: var(--text-primary, #14171A); white-space: nowrap; }
+    .emp-role { font-weight: 500; font-size: .74rem; color: var(--text-muted, #64748b); white-space: nowrap; }
+  </style>
 </head>
 <body class="light-theme admin-page">
 
@@ -1724,13 +1734,13 @@
   <!-- The server adapter must be parsed before shared.js: shared.js asks it whether
        this browser reads shared state or only its own localStorage, and waits on it
        before seeding. Order here is load-bearing. -->
-  <script src="js/api.js?v=20261102_en13"></script>
-  <script src="js/password-change.js?v=20261102_en13"></script>
-  <script src="shared.js?v=20261102_en13"></script>
+  <script src="js/api.js?v=20261102_en14"></script>
+  <script src="js/password-change.js?v=20261102_en14"></script>
+  <script src="shared.js?v=20261102_en14"></script>
   <script src="js/confirm-decision-modal.js?v=20261023_apr1"></script>
   <script src="js/day-popover.js?v=20261030_cr1"></script>
-  <script src="admin.js?v=20261102_en13"></script>
+  <script src="admin.js?v=20261102_en14"></script>
   <script src="js/password-toggle.js?v=20261019_ui1"></script>
-  <script src="js/pwa.js?v=20261102_en13"></script>
+  <script src="js/pwa.js?v=20261102_en14"></script>
 </body>
 </html>
