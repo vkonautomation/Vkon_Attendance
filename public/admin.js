@@ -3433,7 +3433,7 @@ function renderDashboard() {
         <td class="font-bold">${nm}</td>
         <td class="font-mono">${_dashShortDate(a.dateStr)}</td>
         <td><span class="dash-reason">${reason}</span></td>
-        <td class="dash-cell-actions"><button type="button" class="btn btn-ghost btn-sm" data-dash-action="resolve">Resolve</button></td>
+        <td class="dash-cell-actions"><button type="button" class="btn btn-ghost btn-sm" data-dash-action="resolve" data-emp="${a.empId}" data-date="${a.dateStr}">Resolve</button></td>
       </tr>`;
     }).join("");
     const wrap = resolveBody.closest(".table-responsive");
@@ -3571,11 +3571,7 @@ function handleDashboardAction(el) {
   const empId = el.getAttribute("data-emp");
   if (action === "absent") return dashMarkAbsent(empId, el);
   if (action === "remind") return dashSendReminder(empId, el);
-  if (action === "resolve") {
-    switchAdminTab("tab-monthly-sheet");
-    const sel = document.getElementById("masterTodayFilter");
-    if (sel) { sel.value = "not-in"; if (typeof applyMasterTableView === "function") applyMasterTableView(); }
-  }
+  if (action === "resolve") return dashResolveDay(empId, el.getAttribute("data-date"));
 }
 
 // Writes an Absent record for today on the admin's behalf and re-renders.
@@ -3621,6 +3617,74 @@ function dashSendReminder(empId, btn) {
     })
     .catch(() => showToast("Could not send the reminder right now.", "error"))
     .then(() => { if (btn) btn.disabled = false; });
+}
+
+// Opens a small dialog to resolve one open attendance day. Each outcome writes
+// the exact record shape the approval engine produces, so the day is genuinely
+// cleared from "Attendance to resolve" (a completed Present/WFH, Leave, or Loss
+// of Pay is what the alert engine treats as resolved). Reason is required and
+// stored on the record for the audit trail.
+function dashResolveDay(empId, date) {
+  if (!empId || !date) return;
+  const employees = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
+  const emp = employees.find(e => e.id === empId) || { name: empId };
+  ConfirmDecisionModal.open({
+    title: "Resolve attendance",
+    summary: `${emp.name} \u00b7 ${_dashShortDate(date)}`,
+    detail:
+      `<label class="cdm-field-label" for="dashResolveOutcome">Resolve this day as</label>` +
+      `<select id="dashResolveOutcome" class="form-control" style="width:100%;">` +
+      `<option value="present">Present \u2014 they worked a full day</option>` +
+      `<option value="wfh">Work from home \u2014 full day remote</option>` +
+      `<option value="leave">Leave \u2014 approved paid leave</option>` +
+      `<option value="lop">Loss of Pay \u2014 accept as an unpaid absence</option>` +
+      `</select>` +
+      `<p style="margin-top:8px;color:#64748b;font-size:.82rem;">This records the day and removes it from &quot;Attendance to resolve&quot;. The reason is kept in the audit trail.</p>`,
+    actionLabel: "Apply resolution",
+    actionStyle: "primary",
+    reasonRequired: true,
+    reasonLabel: "Reason",
+    placeholder: "Required \u2014 why this day is being corrected",
+    run: (reason) => {
+      const sel = document.getElementById("dashResolveOutcome");
+      const outcome = sel ? sel.value : "present";
+      const res = _dashWriteResolvedRecord(empId, date, outcome, reason, emp);
+      if (res && res.error) return { ok: false, error: res.error };
+      const LABELS = { present: "Present", wfh: "WFH", leave: "Leave", lop: "Loss of Pay" };
+      if (typeof recalcShortHoursDays === "function") recalcShortHoursDays();
+      if (typeof renderMonthlyReport === "function") renderMonthlyReport();
+      if (typeof renderEmpCalendar === "function") renderEmpCalendar();
+      renderDashboard();
+      showToast(`${emp.name} \u2014 ${_dashShortDate(date)} resolved as ${LABELS[outcome] || outcome}.`, "success");
+      return { ok: true };
+    }
+  });
+}
+
+// Writes a resolved-day record mirroring applyApprovedEffect's shapes.
+function _dashWriteResolvedRecord(empId, date, outcome, reason, emp) {
+  const records = getStore(STORAGE_KEYS.RECORDS, {});
+  const base = {
+    employeeId: empId, date,
+    overrideReason: (reason || "").trim(),
+    resolvedBy: "admin", resolvedAt: new Date().toISOString()
+  };
+  const avatar = (emp && emp.avatar) || null;
+  let rec;
+  if (outcome === "present") {
+    rec = Object.assign({}, base, { status: "Present", checkInTime: "09:15 AM", checkOutTime: "06:15 PM", duration: "Regularised Shift (9h 00m)", hoursDecimal: 9.0, distance: 25, locationType: "Office (Regularised)", bioVerified: true, regularised: true, capturedTimestamp: Date.now(), selfieUrl: avatar });
+  } else if (outcome === "wfh") {
+    rec = Object.assign({}, base, { status: "WFH", checkInTime: "09:00 AM", checkOutTime: "06:00 PM", duration: "Scheduled Shift", hoursDecimal: 9.0, distance: 0, locationType: "Work From Home (Approved)", bioVerified: true, selfieUrl: avatar });
+  } else if (outcome === "leave") {
+    rec = Object.assign({}, base, { status: "Leave", checkInTime: "-", checkOutTime: "-", duration: "Personal Leave", hoursDecimal: 0, distance: 0, locationType: "Personal Leave (Approved)", bioVerified: false, selfieUrl: null });
+  } else if (outcome === "lop") {
+    rec = Object.assign({}, base, { status: "Loss of Pay", checkInTime: "-", checkOutTime: "-", duration: "Loss of Pay (Unpaid)", hoursDecimal: 0, distance: 0, locationType: "Loss of Pay (Approved)", bioVerified: false, selfieUrl: null });
+  } else {
+    return { error: "Choose a resolution first." };
+  }
+  records[`${empId}_${date}`] = rec;
+  setStore(STORAGE_KEYS.RECORDS, records);
+  return rec;
 }
 
 // --- Recruitment pipeline ---
