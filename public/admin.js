@@ -3350,21 +3350,16 @@ function renderDashboard() {
   setTextSafe("dashStatLeave", onLeave);
   setTextSafe("dashStatPending", pending);
 
-  // "Unresolved Days (Team)" = the TOTAL count of open, still-actionable absence
-  // days across the team BEFORE the payroll cut-off (a day already past the
-  // cut-off is LOP, not unresolved). Counts days, not employees.
-  let unresolvedDays = 0;
-  employees.forEach(emp => {
-    try {
-      const al = (typeof getRegularisationAlerts === "function") ? getRegularisationAlerts(emp, now, dashSettings) : [];
-      if (al) unresolvedDays += al.filter(a => !a.pastCutOff).length;
-    } catch (e) { /* non-fatal */ }
-  });
-  setTextSafe("dashStatUnresolved", unresolvedDays);
+  // Office vs remote breakdown inside the "In Today" card.
+  setTextSafe("dashPresentSplit", `${inToday - remote} office \u00b7 ${remote} remote`);
 
   // A declared company holiday is not stored per-employee, so "On Leave / Holiday"
   // would read 0 while the whole office is actually off. Show an explicit banner.
   const todayHoliday = (typeof findHolidayForDate === "function") ? findHolidayForDate(todayKey) : null;
+  const istToday = (typeof getISTDate === "function") ? getISTDate(now) : now;
+  const todayIsWeekend = istToday.getDay() === 0 || istToday.getDay() === 6;
+  const officeClosed = todayIsWeekend || !!todayHoliday;
+
   const hBanner = document.getElementById("dashHolidayBanner");
   const hText = document.getElementById("dashHolidayBannerText");
   if (hBanner) {
@@ -3376,6 +3371,122 @@ function renderDashboard() {
     }
   }
 
+  // ---- Not in yet: expected today but no check-in / leave filed yet ----
+  const notIn = [];
+  if (!officeClosed) {
+    employees.forEach(emp => {
+      if (emp.enrolledAt && emp.enrolledAt > todayKey) return;
+      if (typeof isNonWorkingDay === "function" && isNonWorkingDay(todayKey, emp.id)) return;
+      const rec = records[`${emp.id}_${todayKey}`];
+      const st = rec && rec.status;
+      if (st === "Present" || st === "WFH" || st === "Leave" || st === "Holiday") return;
+      notIn.push({ emp, alreadyAbsent: st === "Absent" });
+    });
+  }
+  setTextSafe("dashNotInCount", notIn.length);
+  const expectedStart = (dashSettings && dashSettings.shiftStart) ? dashSettings.shiftStart : "09:30 AM";
+  const notInBody = document.getElementById("dashNotInBody");
+  if (notInBody) {
+    notInBody.innerHTML = notIn.map(n => `
+      <tr>
+        <td><div class="table-emp-cell"><img src="${n.emp.avatar}" class="table-avatar" alt="${n.emp.name}"><span class="font-bold">${n.emp.name}</span></div></td>
+        <td class="dash-expected">${expectedStart}</td>
+        <td>${n.alreadyAbsent ? '<span class="today-pill pill-notin">Marked absent</span>' : '<span class="today-pill pill-late">No check-in</span>'}</td>
+        <td class="dash-cell-actions">
+          <button type="button" class="btn btn-ghost btn-sm" data-dash-action="remind" data-emp="${n.emp.id}">Send reminder</button>
+          ${n.alreadyAbsent ? "" : `<button type="button" class="btn btn-ghost btn-sm" data-dash-action="absent" data-emp="${n.emp.id}">Mark absent</button>`}
+        </td>
+      </tr>`).join("");
+    const wrap = notInBody.closest(".table-responsive");
+    if (wrap) wrap.style.display = notIn.length ? "" : "none";
+  }
+  const notInEmpty = document.getElementById("dashNotInEmpty");
+  if (notInEmpty) {
+    notInEmpty.style.display = notIn.length ? "none" : "";
+    notInEmpty.innerHTML = officeClosed
+      ? '<i class="fa-solid fa-umbrella-beach"></i> The office is closed today \u2014 no check-ins expected.'
+      : '<i class="fa-solid fa-circle-check"></i> Everyone expected today has checked in.';
+  }
+
+  // ---- Attendance to resolve: short list of open, still-actionable days ----
+  const resolveAlerts = [];
+  employees.forEach(emp => {
+    try {
+      const al = (typeof getRegularisationAlerts === "function") ? getRegularisationAlerts(emp, now, dashSettings) : [];
+      (al || []).forEach(a => { if (!a.pastCutOff) { a._emp = emp; resolveAlerts.push(a); } });
+    } catch (e) { /* non-fatal */ }
+  });
+  const RANKD = { critical: 0, warning: 1, info: 2 };
+  resolveAlerts.sort((a, b) => (RANKD[a.urgency] - RANKD[b.urgency]) || (a.dateStr < b.dateStr ? -1 : a.dateStr > b.dateStr ? 1 : 0));
+  setTextSafe("dashStatUnresolved", resolveAlerts.length);
+  setTextSafe("dashResolveCount", resolveAlerts.length);
+  const resolveBody = document.getElementById("dashResolveBody");
+  if (resolveBody) {
+    resolveBody.innerHTML = resolveAlerts.slice(0, 6).map(a => {
+      const rec = records[`${a.empId}_${a.dateStr}`];
+      let reason = "Not marked";
+      if (a.statusLabel === "Absent") reason = (rec && (rec.status === "Present" || rec.status === "WFH")) ? "Missing check-out" : "Marked absent";
+      else if (a.statusLabel === "Not Marked") reason = "No punch / no leave filed";
+      const nm = (a._emp && a._emp.name) || (typeof _employeeName === "function" ? _employeeName(a.empId) : a.empId);
+      return `
+      <tr>
+        <td class="font-bold">${nm}</td>
+        <td class="font-mono">${_dashShortDate(a.dateStr)}</td>
+        <td><span class="dash-reason">${reason}</span></td>
+        <td class="dash-cell-actions"><button type="button" class="btn btn-ghost btn-sm" data-dash-action="resolve">Resolve</button></td>
+      </tr>`;
+    }).join("");
+    const wrap = resolveBody.closest(".table-responsive");
+    if (wrap) wrap.style.display = resolveAlerts.length ? "" : "none";
+  }
+  const resolveEmpty = document.getElementById("dashResolveEmpty");
+  if (resolveEmpty) resolveEmpty.style.display = resolveAlerts.length ? "none" : "";
+  const resolveViewAll = document.getElementById("dashResolveViewAll");
+  if (resolveViewAll) resolveViewAll.style.display = resolveAlerts.length ? "" : "none";
+
+  // ---- Missing check-outs from yesterday (the most common cause of unresolved days) ----
+  const yest = new Date(istToday); yest.setDate(yest.getDate() - 1);
+  const yestKey = formatDateKey(yest);
+  const missOut = [];
+  employees.forEach(emp => {
+    const rec = records[`${emp.id}_${yestKey}`];
+    if (rec && (rec.status === "Present" || rec.status === "WFH") && (typeof isOpenPunch === "function") && isOpenPunch(rec)) {
+      missOut.push({ emp, date: yestKey });
+    }
+  });
+  setTextSafe("dashMissOutCount", missOut.length);
+  const missList = document.getElementById("dashMissOutList");
+  if (missList) {
+    missList.innerHTML = missOut.map(m => `<span class="dash-chip"><i class="fa-solid fa-arrow-right-from-bracket"></i> ${m.emp.name} <span class="dash-chip-when">${_dashShortDate(m.date)}</span><button type="button" data-dash-action="remind" data-emp="${m.emp.id}">Nudge</button></span>`).join("");
+    missList.style.display = missOut.length ? "" : "none";
+  }
+  const missEmpty = document.getElementById("dashMissOutEmpty");
+  if (missEmpty) missEmpty.style.display = missOut.length ? "none" : "";
+
+  // ---- Out this week: approved leave + declared holidays, next 7 days ----
+  const winEnd = new Date(istToday); winEnd.setDate(winEnd.getDate() + 6);
+  const winEndKey = formatDateKey(winEnd);
+  const outItems = [];
+  leaves.filter(l => l.status === "Approved").forEach(l => {
+    const sKey = l.startDate || l.date; const eKey = l.endDate || l.date || sKey;
+    if (!sKey || eKey < todayKey || sKey > winEndKey) return;
+    const nm = l.employeeName || (typeof _employeeName === "function" ? _employeeName(l.employeeId) : l.employeeId);
+    const label = (sKey === eKey) ? _dashShortDate(sKey) : `${_dashShortDate(sKey)} \u2013 ${_dashShortDate(eKey)}`;
+    outItems.push({ sort: sKey, icon: "fa-umbrella-beach", text: nm, when: label });
+  });
+  (typeof getDeclaredHolidays === "function" ? getDeclaredHolidays() : []).forEach(h => {
+    if (h.date >= todayKey && h.date <= winEndKey) outItems.push({ sort: h.date, icon: "fa-gift", text: h.name, when: _dashShortDate(h.date) });
+  });
+  outItems.sort((a, b) => a.sort < b.sort ? -1 : a.sort > b.sort ? 1 : 0);
+  const outList = document.getElementById("dashOutWeekList");
+  if (outList) {
+    outList.innerHTML = outItems.map(o => `<span class="dash-chip"><i class="fa-solid ${o.icon}"></i> ${o.text} <span class="dash-chip-when">${o.when}</span></span>`).join("");
+    outList.style.display = outItems.length ? "" : "none";
+  }
+  const outEmpty = document.getElementById("dashOutWeekEmpty");
+  if (outEmpty) outEmpty.style.display = outItems.length ? "none" : "";
+
+  // ---- Check-ins today ----
   const tbody = document.getElementById("dashTodayTableBody");
   if (tbody) {
     tbody.innerHTML = rows.join("");
@@ -3385,6 +3496,7 @@ function renderDashboard() {
   const emptyNote = document.getElementById("dashEmptyToday");
   if (emptyNote) emptyNote.style.display = rows.length ? "none" : "";
 
+  // ---- Latest requests ----
   const items = [
     ...leaves.filter(l => l.status === "Pending").map(l => ({ kind: "Leave", who: l.employeeName || l.employeeId, when: l.dates || l.startDate || "", icon: "fa-umbrella-beach" })),
     ...wfhList.filter(w => w.status === "Pending").map(w => ({ kind: "WFH", who: w.employeeName || w.employeeId, when: w.date || "", icon: "fa-house-laptop" })),
@@ -3405,34 +3517,110 @@ function renderDashboard() {
   }
   const emptyReq = document.getElementById("dashEmptyRequests");
   if (emptyReq) emptyReq.style.display = items.length ? "none" : "";
+
+  // ---- "Updated HH:MM AM" stamp confirming the live view ----
+  const updEl = document.getElementById("dashUpdatedAt");
+  if (updEl) {
+    let t = "";
+    try { t = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Kolkata", hour: "numeric", minute: "2-digit", hour12: true }).format(new Date()); } catch (e) { t = ""; }
+    updEl.innerHTML = `<i class="fa-regular fa-clock"></i> Updated ${t || "--:--"}`;
+  }
 }
 
-// Dashboard KPI cards are entry points: clicking one jumps to the relevant tab
-// and, where the Attendance master sheet has a matching "Today Status" filter,
-// pre-applies it. Wired once (the cards are static markup).
+// Compact "Mon 4 Nov" label for the dashboard's new date columns/chips.
+function _dashShortDate(key) {
+  try { return new Date(key + "T00:00:00").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" }); }
+  catch (e) { return key; }
+}
+
+// Dashboard cards and action buttons are entry points. Wired once at panel level
+// (delegation) so the dynamically-rendered rows need no re-binding and inline
+// handlers (blocked by the page CSP) are never required.
 function wireDashboardCards() {
-  const grid = document.querySelector("#tab-dashboard .kpi-grid");
-  if (!grid || grid.dataset.wired === "1") return;
-  grid.dataset.wired = "1";
-  const go = (card) => {
-    const target = card.getAttribute("data-go");
+  const panel = document.getElementById("tab-dashboard");
+  if (!panel || panel.dataset.wired === "1") return;
+  panel.dataset.wired = "1";
+  const go = (el) => {
+    const target = el.getAttribute("data-go");
     if (!target) return;
-    const today = card.getAttribute("data-today");
+    const today = el.getAttribute("data-today");
     switchAdminTab(target);
     if (target === "tab-monthly-sheet" && today !== null) {
       const sel = document.getElementById("masterTodayFilter");
       if (sel) { sel.value = today; if (typeof applyMasterTableView === "function") applyMasterTableView(); }
     }
   };
-  grid.addEventListener("click", (e) => {
-    const card = e.target.closest(".kpi-card[data-go]");
-    if (card) go(card);
+  panel.addEventListener("click", (e) => {
+    const act = e.target.closest("[data-dash-action]");
+    if (act) { handleDashboardAction(act); return; }
+    const nav = e.target.closest("[data-go]");
+    if (nav) go(nav);
   });
-  grid.addEventListener("keydown", (e) => {
+  panel.addEventListener("keydown", (e) => {
     if (e.key !== "Enter" && e.key !== " ") return;
     const card = e.target.closest(".kpi-card[data-go]");
     if (card) { e.preventDefault(); go(card); }
   });
+  const refresh = document.getElementById("dashRefreshBtn");
+  if (refresh) refresh.addEventListener("click", () => renderDashboard());
+}
+
+// Row/card actions on the dashboard, dispatched from the delegated click handler.
+function handleDashboardAction(el) {
+  const action = el.getAttribute("data-dash-action");
+  const empId = el.getAttribute("data-emp");
+  if (action === "absent") return dashMarkAbsent(empId, el);
+  if (action === "remind") return dashSendReminder(empId, el);
+  if (action === "resolve") {
+    switchAdminTab("tab-monthly-sheet");
+    const sel = document.getElementById("masterTodayFilter");
+    if (sel) { sel.value = "not-in"; if (typeof applyMasterTableView === "function") applyMasterTableView(); }
+  }
+}
+
+// Writes an Absent record for today on the admin's behalf and re-renders.
+function dashMarkAbsent(empId, btn) {
+  if (!empId) return;
+  const employees = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
+  const emp = employees.find(e => e.id === empId);
+  if (!emp) return;
+  const now = (typeof getPresentDate === "function") ? getPresentDate() : new Date();
+  const todayKey = formatDateKey(now);
+  const records = getStore(STORAGE_KEYS.RECORDS, {});
+  records[`${empId}_${todayKey}`] = {
+    employeeId: empId, date: todayKey, status: "Absent", checkInTime: "-", checkOutTime: "-",
+    duration: "-", hoursDecimal: 0, distance: 0, locationType: "Office", bioVerified: false,
+    selfieUrl: null, markedBy: "admin", markedAt: new Date().toISOString()
+  };
+  setStore(STORAGE_KEYS.RECORDS, records);
+  showToast(`Marked ${emp.name} absent for today.`, "success");
+  renderDashboard();
+}
+
+// Emails the employee a check-in reminder via the server-backed /notify path.
+function dashSendReminder(empId, btn) {
+  if (!empId) return;
+  const employees = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
+  const emp = employees.find(e => e.id === empId);
+  if (!emp) return;
+  const api = window.VKON_API;
+  if (!api || typeof api.notify !== "function" || !api.isServerBacked || !api.isServerBacked()) {
+    showToast("Reminders need the server-backed build.", "warning");
+    return;
+  }
+  const s = (typeof getAttendanceSettings === "function") ? getAttendanceSettings() : null;
+  const start = (s && s.shiftStart) ? s.shiftStart : "the start of the day";
+  if (btn) btn.disabled = true;
+  const subject = "Reminder: you have not checked in today";
+  const text = `Hi ${emp.name || ""},\n\nYou have not checked in yet today (expected start ${start}). Please punch in when you arrive.\n\n\u2014 VKON Attendance`;
+  Promise.resolve(api.notify({ employeeId: empId, subject, text }))
+    .then(r => {
+      if (r && r.ok && (r.sent || r.reason === "already_sent_today")) showToast(`Reminder emailed to ${emp.name}.`, "success");
+      else if (r && r.reason === "no_address") showToast(`${emp.name} has no email on file.`, "warning");
+      else showToast("Could not send the reminder right now.", "error");
+    })
+    .catch(() => showToast("Could not send the reminder right now.", "error"))
+    .then(() => { if (btn) btn.disabled = false; });
 }
 
 // --- Recruitment pipeline ---

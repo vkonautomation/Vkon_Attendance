@@ -82,6 +82,29 @@
     body.admin-page .admin-chip-icon { font-size: .95rem; }
     body.admin-page .admin-chip .chip-name { font-size: .8rem; }
     body.admin-page .admin-chip .chip-role { font-size: .68rem; }
+
+    /* --- Dashboard: refresh control, sub-lines, action sections --- */
+    body.admin-page .dash-refresh-group { margin-left: auto; display: flex; align-items: center; gap: .6rem; }
+    body.admin-page .dash-updated { font-size: .78rem; color: var(--text-muted, #64748b); white-space: nowrap; }
+    body.admin-page .dash-updated i { margin-right: .25rem; }
+    /* Office/remote breakdown line inside the "In Today" card. */
+    body.admin-page #tab-dashboard .kpi-sub { display: block; font-size: .72rem; font-weight: 600; color: var(--text-muted, #64748b); margin-top: .15rem; }
+    /* Section headings: count badge + light hint + inline "View all". */
+    body.admin-page .dash-count { display: inline-block; min-width: 1.4rem; padding: 0 .4rem; margin-left: .35rem; border-radius: 999px; background: #eef2f7; color: #475569; font-size: .78rem; font-weight: 700; line-height: 1.5; text-align: center; vertical-align: middle; }
+    body.admin-page .dash-sub-hint { font-size: .72rem; font-weight: 500; color: var(--text-muted, #94a3b8); margin-left: .3rem; }
+    body.admin-page .dash-viewall { margin-left: .6rem; font-weight: 600; color: var(--primary, #ea580c); }
+    body.admin-page .dash-section { margin: 0 0 1.35rem; }
+    body.admin-page .dash-col-actions { text-align: right; }
+    body.admin-page td.dash-col-actions, body.admin-page td.dash-cell-actions { text-align: right; white-space: nowrap; }
+    body.admin-page .dash-cell-actions .btn { margin-left: .35rem; }
+    body.admin-page .dash-expected { font-family: var(--font-mono, monospace); font-weight: 600; }
+    body.admin-page .dash-reason { color: #b45309; font-weight: 600; }
+    /* Chip lists (missing check-outs, out this week). */
+    body.admin-page .dash-chip-list { display: flex; flex-wrap: wrap; gap: .5rem; }
+    body.admin-page .dash-chip { display: inline-flex; align-items: center; gap: .45rem; padding: .35rem .65rem; border: 1px solid #e7eaf0; border-radius: 999px; background: #fff; font-size: .82rem; }
+    body.admin-page .dash-chip i { color: var(--text-muted, #64748b); }
+    body.admin-page .dash-chip .dash-chip-when { color: var(--text-muted, #64748b); font-size: .76rem; }
+    body.admin-page .dash-chip button { border: 0; background: none; color: var(--primary, #ea580c); font-weight: 600; font-size: .78rem; cursor: pointer; padding: 0 0 0 .3rem; }
   </style>
 </head>
 <body class="light-theme admin-page">
@@ -277,6 +300,12 @@
               <h2><i class="fa-solid fa-gauge-high text-primary"></i> Today at a glance</h2>
               <p class="subtitle">Live company snapshot</p>
             </div>
+            <div class="dash-refresh-group">
+              <span class="dash-updated" id="dashUpdatedAt"><i class="fa-regular fa-clock"></i> Updated --:--</span>
+              <button type="button" class="btn btn-ghost btn-sm" id="dashRefreshBtn" title="Refresh this view" aria-label="Refresh dashboard">
+                <i class="fa-solid fa-rotate"></i> Refresh
+              </button>
+            </div>
           </div>
 
           <div class="kpi-grid">
@@ -285,6 +314,7 @@
               <div class="kpi-data">
                 <span class="kpi-num text-success" id="dashStatPresent">0</span>
                 <span class="kpi-lbl">In Today (Office + Remote)</span>
+                <span class="kpi-sub" id="dashPresentSplit">0 office &middot; 0 remote</span>
               </div>
             </div>
             <div class="kpi-card" data-go="tab-monthly-sheet" data-today="late" role="button" tabindex="0" title="View late check-ins">
@@ -329,6 +359,19 @@
             <span id="dashHolidayBannerText">Today is a company holiday.</span>
           </div>
 
+          <h3 class="dash-sub-heading"><i class="fa-solid fa-user-clock text-danger"></i> Not in yet <span class="dash-count" id="dashNotInCount">0</span></h3>
+          <div class="dash-section" id="dashNotInWrap">
+            <div class="table-responsive master-table-wrap">
+              <table class="data-table">
+                <thead>
+                  <tr><th>Employee</th><th>Expected start</th><th>Status</th><th class="dash-col-actions">Actions</th></tr>
+                </thead>
+                <tbody id="dashNotInBody"></tbody>
+              </table>
+            </div>
+            <p class="dash-empty-note" id="dashNotInEmpty" style="display: none;"><i class="fa-solid fa-circle-check"></i> Everyone expected today has checked in.</p>
+          </div>
+
           <h3 class="dash-sub-heading"><i class="fa-solid fa-right-to-bracket"></i> Check-ins today</h3>
           <div class="table-responsive master-table-wrap">
             <table class="data-table">
@@ -339,6 +382,33 @@
             </table>
           </div>
           <p class="dash-empty-note" id="dashEmptyToday" style="display: none;"><i class="fa-solid fa-mug-hot"></i> Nobody has punched in yet today &mdash; the list fills up as the team checks in.</p>
+
+          <h3 class="dash-sub-heading"><i class="fa-solid fa-triangle-exclamation text-danger"></i> Attendance to resolve <span class="dash-count" id="dashResolveCount">0</span>
+            <button type="button" class="btn btn-ghost btn-sm dash-viewall" data-go="tab-monthly-sheet" data-today="not-in" id="dashResolveViewAll" style="display: none;">View all</button>
+          </h3>
+          <div class="dash-section" id="dashResolveWrap">
+            <div class="table-responsive master-table-wrap">
+              <table class="data-table">
+                <thead>
+                  <tr><th>Employee</th><th>Date</th><th>Reason</th><th class="dash-col-actions">Action</th></tr>
+                </thead>
+                <tbody id="dashResolveBody"></tbody>
+              </table>
+            </div>
+            <p class="dash-empty-note" id="dashResolveEmpty"><i class="fa-solid fa-circle-check"></i> No days to resolve.</p>
+          </div>
+
+          <h3 class="dash-sub-heading"><i class="fa-solid fa-person-walking-arrow-right"></i> Missing check-outs <span class="dash-sub-hint">from yesterday</span> <span class="dash-count" id="dashMissOutCount">0</span></h3>
+          <div class="dash-section" id="dashMissOutWrap">
+            <div class="dash-chip-list" id="dashMissOutList"></div>
+            <p class="dash-empty-note" id="dashMissOutEmpty" style="display: none;"><i class="fa-solid fa-circle-check"></i> Everyone punched out yesterday.</p>
+          </div>
+
+          <h3 class="dash-sub-heading"><i class="fa-solid fa-calendar-days text-primary"></i> Out this week <span class="dash-sub-hint">next 7 days</span></h3>
+          <div class="dash-section" id="dashOutWeekWrap">
+            <div class="dash-chip-list" id="dashOutWeekList"></div>
+            <p class="dash-empty-note" id="dashOutWeekEmpty" style="display: none;"><i class="fa-regular fa-sun"></i> No leave or holidays in the next 7 days.</p>
+          </div>
 
           <h3 class="dash-sub-heading"><i class="fa-solid fa-inbox"></i> Latest requests</h3>
           <div class="dash-request-list" id="dashRecentRequests"></div>
@@ -1781,13 +1851,13 @@
   <!-- The server adapter must be parsed before shared.js: shared.js asks it whether
        this browser reads shared state or only its own localStorage, and waits on it
        before seeding. Order here is load-bearing. -->
-  <script src="js/api.js?v=20261102_en17"></script>
-  <script src="js/password-change.js?v=20261102_en17"></script>
-  <script src="shared.js?v=20261102_en17"></script>
+  <script src="js/api.js?v=20261102_en18"></script>
+  <script src="js/password-change.js?v=20261102_en18"></script>
+  <script src="shared.js?v=20261102_en18"></script>
   <script src="js/confirm-decision-modal.js?v=20261023_apr1"></script>
   <script src="js/day-popover.js?v=20261030_cr1"></script>
-  <script src="admin.js?v=20261102_en17"></script>
+  <script src="admin.js?v=20261102_en18"></script>
   <script src="js/password-toggle.js?v=20261019_ui1"></script>
-  <script src="js/pwa.js?v=20261102_en17"></script>
+  <script src="js/pwa.js?v=20261102_en18"></script>
 </body>
 </html>
