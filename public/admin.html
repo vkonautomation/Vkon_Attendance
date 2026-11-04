@@ -55,6 +55,33 @@
     .roster-info-cell .roster-manager strong { color: var(--text-primary, #14171A); font-weight: 600; }
     .roster-info-cell .roster-contact { display: block; font-size: .74rem; color: var(--text-muted, #64748b); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .roster-info-cell .roster-id { font-size: .72rem; color: var(--text-muted, #64748b); font-family: var(--font-mono, ui-monospace, monospace); }
+
+    /* Dashboard refinements ------------------------------------------------
+       Balanced 3-column grid (6 cards = 2 even rows, no orphan fifth card). */
+    body.admin-page #tab-dashboard .kpi-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+    @media (max-width: 900px) { body.admin-page #tab-dashboard .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 560px) { body.admin-page #tab-dashboard .kpi-grid { grid-template-columns: 1fr; } }
+    /* Flatter cards to match the flat table below (drop the heavy shadow/radius). */
+    body.admin-page #tab-dashboard .kpi-card { background: #fff; border: 1px solid #e7eaf0; border-radius: 10px; box-shadow: none; }
+    body.admin-page:not(.light-theme) #tab-dashboard .kpi-card { background: rgba(255,255,255,.02); border-color: var(--border-glass); }
+    /* Clickable entry-point affordance. */
+    body.admin-page #tab-dashboard .kpi-card[data-go] { cursor: pointer; transition: border-color .15s ease, box-shadow .15s ease, transform .12s ease; }
+    body.admin-page #tab-dashboard .kpi-card[data-go]:hover { border-color: #f0a875; box-shadow: 0 2px 10px rgba(234,88,12,.10); transform: translateY(-1px); }
+    body.admin-page #tab-dashboard .kpi-card[data-go]:focus-visible { outline: 2px solid #ea580c; outline-offset: 2px; }
+    body.admin-page #tab-dashboard .kpi-card-alert .kpi-num { color: #e11d48; }
+    /* Stronger label contrast (the faint grey was hard to read). */
+    body.admin-page #tab-dashboard .kpi-lbl { color: #475569; font-weight: 600; }
+    body.admin-page:not(.light-theme) #tab-dashboard .kpi-lbl { color: #cbd5e1; }
+    /* Subtitle reads as a subtitle, not a second title. */
+    .toolbar-title-group .subtitle { font-size: .8rem; font-weight: 400; color: var(--text-muted, #64748b); margin-top: .15rem; }
+    /* "On shift" live chip: normal font + a small green dot (was monospace). */
+    .on-shift { display: inline-flex; align-items: center; gap: .35rem; font-family: inherit; font-size: .82rem; color: var(--text-muted, #64748b); }
+    .on-shift::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #10b981; box-shadow: 0 0 0 3px rgba(16,185,129,.16); }
+    /* Calmer, smaller admin role chip (rarely changes, shouldn't shout). */
+    body.admin-page .admin-chip { padding: .22rem .5rem; gap: .4rem; background: transparent; border: 1px solid #e7eaf0; }
+    body.admin-page .admin-chip-icon { font-size: .95rem; }
+    body.admin-page .admin-chip .chip-name { font-size: .8rem; }
+    body.admin-page .admin-chip .chip-role { font-size: .68rem; }
   </style>
 </head>
 <body class="light-theme admin-page">
@@ -247,45 +274,52 @@
         <div class="admin-panel glass-panel">
           <div class="panel-header-toolbar">
             <div class="toolbar-title-group">
-              <h2><i class="fa-solid fa-gauge-high text-primary"></i> Today At A Glance</h2>
-              <p class="subtitle">Live company snapshot for <strong id="dashDateLabel">--</strong> (IST)</p>
+              <h2><i class="fa-solid fa-gauge-high text-primary"></i> Today at a glance</h2>
+              <p class="subtitle">Live company snapshot</p>
             </div>
           </div>
 
           <div class="kpi-grid">
-            <div class="kpi-card">
+            <div class="kpi-card" data-go="tab-monthly-sheet" data-today="" role="button" tabindex="0" title="View everyone checked in today">
               <div class="kpi-icon icon-bg-green"><i class="fa-solid fa-user-check"></i></div>
               <div class="kpi-data">
                 <span class="kpi-num text-success" id="dashStatPresent">0</span>
                 <span class="kpi-lbl">In Today (Office + Remote)</span>
               </div>
             </div>
-            <div class="kpi-card">
+            <div class="kpi-card" data-go="tab-monthly-sheet" data-today="late" role="button" tabindex="0" title="View late check-ins">
               <div class="kpi-icon icon-bg-amber"><i class="fa-solid fa-clock"></i></div>
               <div class="kpi-data">
                 <span class="kpi-num" id="dashStatLate">0</span>
                 <span class="kpi-lbl">Late Check-Ins</span>
               </div>
             </div>
-            <div class="kpi-card">
+            <div class="kpi-card" data-go="tab-monthly-sheet" data-today="remote" role="button" tabindex="0" title="View remote (WFH) today">
+              <div class="kpi-icon icon-bg-teal"><i class="fa-solid fa-house-laptop"></i></div>
+              <div class="kpi-data">
+                <span class="kpi-num" id="dashStatRemote">0</span>
+                <span class="kpi-lbl">Remote Today</span>
+              </div>
+            </div>
+            <div class="kpi-card" data-go="tab-monthly-sheet" data-today="leave" role="button" tabindex="0" title="View leave / holiday today">
               <div class="kpi-icon icon-bg-purple"><i class="fa-solid fa-umbrella-beach"></i></div>
               <div class="kpi-data">
                 <span class="kpi-num" id="dashStatLeave">0</span>
                 <span class="kpi-lbl">On Leave / Holiday</span>
               </div>
             </div>
-            <div class="kpi-card">
+            <div class="kpi-card" data-go="tab-approvals" role="button" tabindex="0" title="Open the approvals queue">
               <div class="kpi-icon icon-bg-blue"><i class="fa-solid fa-inbox"></i></div>
               <div class="kpi-data">
                 <span class="kpi-num" id="dashStatPending">0</span>
                 <span class="kpi-lbl">Requests Awaiting You</span>
               </div>
             </div>
-            <div class="kpi-card">
+            <div class="kpi-card kpi-card-alert" data-go="tab-monthly-sheet" data-today="not-in" role="button" tabindex="0" title="Days still needing action &mdash; missing check-outs or days not marked, before the payroll cut-off. Click to review.">
               <div class="kpi-icon icon-bg-rose"><i class="fa-solid fa-triangle-exclamation"></i></div>
               <div class="kpi-data">
                 <span class="kpi-num" id="dashStatUnresolved">0</span>
-                <span class="kpi-lbl">Unresolved Days (Team)</span>
+                <span class="kpi-lbl">Attendance to Resolve</span>
               </div>
             </div>
           </div>
@@ -295,7 +329,7 @@
             <span id="dashHolidayBannerText">Today is a company holiday.</span>
           </div>
 
-          <h3 class="dash-sub-heading"><i class="fa-solid fa-right-to-bracket"></i> Check-Ins Today</h3>
+          <h3 class="dash-sub-heading"><i class="fa-solid fa-right-to-bracket"></i> Check-ins today</h3>
           <div class="table-responsive master-table-wrap">
             <table class="data-table">
               <thead>
@@ -306,7 +340,7 @@
           </div>
           <p class="dash-empty-note" id="dashEmptyToday" style="display: none;"><i class="fa-solid fa-mug-hot"></i> Nobody has punched in yet today &mdash; the list fills up as the team checks in.</p>
 
-          <h3 class="dash-sub-heading"><i class="fa-solid fa-inbox"></i> Latest Requests</h3>
+          <h3 class="dash-sub-heading"><i class="fa-solid fa-inbox"></i> Latest requests</h3>
           <div class="dash-request-list" id="dashRecentRequests"></div>
           <p class="dash-empty-note" id="dashEmptyRequests" style="display: none;"><i class="fa-regular fa-face-smile"></i> Nothing pending &mdash; you are all caught up.</p>
         </div>
@@ -1747,13 +1781,13 @@
   <!-- The server adapter must be parsed before shared.js: shared.js asks it whether
        this browser reads shared state or only its own localStorage, and waits on it
        before seeding. Order here is load-bearing. -->
-  <script src="js/api.js?v=20261102_en15"></script>
-  <script src="js/password-change.js?v=20261102_en15"></script>
-  <script src="shared.js?v=20261102_en15"></script>
+  <script src="js/api.js?v=20261102_en16"></script>
+  <script src="js/password-change.js?v=20261102_en16"></script>
+  <script src="shared.js?v=20261102_en16"></script>
   <script src="js/confirm-decision-modal.js?v=20261023_apr1"></script>
   <script src="js/day-popover.js?v=20261030_cr1"></script>
-  <script src="admin.js?v=20261102_en15"></script>
+  <script src="admin.js?v=20261102_en16"></script>
   <script src="js/password-toggle.js?v=20261019_ui1"></script>
-  <script src="js/pwa.js?v=20261102_en15"></script>
+  <script src="js/pwa.js?v=20261102_en16"></script>
 </body>
 </html>

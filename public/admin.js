@@ -3299,11 +3299,7 @@ function renderDashboard() {
   const regs = getStore(STORAGE_KEYS.REGULARISATIONS, []);
   const todayKey = formatDateKey(now);
 
-  setTextSafe("dashDateLabel", now.toLocaleDateString("en-US", {
-    timeZone: "Asia/Kolkata", weekday: "long", month: "long", day: "numeric", year: "numeric"
-  }));
-
-  let inToday = 0, late = 0, onLeave = 0;
+  let inToday = 0, late = 0, onLeave = 0, remote = 0;
   const rows = [];
   employees.forEach(emp => {
     const rec = records[`${emp.id}_${todayKey}`];
@@ -3313,13 +3309,25 @@ function renderDashboard() {
       const isLate = inMin !== null && inMin > LATE_CUTOFF_MIN_DASH;
       inToday++;
       if (isLate) late++;
+      if (rec.status === "WFH") remote++;
+      // Show HOW late, not just a bare "Late" badge.
+      let statusPill = "On Time";
+      if (isLate) {
+        const minsLate = inMin - LATE_CUTOFF_MIN_DASH;
+        const hh = Math.floor(minsLate / 60), mm = minsLate % 60;
+        statusPill = `Late \u00b7 ${hh > 0 ? hh + "h " : ""}${String(mm).padStart(2, "0")}m`;
+      }
+      // Check-out: a real time in mono, or a live "On shift" chip (not mono).
+      const outCell = rec.checkOutTime && rec.checkOutTime !== "-"
+        ? `<span class="font-mono">${rec.checkOutTime}</span>`
+        : `<span class="on-shift">On shift</span>`;
       rows.push(`
         <tr>
           <td><div class="table-emp-cell"><img src="${emp.avatar}" class="table-avatar" alt="${emp.name}"><span class="font-bold">${emp.name}</span></div></td>
           <td class="font-mono">${rec.checkInTime && rec.checkInTime !== "-" ? rec.checkInTime : "--"}</td>
-          <td class="font-mono">${rec.checkOutTime && rec.checkOutTime !== "-" ? rec.checkOutTime : "On shift"}</td>
+          <td>${outCell}</td>
           <td><span class="type-cell">${rec.status === "WFH" ? "Remote" : "In house"}</span></td>
-          <td><span class="today-pill ${isLate ? "pill-late" : "pill-on-time"}">${isLate ? "Late" : "On Time"}</span></td>
+          <td><span class="today-pill ${isLate ? "pill-late" : "pill-on-time"}">${statusPill}</span></td>
         </tr>`);
     } else if (rec.status === "Leave" || rec.status === "Holiday") {
       onLeave++;
@@ -3333,6 +3341,7 @@ function renderDashboard() {
 
   setTextSafe("dashStatPresent", inToday);
   setTextSafe("dashStatLate", late);
+  setTextSafe("dashStatRemote", remote);
   setTextSafe("dashStatLeave", onLeave);
   setTextSafe("dashStatPending", pending);
 
@@ -3392,6 +3401,34 @@ function renderDashboard() {
   }
   const emptyReq = document.getElementById("dashEmptyRequests");
   if (emptyReq) emptyReq.style.display = items.length ? "none" : "";
+}
+
+// Dashboard KPI cards are entry points: clicking one jumps to the relevant tab
+// and, where the Attendance master sheet has a matching "Today Status" filter,
+// pre-applies it. Wired once (the cards are static markup).
+function wireDashboardCards() {
+  const grid = document.querySelector("#tab-dashboard .kpi-grid");
+  if (!grid || grid.dataset.wired === "1") return;
+  grid.dataset.wired = "1";
+  const go = (card) => {
+    const target = card.getAttribute("data-go");
+    if (!target) return;
+    const today = card.getAttribute("data-today");
+    switchAdminTab(target);
+    if (target === "tab-monthly-sheet" && today !== null) {
+      const sel = document.getElementById("masterTodayFilter");
+      if (sel) { sel.value = today; if (typeof applyMasterTableView === "function") applyMasterTableView(); }
+    }
+  };
+  grid.addEventListener("click", (e) => {
+    const card = e.target.closest(".kpi-card[data-go]");
+    if (card) go(card);
+  });
+  grid.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    const card = e.target.closest(".kpi-card[data-go]");
+    if (card) { e.preventDefault(); go(card); }
+  });
 }
 
 // --- Recruitment pipeline ---
@@ -3797,6 +3834,7 @@ function startAdminConsole() {
   initMasterTableSearch();
   initExtraModules();
   populateReportMonthSelect();
+  wireDashboardCards();
   renderMonthlyReport();
   renderRosterTable();
   initEnrollmentForm();

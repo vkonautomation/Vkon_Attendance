@@ -129,11 +129,11 @@ def verify_all():
     # ---- 7. worker version agrees with the HTML cache-buster --------------
     print("\n[Cache] worker version matches served assets:")
     ver_line = [ln for ln in sw.splitlines() if "const VERSION" in ln]
-    need(len(ver_line) == 1 and "20261102_en15" in ver_line[0],
-         "sw.js VERSION is pinned to the current token (20261102_en15)")
-    need("20261102_en15" in index_html and "20261102_en15" in admin_html,
+    need(len(ver_line) == 1 and "20261102_en16" in ver_line[0],
+         "sw.js VERSION is pinned to the current token (20261102_en16)")
+    need("20261102_en16" in index_html and "20261102_en16" in admin_html,
          "both pages carry the en13 cache-buster")
-    need("20261102_en14" not in index_html and "20261102_en14" not in admin_html,
+    need("20261102_en15" not in index_html and "20261102_en15" not in admin_html,
          "no stale en12 token left in either page")
 
     for r in results:
