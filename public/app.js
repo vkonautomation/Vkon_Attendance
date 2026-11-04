@@ -411,6 +411,7 @@ function initClock() {
   const clockTime = document.getElementById("clockTime");
   const clockDate = document.getElementById("clockDate");
   let lastDayKey = (typeof getPresentDate === "function") ? formatDateKey(getPresentDate()) : formatDateKey(new Date());
+  let lastPunchMinute = null;
 
   function update() {
     const istNow = (typeof getNowIST === "function") ? getNowIST() : new Date();
@@ -445,6 +446,17 @@ function initClock() {
       try { updatePunchStatus(); } catch (e) { /* non-fatal */ }
       try { renderRegAlertBanner(); } catch (e) { /* non-fatal */ }
       try { if (employeeState.currentEmployee) renderNotifications(employeeState.currentEmployee.id); } catch (e) { /* non-fatal */ }
+    }
+
+    // Keep the live shift timer (the "Shift Active (5h 47m)" pill, the worked-so-far
+    // text and the punch-out lock state) ticking without a page refresh. The display
+    // is minute-granular, so re-render the punch card the moment the IST minute rolls
+    // over; this also flips the pill to "Ready to Punch Out" on its own once the
+    // minimum-shift duration is met, with no reload required.
+    const curPunchMinute = istNow.getMinutes();
+    if (curPunchMinute !== lastPunchMinute) {
+      lastPunchMinute = curPunchMinute;
+      try { updatePunchStatus(); } catch (e) { /* non-fatal */ }
     }
   }
   update();
