@@ -79,3 +79,45 @@ body:not(.light-theme) .na-group-head {
 .na-item { align-items: flex-start; }
 .na-item:hover { background: #f1f5f9; }
 body:not(.light-theme) .na-item:hover { background: rgba(148, 163, 184, 0.10); }
+
+/* ==========================================================================
+   GROUPED TREATMENT — "Needs action" (amber, expanded, at the top) vs
+   "Already resolved" (muted, collapsed behind a toggle). The headline reflects
+   only the actionable group; when nothing is actionable the whole banner drops
+   to a calm FYI tone (.rab-fyi) instead of reading like an unread alert.
+   ========================================================================== */
+.rab-head { align-items: center; }
+.rab-icon { flex: 0 0 auto; width: 2rem; height: 2rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.95rem; background: rgba(245, 158, 11, 0.14); color: #b45309; }
+body:not(.light-theme) .rab-icon { background: rgba(251, 191, 36, 0.16); color: #fbbf24; }
+
+/* A soft amber edge on the card while something is still actionable. */
+.reg-alert-banner:not(.rab-fyi) { border-color: #fcd34d; }
+body:not(.light-theme) .reg-alert-banner:not(.rab-fyi) { border-color: rgba(245, 158, 11, 0.32); }
+
+/* FYI tone: no urgency anywhere — neutral icon and muted title. */
+.reg-alert-banner.rab-fyi .rab-icon { background: rgba(148, 163, 184, 0.16); color: #64748b; }
+body:not(.light-theme) .reg-alert-banner.rab-fyi .rab-icon { background: rgba(148, 163, 184, 0.18); color: #94a3b8; }
+.reg-alert-banner.rab-fyi .rab-title { color: #475569; }
+body:not(.light-theme) .reg-alert-banner.rab-fyi .rab-title { color: #cbd5e1; }
+
+/* Group headers divide the two sections. */
+.rab-group-head { display: flex; align-items: center; gap: 0.4rem; margin: 0.2rem 0 0; font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.03em; }
+.rab-group-head i { font-size: 0.78rem; }
+.rab-group-action { color: #b45309; }
+body:not(.light-theme) .rab-group-action { color: #fbbf24; }
+.rab-group-resolved { color: #94a3b8; margin-top: 0.35rem; }
+
+/* Needs-action rows: amber, with the due-by chip and the Regularise action. */
+.rab-item.rab-needs { border-left: 3px solid #f59e0b; background: #fffbeb; }
+body:not(.light-theme) .rab-item.rab-needs { background: rgba(245, 158, 11, 0.08); border-left-color: #f59e0b; }
+.rab-needs .rab-item-icon { color: #d97706; flex: 0 0 auto; }
+body:not(.light-theme) .rab-needs .rab-item-icon { color: #fbbf24; }
+.rab-chip-due { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.68rem; font-weight: 700; padding: 0.12rem 0.5rem; border-radius: 999px; background: rgba(245, 158, 11, 0.14); color: #b45309; }
+body:not(.light-theme) .rab-chip-due { background: rgba(251, 191, 36, 0.16); color: #fcd34d; }
+
+/* Already-resolved rows: muted history, no action, not styled like an active alert. */
+.rab-item.rab-resolved { border-left: 3px solid #cbd5e1; background: #f8fafc; opacity: 0.9; }
+body:not(.light-theme) .rab-item.rab-resolved { background: rgba(148, 163, 184, 0.06); border-left-color: rgba(148, 163, 184, 0.4); }
+.rab-resolved .rab-item-icon { color: #94a3b8; flex: 0 0 auto; }
+.rab-resolved .rab-item-msg { color: #64748b; }
+body:not(.light-theme) .rab-resolved .rab-item-msg { color: #94a3b8; }

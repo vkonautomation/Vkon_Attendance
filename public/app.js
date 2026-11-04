@@ -3646,8 +3646,7 @@ function initNotifications() {
 // The alerts themselves are computed by the pure shared function; nothing here
 // persists them. Only a per-employee "last seen" timestamp is stored.
 // ============================================================================
-const REG_ALERT_COLLAPSED = 3;   // banner shows this many, then "Show all"
-let regAlertsExpanded = false;
+let regResolvedExpanded = false;   // the "Already resolved" (past cut-off) group is collapsed by default
 
 function _regAlertsFor(empId) {
   if (!empId || typeof getRegularisationAlerts !== "function") return [];
@@ -3660,18 +3659,50 @@ function _regAlertsFor(empId) {
   } catch (e) { console.warn("reg alerts err:", e); return []; }
 }
 
-// One clean row per day: the sentence, and the action. No icons, no chips -- the message already
-// names the date, the status and the deadline, so a coloured border carries the remaining urgency.
-function _regAlertRowHtml(a, withButton) {
-  const action = withButton && !a.pastCutOff
-    ? `<button type="button" class="btn btn-xs btn-primary rab-reg-btn" data-reg-date="${a.dateStr}">Regularise</button>`
-    : (withButton && a.pastCutOff
-        ? `<span class="rab-locked" title="Payroll for that month has closed &mdash; this day is already counted as LOP and can no longer be regularised.">Cut-off passed</span>`
-        : "");
+// A short "Mon 30" style label for a day key, matching the wording the alert engine uses.
+function _regFmtDay(dateStr) {
+  return (typeof _prettyDateKey === "function") ? _prettyDateKey(dateStr) : dateStr;
+}
+
+// Forward-looking deadline wording for a day that is still regularisable.
+function _regCutOffPhrase(daysLeft) {
+  if (daysLeft <= 0) return "the cut-off is today";
+  if (daysLeft === 1) return "the cut-off is tomorrow";
+  return `the cut-off is in ${daysLeft} days`;
+}
+
+// Needs-action row: still before the payroll cut-off, so it can be fixed now. Amber
+// treatment, a forward-looking sentence and the due-by date, plus the Regularise action.
+function _regNeedsActionRow(a) {
+  const when = _regFmtDay(a.dateStr);
+  const due = a.deadlineKey ? _regFmtDay(a.deadlineKey) : "";
+  const lead = a.rejected
+    ? `${when} \u2014 regularisation was rejected, you can resubmit (${_regCutOffPhrase(a.daysLeft)}).`
+    : `${when} \u2014 not yet regularised, ${_regCutOffPhrase(a.daysLeft)}.`;
+  const dueChip = due
+    ? `<span class="rab-item-meta"><span class="rab-chip rab-chip-due"><i class="fa-solid fa-hourglass-half" aria-hidden="true"></i> Regularise by ${due}</span></span>`
+    : "";
   return `
-    <div class="rab-item rab-${a.urgency}">
-      <span class="rab-item-msg">${a.message}</span>
-      ${action}
+    <div class="rab-item rab-needs">
+      <span class="rab-item-icon" aria-hidden="true"><i class="fa-solid fa-triangle-exclamation"></i></span>
+      <div class="rab-item-main">
+        <span class="rab-item-msg">${lead}</span>
+        ${dueChip}
+      </div>
+      <button type="button" class="btn btn-xs btn-primary rab-reg-btn" data-reg-date="${a.dateStr}">Regularise</button>
+    </div>`;
+}
+
+// Already-resolved row: past the cut-off and counted as LOP, so there is no action. Muted
+// treatment and the engine's original detail sentence kept verbatim.
+function _regResolvedRow(a) {
+  return `
+    <div class="rab-item rab-resolved">
+      <span class="rab-item-icon" aria-hidden="true"><i class="fa-solid fa-circle-xmark"></i></span>
+      <div class="rab-item-main">
+        <span class="rab-item-msg">${a.message}</span>
+      </div>
+      <span class="rab-locked" title="Payroll for that month has closed &mdash; this day is already counted as LOP and can no longer be regularised.">Cut-off passed</span>
     </div>`;
 }
 
@@ -3690,32 +3721,67 @@ function renderRegAlertBanner() {
   }
   section.classList.remove("rab-hidden");
 
-  const crit = alerts.filter(a => a.pastCutOff).length;
+  // Split the flat, urgency-sorted list into what the person can still act on and
+  // what is already closed as LOP. The headline reflects ONLY the actionable group,
+  // so a big historical LOP total never buries the few days that still matter.
+  const needsAction = alerts.filter(a => !a.pastCutOff);
+  const resolved = alerts.filter(a => a.pastCutOff);
+  const hasAction = needsAction.length > 0;
+
+  // Urgent (amber) tone only when something is still actionable; otherwise a calm,
+  // de-emphasised FYI so a purely-historical list is not styled like an unread alert.
+  section.classList.toggle("rab-fyi", !hasAction);
+
   const title = document.getElementById("regAlertBannerTitle");
   const sub = document.getElementById("regAlertBannerSub");
+  const icon = document.getElementById("regAlertBannerIcon");
   if (title) {
-    title.textContent = alerts.length === 1
-      ? "1 day needs regularisation"
-      : `${alerts.length} days need regularisation`;
+    title.textContent = hasAction
+      ? (needsAction.length === 1 ? "1 day still needs regularisation" : `${needsAction.length} days still need regularisation`)
+      : "No days need regularisation";
   }
   if (sub) {
-    sub.textContent = crit
-      ? `${crit} of ${alerts.length} ${crit === 1 ? "day has" : "days have"} passed the payroll cut-off and are already counted as LOP.`
-      : "Regularise before the payroll cut-off to avoid a full day of LOP.";
+    if (hasAction && resolved.length) {
+      sub.textContent = `${resolved.length} additional ${resolved.length === 1 ? "day" : "days"} already closed as LOP.`;
+    } else if (hasAction) {
+      sub.textContent = "Regularise before the payroll cut-off to avoid a full day of LOP.";
+    } else {
+      sub.textContent = resolved.length === 1
+        ? "1 day was closed as LOP after the payroll cut-off."
+        : `${resolved.length} days were closed as LOP after the payroll cut-off.`;
+    }
+  }
+  if (icon) {
+    icon.innerHTML = hasAction
+      ? '<i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>'
+      : '<i class="fa-solid fa-circle-info" aria-hidden="true"></i>';
   }
 
   const listEl = document.getElementById("regAlertBannerList");
   const expand = document.getElementById("regAlertBannerExpand");
   if (listEl) {
-    const shown = regAlertsExpanded ? alerts : alerts.slice(0, REG_ALERT_COLLAPSED);
-    listEl.innerHTML = shown.map(a => _regAlertRowHtml(a, true)).join("");
-    if (expand) {
-      if (alerts.length > REG_ALERT_COLLAPSED) {
-        expand.style.display = "";
-        expand.innerHTML = regAlertsExpanded
-          ? `<span>Show less</span>`
-          : `<span>Show all ${alerts.length} days</span>`;
-      } else { expand.style.display = "none"; }
+    let html = "";
+    if (hasAction) {
+      html += `<div class="rab-group-head rab-group-action"><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i> Needs action</div>`;
+      html += needsAction.map(_regNeedsActionRow).join("");
+    }
+    // The resolved group stays collapsed until toggled, so it never competes with the
+    // actionable days for attention.
+    if (resolved.length && regResolvedExpanded) {
+      html += `<div class="rab-group-head rab-group-resolved"><i class="fa-solid fa-clipboard-check" aria-hidden="true"></i> Already resolved</div>`;
+      html += resolved.map(_regResolvedRow).join("");
+    }
+    listEl.innerHTML = html;
+  }
+  if (expand) {
+    if (resolved.length) {
+      expand.style.display = "";
+      const n = resolved.length;
+      expand.innerHTML = regResolvedExpanded
+        ? `<span>Hide ${n} resolved ${n === 1 ? "day" : "days"}</span>`
+        : `<span>Show ${n} resolved ${n === 1 ? "day" : "days"}</span>`;
+    } else {
+      expand.style.display = "none";
     }
   }
 
@@ -3783,8 +3849,14 @@ function renderNotifAlerts(empId) {
   const lastSeen = (typeof getRegAlertLastSeen === "function") ? getRegAlertLastSeen(empId) : null;
   const seenT = lastSeen ? new Date(lastSeen).getTime() : 0;
   const isUnread = a => !seenT || new Date(a.occurredAt).getTime() > seenT;
-  box.innerHTML = `<div class="na-group-head">${alerts.length} day${alerts.length === 1 ? "" : "s"} need regularisation</div>` +
-    alerts.map(a => {
+  const needs = alerts.filter(a => !a.pastCutOff);
+  const done = alerts.filter(a => a.pastCutOff);
+  const ordered = needs.concat(done);   // actionable days first, closed LOP days after
+  const headLabel = needs.length
+    ? `${needs.length} day${needs.length === 1 ? "" : "s"} need regularisation`
+    : `${done.length} day${done.length === 1 ? "" : "s"} closed as LOP`;
+  box.innerHTML = `<div class="na-group-head">${headLabel}</div>` +
+    ordered.map(a => {
       const inner = `
           <span class="ni-body">
             <span class="ni-title">${a.dateStr}</span>
@@ -3803,7 +3875,7 @@ function initRegAlertBanner() {
   const expand = document.getElementById("regAlertBannerExpand");
   if (expand && !expand.dataset.bound) {
     expand.dataset.bound = "1";
-    expand.addEventListener("click", () => { regAlertsExpanded = !regAlertsExpanded; renderRegAlertBanner(); });
+    expand.addEventListener("click", () => { regResolvedExpanded = !regResolvedExpanded; renderRegAlertBanner(); });
   }
   const listEl = document.getElementById("regAlertBannerList");
   if (listEl && !listEl.dataset.bound) {

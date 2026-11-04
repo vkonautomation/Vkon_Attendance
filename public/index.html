@@ -30,7 +30,7 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <link rel="stylesheet" href="styles.css?v=20261026_nm2">
-  <link rel="stylesheet" href="regularisation-alerts.css?v=20261030_ra1">
+  <link rel="stylesheet" href="regularisation-alerts.css?v=20261030_ra2">
   <link rel="stylesheet" href="calendar-refined.css?v=20261102_cr3">
 </head>
 <body class="light-theme">
@@ -239,6 +239,7 @@
       <!-- ================= REGULARISATION WARNING BANNER (top of Dashboard) ================= -->
       <section class="portal-view reg-alert-banner rab-hidden" id="sectionRegAlertBanner" data-portal-view="dashboard" aria-live="polite">
         <div class="rab-head">
+          <span class="rab-icon" id="regAlertBannerIcon" aria-hidden="true"><i class="fa-solid fa-triangle-exclamation"></i></span>
           <div class="rab-titles">
             <strong class="rab-title" id="regAlertBannerTitle">Days need regularisation</strong>
             <span class="rab-sub" id="regAlertBannerSub">Unresolved absences count as a full day of LOP once the payroll cut-off passes.</span>
@@ -1109,14 +1110,14 @@
   <!-- The server adapter must be parsed before shared.js: shared.js asks it whether
        this browser reads shared state or only its own localStorage, and waits on it
        before seeding. Order here is load-bearing. -->
-  <script src="js/api.js?v=20261102_en20"></script>
-  <script src="js/password-change.js?v=20261102_en20"></script>
-  <script src="shared.js?v=20261102_en20"></script>
+  <script src="js/api.js?v=20261102_en21"></script>
+  <script src="js/password-change.js?v=20261102_en21"></script>
+  <script src="shared.js?v=20261102_en21"></script>
   <script src="js/confirm-decision-modal.js?v=20261023_apr1"></script>
   <script src="js/day-popover.js?v=20261030_cr1"></script>
-  <script src="app.js?v=20261102_en20"></script>
+  <script src="app.js?v=20261102_en21"></script>
   <script src="js/password-toggle.js?v=20261019_ui1"></script>
-  <script src="js/pwa.js?v=20261102_en20"></script>
+  <script src="js/pwa.js?v=20261102_en21"></script>
 
   <!-- Present Day & Migration Guarantee -->
   <script>
