@@ -3298,6 +3298,7 @@ function renderDashboard() {
   const wfhList = getStore(STORAGE_KEYS.WFH, []);
   const regs = getStore(STORAGE_KEYS.REGULARISATIONS, []);
   const todayKey = formatDateKey(now);
+  const dashSettings = (typeof getAttendanceSettings === "function") ? getAttendanceSettings() : null;
 
   let inToday = 0, late = 0, onLeave = 0, remote = 0;
   const rows = [];
@@ -3305,17 +3306,21 @@ function renderDashboard() {
     const rec = records[`${emp.id}_${todayKey}`];
     if (!rec) return;
     if (rec.status === "Present" || rec.status === "WFH") {
-      const inMin = rec.checkInTime && rec.checkInTime !== "-" ? parseAmPmToMinutes(rec.checkInTime) : null;
-      const isLate = inMin !== null && inMin > LATE_CUTOFF_MIN_DASH;
+      // Read lateness from the SAME source of truth the employee calendar uses
+      // (getEffectiveStatus): measured from shift start (+grace) per the live
+      // settings, so the admin dashboard can never disagree with the portal.
+      const eff = (typeof getEffectiveStatus === "function") ? getEffectiveStatus(rec, dashSettings) : null;
+      const lateInfo = (eff && eff.late) ? eff.late : { isLate: false, minutes: 0 };
+      const isLate = !!lateInfo.isLate;
       inToday++;
       if (isLate) late++;
       if (rec.status === "WFH") remote++;
-      // Show HOW late, not just a bare "Late" badge.
+      // Show HOW late, matching the portal's magnitude.
       let statusPill = "On Time";
       if (isLate) {
-        const minsLate = inMin - LATE_CUTOFF_MIN_DASH;
-        const hh = Math.floor(minsLate / 60), mm = minsLate % 60;
-        statusPill = `Late \u00b7 ${hh > 0 ? hh + "h " : ""}${String(mm).padStart(2, "0")}m`;
+        statusPill = "Late \u00b7 " + (typeof formatMinutesHM === "function"
+          ? formatMinutesHM(lateInfo.minutes)
+          : `${Math.floor(lateInfo.minutes / 60)}h ${String(lateInfo.minutes % 60).padStart(2, "0")}m`);
       }
       // Check-out: a real time in mono, or a live "On shift" chip (not mono).
       const outCell = rec.checkOutTime && rec.checkOutTime !== "-"
@@ -3349,7 +3354,6 @@ function renderDashboard() {
   // days across the team BEFORE the payroll cut-off (a day already past the
   // cut-off is LOP, not unresolved). Counts days, not employees.
   let unresolvedDays = 0;
-  const dashSettings = (typeof getAttendanceSettings === "function") ? getAttendanceSettings() : null;
   employees.forEach(emp => {
     try {
       const al = (typeof getRegularisationAlerts === "function") ? getRegularisationAlerts(emp, now, dashSettings) : [];
