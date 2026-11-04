@@ -1112,11 +1112,13 @@ function renderRosterTable() {
       </td>
       <td>
         <div class="roster-info-cell">
-          <span class="font-bold">${emp.name}</span>
-          <span class="table-sub">${emp.role} &bull; <strong class="text-primary">${emp.department}</strong></span>
-          <span class="table-sub roster-manager-line"><i class="fa-solid fa-user-tie"></i> Manager: <strong>${(typeof resolveManagerName === "function" && resolveManagerName(emp.id)) || "&mdash; None &mdash;"}</strong></span>
-          ${(emp.email || emp.phone) ? `<span class="table-sub roster-contact-line">${emp.email ? `<i class="fa-regular fa-envelope"></i> ${emp.email}` : ""}${emp.email && emp.phone ? " &bull; " : ""}${emp.phone ? `<i class="fa-solid fa-phone"></i> ${emp.phone}` : ""}</span>` : ""}
-          <span class="table-sub font-mono">ID: ${emp.id}</span>
+          <span class="roster-name">${emp.name}</span>
+          <span class="roster-role">${emp.role}</span>
+          <span class="roster-dept">Dept: <strong class="text-primary">${emp.department}</strong></span>
+          <span class="roster-manager"><i class="fa-solid fa-user-tie"></i> Manager: <strong>${(typeof resolveManagerName === "function" && resolveManagerName(emp.id)) || "&mdash; None &mdash;"}</strong></span>
+          ${emp.email ? `<span class="roster-contact"><i class="fa-regular fa-envelope"></i> ${emp.email}</span>` : ""}
+          ${emp.phone ? `<span class="roster-contact"><i class="fa-solid fa-phone"></i> ${emp.phone}</span>` : ""}
+          <span class="roster-id">ID: ${emp.id}</span>
         </div>
       </td>
       <td><span class="font-mono text-primary font-bold">${emp.username}</span></td>

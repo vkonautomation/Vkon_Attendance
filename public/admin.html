@@ -42,6 +42,19 @@
     .emp-name-role { display: flex; flex-direction: column; gap: .12rem; min-width: 0; line-height: 1.2; text-align: left; }
     .emp-name { font-weight: 700; font-size: .9rem; color: var(--text-primary, #14171A); white-space: nowrap; }
     .emp-role { font-weight: 500; font-size: .74rem; color: var(--text-muted, #64748b); white-space: nowrap; }
+
+    /* Registered Staff Roster — tidy NAME & ROLE cell: one field per line, no
+       overlap (the old inline-flex manager line collided with the row below),
+       and a fixed width + line-height so it looks identical at any zoom. */
+    .roster-info-cell { min-width: 220px; max-width: 260px; gap: .16rem; line-height: 1.3; }
+    .roster-info-cell .roster-name { font-weight: 700; font-size: .92rem; color: var(--text-primary, #14171A); }
+    .roster-info-cell .roster-role { font-size: .78rem; color: var(--text-muted, #64748b); }
+    .roster-info-cell .roster-dept { font-size: .74rem; color: var(--text-muted, #64748b); }
+    .roster-info-cell .roster-manager { display: block; font-size: .74rem; color: var(--text-muted, #64748b); }
+    .roster-info-cell .roster-manager i, .roster-info-cell .roster-contact i { color: #ea580c; margin-right: .28rem; font-size: .72rem; }
+    .roster-info-cell .roster-manager strong { color: var(--text-primary, #14171A); font-weight: 600; }
+    .roster-info-cell .roster-contact { display: block; font-size: .74rem; color: var(--text-muted, #64748b); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .roster-info-cell .roster-id { font-size: .72rem; color: var(--text-muted, #64748b); font-family: var(--font-mono, ui-monospace, monospace); }
   </style>
 </head>
 <body class="light-theme admin-page">
@@ -1734,13 +1747,13 @@
   <!-- The server adapter must be parsed before shared.js: shared.js asks it whether
        this browser reads shared state or only its own localStorage, and waits on it
        before seeding. Order here is load-bearing. -->
-  <script src="js/api.js?v=20261102_en14"></script>
-  <script src="js/password-change.js?v=20261102_en14"></script>
-  <script src="shared.js?v=20261102_en14"></script>
+  <script src="js/api.js?v=20261102_en15"></script>
+  <script src="js/password-change.js?v=20261102_en15"></script>
+  <script src="shared.js?v=20261102_en15"></script>
   <script src="js/confirm-decision-modal.js?v=20261023_apr1"></script>
   <script src="js/day-popover.js?v=20261030_cr1"></script>
-  <script src="admin.js?v=20261102_en14"></script>
+  <script src="admin.js?v=20261102_en15"></script>
   <script src="js/password-toggle.js?v=20261019_ui1"></script>
-  <script src="js/pwa.js?v=20261102_en14"></script>
+  <script src="js/pwa.js?v=20261102_en15"></script>
 </body>
 </html>

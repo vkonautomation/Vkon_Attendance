@@ -73,7 +73,7 @@ def verify_all():
     need('emp.email = email' in admin and 'emp.phone = phone' in admin,
          "admin.js saves email + phone on edit")
     # ---- A5. roster shows the contact line --------------------------------
-    need("roster-contact-line" in admin,
+    need("roster-contact" in admin and "${emp.email}" in admin and "${emp.phone}" in admin,
          "roster table shows the employee's Gmail + phone")
     # ---- A6. the employee's own profile chip shows it ---------------------
     need('id="currentEmpContact"' in index_html,
@@ -125,8 +125,8 @@ def verify_all():
 
     # ---- shared cache token bumped for this build -------------------------
     print("\n[Cache] shared cache-buster token bumped:")
-    need("20261102_en14" in index_html, "index.html cache token bumped to en7")
-    need("20261102_en14" in admin_html, "admin.html cache token bumped to en7")
+    need("20261102_en15" in index_html, "index.html cache token bumped to en7")
+    need("20261102_en15" in admin_html, "admin.html cache token bumped to en7")
     need("20261029_e9" not in index_html and "20261029_e9" not in admin_html,
          "old e9 token fully replaced in both pages")
 
