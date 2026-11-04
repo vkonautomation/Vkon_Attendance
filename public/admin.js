@@ -423,13 +423,21 @@ function renderMonthlyReport() {
 
       // Attendance credit for this day (a half-day counts as 0.5).
       let credit = 0;
+      const _openPunch = (typeof isOpenPunch === "function") && isOpenPunch(rec);
       if (rec) {
-        if (rec.status === "Present") {
-          presentCount++; credit = 1;
-          empTotalHours += effectiveHoursDecimal(rec);
-        } else if (rec.status === "WFH") {
-          wfhCount++; credit = 1;
-          empTotalHours += effectiveHoursDecimal(rec);
+        if (rec.status === "Present" || rec.status === "WFH") {
+          if (_openPunch) {
+            // Checked in but not out yet: not a completed Present. Today it stays
+            // "In Progress" (counted nowhere); a past unfinished day is Absent,
+            // matching the employee calendar so the sheet can't disagree with it.
+            if (dateStr !== todayKey) absentCount++;
+          } else if (rec.status === "Present") {
+            presentCount++; credit = 1;
+            empTotalHours += effectiveHoursDecimal(rec);
+          } else {
+            wfhCount++; credit = 1;
+            empTotalHours += effectiveHoursDecimal(rec);
+          }
         } else if (rec.status === "Half Day" || rec.status === "Halfday" || rec.status === "Half") {
           halfCount++; credit = 0.5;
           empTotalHours += effectiveHoursDecimal(rec);
@@ -954,6 +962,7 @@ function exportMonthlyExcel() {
 
   const employees = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
   const records = getStore(STORAGE_KEYS.RECORDS, {});
+  const todayKey = formatDateKey(now);
 
   let csv = `VKON EXECUTIVE ATTENDANCE REPORT - ${monthName.toUpperCase()} ${currentYear}\n`;
   csv += `Attendance Report: Calculated as of today (Day 1 to ${todayDay}) across ${workingDaysElapsed} official working days\n`;
@@ -982,13 +991,20 @@ function exportMonthlyExcel() {
       const rec = records[`${emp.id}_${dateStr}`];
       if (rec && typeof isShortHoursDay === "function" && isShortHoursDay(rec)) shortHoursCount++;
 
+      const _openPunch = (typeof isOpenPunch === "function") && isOpenPunch(rec);
       if (rec) {
-        if (rec.status === "Present") {
-          presentCount++;
-          empTotalHours += (rec.hoursDecimal || 9.0);
-        } else if (rec.status === "WFH") {
-          wfhCount++;
-          empTotalHours += (rec.hoursDecimal || 8.8);
+        if (rec.status === "Present" || rec.status === "WFH") {
+          if (_openPunch) {
+            // In-progress punch: not a completed Present. Today is left out of the
+            // count; a past unfinished day is Absent (matches the on-screen sheet).
+            if (dateStr !== todayKey) absentCount++;
+          } else if (rec.status === "Present") {
+            presentCount++;
+            empTotalHours += (rec.hoursDecimal || 9.0);
+          } else {
+            wfhCount++;
+            empTotalHours += (rec.hoursDecimal || 8.8);
+          }
         } else if (rec.status === "Absent") {
           absentCount++;
         } else if (rec.status === "Loss of Pay") {
