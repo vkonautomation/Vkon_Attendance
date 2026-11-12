@@ -7920,15 +7920,6 @@ body:not(.light-theme) .auth-screen-overlay {
   z-index: 5;
 }
 
-/* Collapsed rail is 78px; ensure the filler never covers the page. */
-@media (min-width: 901px) {
-  .admin-shell.is-collapsed::before,
-  .admin-shell:has(.admin-sidebar.is-collapsed)::before {
-    display: none !important;
-    width: 0 !important;
-  }
-}
-
 @media (max-width: 900px) {
   .admin-shell::before {
     display: none !important;
