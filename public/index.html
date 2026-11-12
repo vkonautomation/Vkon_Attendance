@@ -33,6 +33,20 @@
   <link rel="stylesheet" href="regularisation-alerts.css?v=20261030_ra2">
   <link rel="stylesheet" href="calendar-refined.css?v=20261102_cr3">
   <style>
+  /* Kill the insurance pseudo-element unconditionally so it can NEVER cover content */
+  .admin-shell::before,
+  .admin-shell.is-collapsed::before,
+  .admin-shell:has(.admin-sidebar.is-collapsed)::before {
+    display: none !important;
+    content: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    background: transparent !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+  }
+
   /* Sidebar expand/collapse toggle. Desktop rail only (>900px): at or below the
      portal breakpoint the sidebar is an off-canvas drawer, so the toggle and the
      collapsed width are suppressed to avoid interfering with it. Loaded after
@@ -72,8 +86,6 @@
     .admin-sidebar.is-collapsed .sidebar-footer { flex-direction: column; align-items: center; gap: .5rem; }
     .admin-sidebar.is-collapsed .sidebar-logout-btn { font-size: 0 !important; gap: 0; padding-left: 0 !important; padding-right: 0 !important; justify-content: center; }
     .admin-sidebar.is-collapsed .sidebar-logout-btn i { font-size: 1rem !important; }
-    .admin-shell.is-collapsed::before,
-    .admin-shell:has(.admin-sidebar.is-collapsed)::before { display: none !important; width: 0 !important; }
   }
   </style>
 </head>

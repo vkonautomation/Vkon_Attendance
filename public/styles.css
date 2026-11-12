@@ -7902,15 +7902,18 @@ body:not(.light-theme) .auth-screen-overlay {
        can cover dashboard content when collapsed. --- */
 .admin-shell::before {
   display: none !important;
-  content: "";
+  content: none !important;
   position: absolute;
   top: 0;
   bottom: 0;
   left: 0;
-  width: 0;
-  background: transparent;
-  z-index: -1;
-  pointer-events: none;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  z-index: -9999 !important;
 }
 
 .admin-shell .admin-sidebar {

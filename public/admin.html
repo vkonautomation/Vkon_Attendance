@@ -105,6 +105,21 @@
     body.admin-page .dash-chip i { color: var(--text-muted, #64748b); }
     body.admin-page .dash-chip .dash-chip-when { color: var(--text-muted, #64748b); font-size: .76rem; }
     body.admin-page .dash-chip button { border: 0; background: none; color: var(--primary, #ea580c); font-weight: 600; font-size: .78rem; cursor: pointer; padding: 0 0 0 .3rem; }
+    /* Kill the insurance pseudo-element unconditionally so it can NEVER cover content */
+    body.admin-page .admin-shell::before,
+    body.admin-page .admin-shell.is-collapsed::before,
+    body.admin-page .admin-shell:has(.admin-sidebar.is-collapsed)::before,
+    .admin-shell::before {
+      display: none !important;
+      content: none !important;
+      width: 0 !important;
+      height: 0 !important;
+      background: transparent !important;
+      opacity: 0 !important;
+      visibility: hidden !important;
+      pointer-events: none !important;
+    }
+
     /* Sidebar expand/collapse toggle. Desktop rail only (>900px); loaded after
        styles.css so these rules win. */
     body.admin-page .sidebar-brand { position: relative; overflow: visible; }
@@ -139,8 +154,6 @@
       body.admin-page .admin-sidebar.is-collapsed .sidebar-footer { flex-direction: column; align-items: center; gap: .5rem; }
       body.admin-page .admin-sidebar.is-collapsed .sidebar-logout-btn { font-size: 0 !important; gap: 0; padding-left: 0 !important; padding-right: 0 !important; justify-content: center; }
       body.admin-page .admin-sidebar.is-collapsed .sidebar-logout-btn i { font-size: 1rem !important; }
-      body.admin-page .admin-shell.is-collapsed::before,
-      body.admin-page .admin-shell:has(.admin-sidebar.is-collapsed)::before { display: none !important; width: 0 !important; }
     }
   </style>
 </head>
