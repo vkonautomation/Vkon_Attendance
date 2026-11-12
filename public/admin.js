@@ -4126,38 +4126,7 @@ function startAdminConsole() {
   }
 
   initThemeSystem();
-  try { initSidebarCollapse(); } catch (e) { console.error("Error in initSidebarCollapse:", e); }
   console.log("VKON Executive Admin Console initialized.");
-}
-
-// Desktop rail expand/collapse. Toggles the .is-collapsed class on the sidebar,
-// swaps the toggle icon (angles-left <-> angles-right) and its accessible label,
-// and remembers the choice. At or below the drawer breakpoint the CSS hides the
-// button and ignores the class, so the mobile off-canvas menu is untouched.
-function initSidebarCollapse() {
-  const btn = document.getElementById("sidebarCollapseBtn");
-  const sidebar = document.querySelector(".admin-sidebar");
-  if (!btn || !sidebar) return;
-  const shell = sidebar.closest(".admin-shell") || document.querySelector(".admin-shell");
-  const KEY = "vkon_sidebar_collapsed";
-  const icon = btn.querySelector("i");
-  function apply(collapsed) {
-    sidebar.classList.toggle("is-collapsed", collapsed);
-    if (shell) shell.classList.toggle("is-collapsed", collapsed);
-    btn.setAttribute("aria-expanded", collapsed ? "false" : "true");
-    const label = collapsed ? "Expand menu" : "Collapse menu";
-    btn.setAttribute("aria-label", label);
-    btn.title = label;
-    if (icon) icon.className = collapsed ? "fa-solid fa-angles-right" : "fa-solid fa-angles-left";
-  }
-  let collapsed = false;
-  try { collapsed = localStorage.getItem(KEY) === "1"; } catch (e) { /* non-fatal */ }
-  apply(collapsed);
-  btn.addEventListener("click", () => {
-    collapsed = !collapsed;
-    apply(collapsed);
-    try { localStorage.setItem(KEY, collapsed ? "1" : "0"); } catch (e) { /* non-fatal */ }
-  });
 }
 
 function bootAdminConsole() {
