@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -107,8 +107,9 @@
     body.admin-page .dash-chip button { border: 0; background: none; color: var(--primary, #ea580c); font-weight: 600; font-size: .78rem; cursor: pointer; padding: 0 0 0 .3rem; }
     /* Sidebar expand/collapse toggle. Desktop rail only (>900px); loaded after
        styles.css so these rules win. */
-    body.admin-page .sidebar-brand { position: relative; }
-    body.admin-page .admin-sidebar { transition: width .2s ease; }
+    body.admin-page .sidebar-brand { position: relative; overflow: visible; }
+    body.admin-page .admin-sidebar { transition: width .2s ease; overflow: hidden; }
+    body.admin-page .admin-main-col { min-width: 0; }
     body.admin-page .sidebar-mark { display: none; width: 36px; height: 36px; border-radius: 9px; }
     body.admin-page .sidebar-collapse-toggle {
       position: absolute; top: 1.15rem; right: .9rem;
@@ -117,26 +118,29 @@
       background: rgba(255,255,255,.06); color: #c6d1cb;
       border: 1px solid rgba(255,255,255,.12); cursor: pointer;
       font-size: .95rem; line-height: 1; transition: background .15s ease, color .15s ease;
+      z-index: 10; pointer-events: auto;
     }
     body.admin-page .sidebar-collapse-toggle:hover { background: rgba(255,255,255,.14); color: #fff; }
     @media (max-width: 900px) { body.admin-page .sidebar-collapse-toggle { display: none !important; } }
     @media (min-width: 901px) {
-      body.admin-page .admin-sidebar.is-collapsed { width: 78px; }
+      body.admin-page .admin-sidebar.is-collapsed { width: 78px !important; min-width: 78px; }
       body.admin-page .admin-sidebar.is-collapsed .sidebar-brand { align-items: center; padding-left: .5rem; padding-right: .5rem; }
       body.admin-page .admin-sidebar.is-collapsed .brand-logo-wrap,
-      body.admin-page .admin-sidebar.is-collapsed .brand-text { display: none; }
+      body.admin-page .admin-sidebar.is-collapsed .brand-text { display: none !important; }
       body.admin-page .admin-sidebar.is-collapsed .sidebar-mark { display: block; }
       body.admin-page .admin-sidebar.is-collapsed .sidebar-collapse-toggle { position: static; margin-top: .55rem; }
-      body.admin-page .admin-sidebar.is-collapsed .side-nav-label { display: none; }
+      body.admin-page .admin-sidebar.is-collapsed .side-nav-label { display: none !important; }
       body.admin-page .admin-sidebar.is-collapsed .admin-side-nav { padding-left: .5rem; padding-right: .5rem; }
-      body.admin-page .admin-sidebar.is-collapsed .nav-tab { justify-content: center; gap: 0; padding-left: 0; padding-right: 0; font-size: 0; }
-      body.admin-page .admin-sidebar.is-collapsed .nav-tab i { font-size: 1.15rem; width: auto; }
+      body.admin-page .admin-sidebar.is-collapsed .nav-tab { justify-content: center; gap: 0 !important; padding-left: 0 !important; padding-right: 0 !important; font-size: 0 !important; }
+      body.admin-page .admin-sidebar.is-collapsed .nav-tab i { font-size: 1.15rem !important; width: auto; }
       body.admin-page .admin-sidebar.is-collapsed .badge-bubble,
       body.admin-page .admin-sidebar.is-collapsed .dept-nav-list,
-      body.admin-page .admin-sidebar.is-collapsed .dept-add-btn { display: none; }
+      body.admin-page .admin-sidebar.is-collapsed .dept-add-btn { display: none !important; }
       body.admin-page .admin-sidebar.is-collapsed .sidebar-footer { flex-direction: column; align-items: center; gap: .5rem; }
-      body.admin-page .admin-sidebar.is-collapsed .sidebar-logout-btn { font-size: 0; gap: 0; padding-left: 0; padding-right: 0; justify-content: center; }
-      body.admin-page .admin-sidebar.is-collapsed .sidebar-logout-btn i { font-size: 1rem; }
+      body.admin-page .admin-sidebar.is-collapsed .sidebar-logout-btn { font-size: 0 !important; gap: 0; padding-left: 0 !important; padding-right: 0 !important; justify-content: center; }
+      body.admin-page .admin-sidebar.is-collapsed .sidebar-logout-btn i { font-size: 1rem !important; }
+      body.admin-page .admin-shell.is-collapsed::before,
+      body.admin-page .admin-shell:has(.admin-sidebar.is-collapsed)::before { display: none !important; width: 0 !important; }
     }
   </style>
 </head>

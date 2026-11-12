@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -37,8 +37,9 @@
      portal breakpoint the sidebar is an off-canvas drawer, so the toggle and the
      collapsed width are suppressed to avoid interfering with it. Loaded after
      styles.css so these rules win. */
-  .sidebar-brand { position: relative; }
-  .admin-sidebar { transition: width .2s ease; }
+  .sidebar-brand { position: relative; overflow: visible; }
+  .admin-sidebar { transition: width .2s ease; overflow: hidden; }
+  .admin-main-col { min-width: 0; }
   .sidebar-mark { display: none; width: 36px; height: 36px; border-radius: 9px; }
   .sidebar-collapse-toggle {
     position: absolute; top: 1.15rem; right: .9rem;
@@ -47,29 +48,32 @@
     background: rgba(255,255,255,.06); color: #c6d1cb;
     border: 1px solid rgba(255,255,255,.12); cursor: pointer;
     font-size: .95rem; line-height: 1; transition: background .15s ease, color .15s ease;
+    z-index: 10; pointer-events: auto;
   }
   .sidebar-collapse-toggle:hover { background: rgba(255,255,255,.14); color: #fff; }
   @media (max-width: 900px) { .sidebar-collapse-toggle { display: none !important; } }
   @media (min-width: 901px) {
-    .admin-sidebar.is-collapsed { width: 78px; }
+    .admin-sidebar.is-collapsed { width: 78px !important; min-width: 78px; }
     .admin-sidebar.is-collapsed .sidebar-brand { align-items: center; padding-left: .5rem; padding-right: .5rem; }
     .admin-sidebar.is-collapsed .brand-logo-wrap,
-    .admin-sidebar.is-collapsed .brand-text { display: none; }
+    .admin-sidebar.is-collapsed .brand-text { display: none !important; }
     .admin-sidebar.is-collapsed .sidebar-mark { display: block; }
     .admin-sidebar.is-collapsed .sidebar-collapse-toggle { position: static; margin-top: .55rem; }
-    .admin-sidebar.is-collapsed .side-nav-label { display: none; }
+    .admin-sidebar.is-collapsed .side-nav-label { display: none !important; }
     .admin-sidebar.is-collapsed .admin-side-nav { padding-left: .5rem; padding-right: .5rem; }
     .admin-sidebar.is-collapsed .nav-tab,
-    .admin-sidebar.is-collapsed .portal-nav-link { justify-content: center; gap: 0; padding-left: 0; padding-right: 0; font-size: 0; }
+    .admin-sidebar.is-collapsed .portal-nav-link { justify-content: center; gap: 0 !important; padding-left: 0 !important; padding-right: 0 !important; font-size: 0 !important; }
     .admin-sidebar.is-collapsed .nav-tab i,
-    .admin-sidebar.is-collapsed .portal-nav-link i { font-size: 1.15rem; width: auto; }
+    .admin-sidebar.is-collapsed .portal-nav-link i { font-size: 1.15rem !important; width: auto; }
     .admin-sidebar.is-collapsed .badge-bubble,
     .admin-sidebar.is-collapsed .nav-badge,
     .admin-sidebar.is-collapsed .dept-nav-list,
-    .admin-sidebar.is-collapsed .dept-add-btn { display: none; }
+    .admin-sidebar.is-collapsed .dept-add-btn { display: none !important; }
     .admin-sidebar.is-collapsed .sidebar-footer { flex-direction: column; align-items: center; gap: .5rem; }
-    .admin-sidebar.is-collapsed .sidebar-logout-btn { font-size: 0; gap: 0; padding-left: 0; padding-right: 0; justify-content: center; }
-    .admin-sidebar.is-collapsed .sidebar-logout-btn i { font-size: 1rem; }
+    .admin-sidebar.is-collapsed .sidebar-logout-btn { font-size: 0 !important; gap: 0; padding-left: 0 !important; padding-right: 0 !important; justify-content: center; }
+    .admin-sidebar.is-collapsed .sidebar-logout-btn i { font-size: 1rem !important; }
+    .admin-shell.is-collapsed::before,
+    .admin-shell:has(.admin-sidebar.is-collapsed)::before { display: none !important; width: 0 !important; }
   }
   </style>
 </head>

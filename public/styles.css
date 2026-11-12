@@ -33,7 +33,7 @@
   --status-present: #10b981;
   --status-wfh: #f97316;
   --status-leave: #f59e0b;
-  --status-absent: #ef4444;
+  --status-absent: #ef1616;
   --status-weekend: #64748b;
 
   /* Typography Colors */
@@ -7206,6 +7206,8 @@ body.light-theme .policy-badges-row {
   flex-direction: row;
   align-items: stretch;
   min-height: 100vh;
+  position: relative;
+  z-index: 0;
 }
 
 .admin-sidebar {
@@ -7226,6 +7228,8 @@ body.light-theme .policy-badges-row {
   min-width: 0;
   display: flex;
   flex-direction: column;
+  position: relative;
+  z-index: 1;
 }
 
 body.admin-page.light-theme .admin-main-col {
@@ -7893,25 +7897,38 @@ body:not(.light-theme) .auth-screen-overlay {
 }
 
 /* --- Insurance: the dark sidebar column always spans the full document
-       height, so no empty strip can appear at the left bottom --- */
+       height, so no empty strip can appear at the left bottom. Disabled because
+       the sticky sidebar already covers the column and the absolute pseudo-element
+       can cover dashboard content when collapsed. --- */
 .admin-shell::before {
+  display: none !important;
   content: "";
   position: absolute;
   top: 0;
   bottom: 0;
   left: 0;
-  width: 252px;
-  background: #35423d;
-  z-index: 0;
+  width: 0;
+  background: transparent;
+  z-index: -1;
+  pointer-events: none;
 }
 
 .admin-shell .admin-sidebar {
   z-index: 5;
 }
 
+/* Collapsed rail is 78px; ensure the filler never covers the page. */
+@media (min-width: 901px) {
+  .admin-shell.is-collapsed::before,
+  .admin-shell:has(.admin-sidebar.is-collapsed)::before {
+    display: none !important;
+    width: 0 !important;
+  }
+}
+
 @media (max-width: 900px) {
   .admin-shell::before {
-    display: none;
+    display: none !important;
   }
 }
 
