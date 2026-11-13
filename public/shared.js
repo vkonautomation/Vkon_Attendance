@@ -1595,7 +1595,7 @@ function clearWorkedOnHoliday(empId, dateStr, actor) {
 
 // THE single source of truth: is `date` a non-working day for this employee?
 // date: "YYYY-MM-DD" or a Date; employee: id string or employee object (optional).
-// Optionally counts weekends as non-working by setting (treatWeekendsAsNonWorking).
+// Counts weekends as non-working only when treatWeekendsAsNonWorking is enabled.
 // Returns false when a "Worked on holiday" override exists for that emp+date.
 function isNonWorkingDay(date, employee) {
   try {
@@ -1617,8 +1617,7 @@ function isNonWorkingDay(date, employee) {
         nonWorking = true; // Declared Holiday is mandatory off for everyone
       }
     }
-    // Weekends are always non-working (Sat/Sun punch disabled).
-    if (!nonWorking && isWeekend) nonWorking = true;
+    if (!nonWorking && isWeekend && s.treatWeekendsAsNonWorking) nonWorking = true;
     if (!nonWorking) return false;
 
     // Req 6 exception: an approved worked-on-holiday override reopens the day.

@@ -189,6 +189,7 @@ const NON_SECRET_VALUES = [
   ["an absolute filesystem path", /^([A-Za-z]:\\|\/)[A-Za-z0-9._-]+([\/][A-Za-z0-9._-]*)*$/],
   ["a role or database name this repo creates", /^(attendance_app|vkon_owner|postgres|vkon_attendance[a-z_]*|admin)$/i],
   ["an address at a reserved test domain", /^[A-Za-z0-9._%-]+@(example\.(test|com)|test\.invalid)$/],
+  ["a public SMTP hostname", /^(?=.{1,253}$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,}$/],
 ];
 
 function isNonSecretValue(value) {
@@ -343,7 +344,7 @@ for (const [label, re] of PII_PATTERNS) {
   check("an ordinary git sha is not flagged", falsePositives.length === 0, falsePositives.join("\n"));
 
   const allowed = ["development", "true", "5433", "/var/lib/vkon/vkon.db", "attendance_app",
-                   "vkon_attendance_dev", "tester_a@example.test"];
+                   "vkon_attendance_dev", "tester_a@example.test", "smtp.gmail.com"];
   const refused = allowed.filter((v) => !isNonSecretValue(v));
   check("ordinary .env.example values stay exempt", refused.length === 0, refused.join(", "));
 

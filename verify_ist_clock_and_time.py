@@ -34,7 +34,7 @@ def test_ist_implementation():
 
     # 4. Cache-buster query parameters in HTML (current build token)
     assert "shared.js?v=20261102_en22" in html, "index.html must have updated cache buster for fresh load"
-    assert "app.js?v=20261102_en22" in html, "app.js (which owns the IST clock) cache buster not bumped"
+    assert "app.js?v=20261112_sidebar-controls-removed" in html, "app.js (which owns the IST clock) cache buster not bumped"
     print("PASS: index.html has fresh cache-buster parameters.")
 
     print("\n" + "=" * 50)

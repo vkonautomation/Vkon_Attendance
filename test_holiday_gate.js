@@ -87,7 +87,7 @@ let sat = new Date("2026-10-01T00:00:00");
 while (sat.getDay() !== 6) sat.setDate(sat.getDate() + 1);
 const satStr = ymd(sat);
 ctx.setAttendanceSettings({ treatWeekendsAsNonWorking: false });
-ok(ctx.isNonWorkingDay(satStr, "E3") === false, "weekend is a working day by default");
+ok(ctx.isNonWorkingDay(satStr, "E3") === false, "weekend is working when the setting is off");
 ctx.setAttendanceSettings({ treatWeekendsAsNonWorking: true });
 ok(ctx.getAttendanceSettings().treatWeekendsAsNonWorking === true, "weekend setting persists as boolean");
 ok(ctx.isNonWorkingDay(satStr, "E3") === true, "weekend is non-working when the setting is on");
