@@ -30,6 +30,10 @@ const LOCAL_ONLY = new Set([
   "vkon_session_v6",
   "vkon_theme_v6",
   "vkon_regalert_seen_v1",
+  // Last-seen approval decisions, kept so a tab notifies once per decision. Like the
+  // reg-alert seen marks this is per-device notification bookkeeping, not policy:
+  // employee tabs write it on every sync, so it must never be admin-classified.
+  "vkon_admin_decision_snap_v6",
 ]);
 /** The browser's offline punch queue -- drained via /api/punches, never PUT as a document. */
 const QUEUE_KEY = "vkon_punch_queue_v1";
@@ -46,7 +50,6 @@ const ADMIN_ONLY = new Set([
   "vkon_holidays_v6",
   "vkon_leave_quotas_v6",
   "vkon_min_work_policy_v6",
-  "vkon_admin_decision_snap_v6",
   "vkon_lop_entries_v1",
   "vkon_approval_flow_v1",
   "vkon_short_leave_settings_v1",
@@ -78,6 +81,17 @@ export function classifyDocument(key: string): DocumentWriteClass {
   if (ADMIN_ONLY.has(key)) return "admin";
   if (ANY_AUTHENTICATED.has(key)) return "any";
   return "admin";
+}
+
+/**
+ * The keys a session may publish, told to the browser so its boot-time seeding and
+ * migration offers defer silently instead of asking the server to refuse them. The
+ * server still re-checks every write; this is advice, not authority.
+ */
+export function writableKeysFor(role: "employee" | "manager" | "admin"): string[] {
+  const keys = [...ANY_AUTHENTICATED];
+  if (role === "admin") keys.push(...ADMIN_ONLY);
+  return keys;
 }
 
 export interface StateProjection {

@@ -2,7 +2,9 @@
  * app/api/state/route.ts -- the whole shared state in one read (the D1 facade).
  *
  * js/api.js `hydrate()` and `pull()` hit exactly this path and expect
- * `{ stores: { key: { value, version } }, serverVersion }`. It is a projection, not a
+ * `{ stores: { key: { value, version } }, serverVersion, writable }`. `writable` names the
+ * keys this session may publish so the tab's boot-time seeding defers silently on the
+ * rest; it is advice -- every PUT is still classified and role-checked server-side. It is a projection, not a
  * query: the browser wants every shared store at once because that is how its
  * synchronous getStore() cache was built, and rewriting ~190 call sites to fetch per store
  * is out of scope (D1).
@@ -20,14 +22,15 @@ import type { NextRequest } from "next/server";
 import { requireSession } from "@/lib/http/require-session";
 import { json } from "@/lib/http/json";
 import { errorResponse } from "@/lib/http/errors";
-import { readStateDocuments } from "@/lib/state/documents";
+import { readStateDocuments, writableKeysFor } from "@/lib/state/documents";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest): Promise<Response> {
   try {
-    await requireSession(req);
-    return json(await readStateDocuments());
+    const session = await requireSession(req);
+    const projection = await readStateDocuments();
+    return json({ ...projection, writable: writableKeysFor(session.role) });
   } catch (err) {
     return errorResponse(err, "GET /api/state");
   }

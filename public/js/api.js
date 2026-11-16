@@ -34,11 +34,19 @@ window.VKON_API = (function () {
     "vkon_session_v6",
     "vkon_theme_v6",
     "vkon_regalert_seen_v1",
+    // Notification bookkeeping: each device remembers what it already announced.
+    "vkon_admin_decision_snap_v6",
+    // The server never round-trips credentials; a local copy is for local mode only.
+    "vkon_admin_creds_v6",
   ]);
 
   let mode = "probing"; // "probing" | "server" | "local"
   let cache = Object.create(null);
   let versions = Object.create(null);
+  // The keys this session may publish, as told by GET /api/state. Boot-time seeding
+  // and migration offers stay local for everything else instead of asking the server
+  // to refuse them; the server still re-checks every write it does receive.
+  let writable = new Set();
   let serverVersion = 0;
   let dirty = new Set();
   let flushTimer = null;
@@ -140,6 +148,7 @@ window.VKON_API = (function () {
       cache[key] = state.stores[key].value;
       versions[key] = state.stores[key].version;
     });
+    writable = new Set(state.writable || []);
     serverVersion = state.serverVersion || 0;
     await adoptLocalState();
   }
@@ -157,6 +166,7 @@ window.VKON_API = (function () {
       if (!key || !key.startsWith("vkon_") || LOCAL_ONLY.has(key)) continue;
       if (key in versions) continue;
       if (key === QUEUE_KEY) continue;
+      if (!writable.has(key)) continue;
       let value;
       try { value = JSON.parse(localStorage.getItem(key)); } catch (e) { continue; }
       if (value === null || value === undefined) continue;
@@ -189,6 +199,10 @@ window.VKON_API = (function () {
   }
 
   function write(key, value) {
+    // A store this session may not publish keeps its localStorage shadow (setStore
+    // wrote it) but never enters the flush: the server would refuse it, and a boot
+    // time seed of somebody else's policy is not an edit worth a refusal toast.
+    if (mode === "server" && authenticated && !writable.has(key)) return;
     cache[key] = value;
     dirty.add(key);
     scheduleFlush();
@@ -256,6 +270,7 @@ window.VKON_API = (function () {
       const state = await request("/state");
       if ((state.serverVersion || 0) === serverVersion) return;
       serverVersion = state.serverVersion;
+      writable = new Set(state.writable || []);
       Object.keys(state.stores || {}).forEach((key) => {
         if (dirty.has(key)) return; // an unsent local edit outranks a remote copy
         cache[key] = state.stores[key].value;

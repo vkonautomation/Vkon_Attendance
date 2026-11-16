@@ -123,7 +123,7 @@ const drain = () => new Promise((r) => setImmediate(r));
     if (url === "/api/auth/login") {
       return { status: 200, body: { role: "employee", employeeId: "EMP001", mustChangePassword: false } };
     }
-    if (url === "/api/state") return { status: 200, body: { serverVersion: 3, stores: {} } };
+    if (url === "/api/state") return { status: 200, body: { serverVersion: 3, stores: {}, writable: ["vkon_records_v6"] } };
     if (url.startsWith("/api/state/")) return { status: 200, body: { version: 4 } };
     return { status: 404, body: {} };
   });
@@ -146,7 +146,7 @@ const drain = () => new Promise((r) => setImmediate(r));
     if (url === "/api/auth/login") {
       return { status: 200, body: { role: "employee", employeeId: "EMP001", mustChangePassword: false } };
     }
-    if (url === "/api/state") return { status: 200, body: { serverVersion: 1, stores: {} } };
+    if (url === "/api/state") return { status: 200, body: { serverVersion: 1, stores: {}, writable: ["vkon_records_v6"] } };
     if (url.startsWith("/api/state/")) return { status: 401, body: { error: { message: "Sign in first." } } };
     return { status: 404, body: {} };
   });
@@ -174,7 +174,7 @@ const drain = () => new Promise((r) => setImmediate(r));
     if (url === "/api/auth/login") {
       return { status: 200, body: { role: "employee", employeeId: "EMP001", mustChangePassword: false } };
     }
-    if (url === "/api/state") return { status: 200, body: { serverVersion: 1, stores: {} } };
+    if (url === "/api/state") return { status: 200, body: { serverVersion: 1, stores: {}, writable: ["vkon_records_v6"] } };
     throw new Error("network down");
   });
   await offline.api.ready;
@@ -208,7 +208,7 @@ const drain = () => new Promise((r) => setImmediate(r));
       bodies.push(JSON.parse(opts.body));
       return { status: 200, body: { ok: true } };
     }
-    if (url === "/api/state") return { status: 200, body: { serverVersion: 1, stores: {} } };
+    if (url === "/api/state") return { status: 200, body: { serverVersion: 1, stores: {}, writable: ["vkon_records_v6"] } };
     return { status: 404, body: {} };
   });
   await pw.api.ready;

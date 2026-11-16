@@ -207,6 +207,18 @@ async function runRoleGates() {
   check("an admin writing an admin-only store is 200 (version 1)",
     adminTry.status === 200 && adminTry.json && adminTry.json.version === 1,
     `${adminTry.status} ${adminTry.text}`);
+
+  // The projection tells each session which keys it may publish, so boot-time seeding
+  // defers silently instead of offering stores the server would refuse.
+  const empView = await api("/api/state", { token: tok.ZZSE });
+  const empWritable = (empView.json && empView.json.writable) || [];
+  check("employee writable list covers self-service but not policy",
+    empWritable.includes("vkon_records_v6") && !empWritable.includes("vkon_settings_v6"),
+    empWritable.join(","));
+  const adminView = await api("/api/state", { token: tok.ZZSA });
+  const adminWritable = (adminView.json && adminView.json.writable) || [];
+  check("admin writable list includes policy stores",
+    adminWritable.includes("vkon_settings_v6"), adminWritable.join(","));
 }
 
 async function runCredentialStoreSuppressed(client) {
@@ -223,6 +235,8 @@ async function runCredentialStoreSuppressed(client) {
   const stores = (state.json && state.json.stores) || {};
   check("GET /api/state omits vkon_admin_creds_v6", !("vkon_admin_creds_v6" in stores),
     Object.keys(stores).join(","));
+  check("GET /api/state omits the per-device decision snapshot",
+    !("vkon_admin_decision_snap_v6" in stores), Object.keys(stores).join(","));
   check("GET /api/state includes the writable stores just published",
     "vkon_leaves_v6" in stores && "vkon_settings_v6" in stores,
     Object.keys(stores).join(","));
@@ -243,6 +257,14 @@ async function runTransportGuards() {
   });
   check("the punch queue key is refused (400)", queue.status === 400,
     `${queue.status} ${queue.text}`);
+
+  // Per-device notification bookkeeping: employee tabs write it on every sync, so the
+  // facade must refuse it like the queue rather than class it as an admin store.
+  const snap = await api("/api/state/vkon_admin_decision_snap_v6", {
+    method: "PUT", token: tok.ZZSE, body: { baseVersion: 0, value: {} },
+  });
+  check("the decision-snapshot key is refused (400)", snap.status === 400,
+    `${snap.status} ${snap.text}`);
 
   // A missing `value` is a malformed command.
   const noValue = await api("/api/state/vkon_leaves_v6", {
