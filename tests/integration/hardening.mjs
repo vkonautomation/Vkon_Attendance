@@ -176,6 +176,19 @@ async function runOriginCheck() {
   });
   check("a correct Referer origin is accepted in place of Origin", viaReferer.status === 200,
     `${viaReferer.status} ${viaReferer.text}`);
+
+  // PUBLIC_ORIGIN may list several live domains; every listed one is same-origin.
+  const second = await login(USERS.origin.username, USERS.origin.pw, {
+    ip: "203.0.114.5", origin: "https://second-origin.example",
+  });
+  check("a second configured origin is accepted (comma-separated PUBLIC_ORIGIN)",
+    second.status === 200, `${second.status} ${second.text}`);
+
+  const unlisted = await login(USERS.origin.username, USERS.origin.pw, {
+    ip: "203.0.114.6", origin: "https://third-origin.example",
+  });
+  check("an origin outside the configured list is still 403", unlisted.status === 403,
+    `${unlisted.status} ${unlisted.text}`);
 }
 
 async function runBodyLimit() {

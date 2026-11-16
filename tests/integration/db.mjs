@@ -705,74 +705,98 @@ function seedResult(env) {
 }
 
 async function seedIsIdempotent(owner) {
-  const first = seedResult({ VKON_ENV: "development" });
-  if (first.code !== 0) {
-    check("db:seed runs", false, first.out.split("\n").slice(-3).join(" | "));
-    return;
+  // Assert the seed's own behaviour on a pristine scratch database. A live dev box may
+  // legitimately carry operator-set credentials and a settled admin password; those rows
+  // say nothing about what the seed writes, so checking them here would test the wrong
+  // subject. Every claim below is unchanged -- only the database it is made against is.
+  const dbname = `vkon_seed_${process.pid}`;
+  await owner.query(`CREATE DATABASE ${dbname}`);
+  const url = new URL(process.env.DATABASE_URL_OWNER || process.env.DATABASE_URL);
+  url.pathname = `/${dbname}`;
+  const scratch = String(url);
+  const env = { DATABASE_URL_OWNER: scratch, POSTGRES_DB: dbname };
+
+  let client;
+  try {
+    const migrated = runMigrate(join(ROOT, "db", "migrations"), env);
+    if (migrated.code !== 0) {
+      check("db:seed runs", false, migrated.out.split("\n").slice(-3).join(" | "));
+      return;
+    }
+    client = await connect(scratch, "test-seed-scratch");
+
+    const first = seedResult({ ...env, VKON_ENV: "development" });
+    if (first.code !== 0) {
+      check("db:seed runs", false, first.out.split("\n").slice(-3).join(" | "));
+      return;
+    }
+    check("db:seed runs", true);
+
+    // The refusal is the more important half of that script, so test it rather than trust
+    // the branch: the same file against a database told it is production must fail. An
+    // explicit process.env wins over .env.local inside loadEnvChain, which is what makes
+    // this a real test of the switch rather than a test of whichever file happens to set
+    // the variable last.
+    const prod = seedResult({ ...env, VKON_ENV: "production" });
+    check("db:seed refuses when VKON_ENV=production",
+      prod.code !== 0 && /refusing to seed/.test(prod.out),
+      `exit ${prod.code}: ${prod.out.split("\n").filter(Boolean)[0] || "(no output)"}`);
+
+    const second = seedResult({ ...env, VKON_ENV: "development" });
+    const lines = first.out.trim().split("\n");
+    const secondLines = second.out.trim().split("\n");
+    const summary = (s) => (s.find((l) => l.includes("[seed]")) || "").replace(/^\[seed\] .*?: /, "");
+    check("db:seed twice reports identical counts (idempotent)",
+      second.code === 0 && summary(lines) === summary(secondLines),
+      `1st: ${summary(lines)}\n2nd: ${summary(secondLines)}`);
+
+    // "Identical counts" is only meaningful if the counts are not zero, and only meaningful
+    // as a claim about rows if nothing else in the database is also counted. The roster and
+    // the reference tables are the seed's own work, so assert those specifically.
+    const counts = (await client.query(`
+      SELECT (SELECT COUNT(*) FROM employees)        AS employees,
+             (SELECT COUNT(*) FROM leave_kinds)      AS kinds,
+             (SELECT COUNT(*) FROM settings)         AS settings,
+             (SELECT COUNT(*) FROM holidays)         AS holidays,
+             (SELECT COUNT(*) FROM records)          AS records,
+             (SELECT COUNT(*) FROM audit_log WHERE action = 'seed.synthetic') AS seeded`)).rows[0];
+    check("the seed produced a roster and reference data, not an empty pass",
+      Number(counts.employees) >= 5 && Number(counts.kinds) >= 5 && Number(counts.settings) >= 5 &&
+      Number(counts.holidays) >= 2 && Number(counts.records) >= 5 && Number(counts.seeded) === 1,
+      JSON.stringify(counts));
+
+    // The plan's rule for a public repository, restated as a database assertion: a synthetic
+    // roster that carries a credential is a leaked credential, however fake the name. The
+    // bootstrap admin is the one exception -- it is created by the M3 seed with a generated
+    // (never committed) hash -- so the rule is scoped to everyone the SQL file inserts.
+    const hashed = (await client.query(
+      "SELECT COUNT(*) AS n FROM employees WHERE password_hash IS NOT NULL AND username <> 'admin'")).rows[0].n;
+    check("no synthetic roster employee carries a committed password hash", Number(hashed) === 0, `${hashed} rows`);
+
+    const domains = (await client.query(`
+      SELECT DISTINCT split_part(email, '@', 2) AS d FROM employees WHERE email IS NOT NULL`)).rows;
+    check("every seeded email is at a reserved test domain",
+      domains.every((r) => ["example.test", "example.com", "test.invalid"].includes(r.d)),
+      domains.map((r) => (r.d || "(null)")).join(", "));
+
+    // M3 changed what a development seed does: it bootstraps exactly one live administrator,
+    // forced to change its generated password on first sign-in. This used to assert the
+    // opposite ("the seed does not create a live administrator") before bcrypt arrived.
+    const admin = (await client.query(`
+      SELECT COUNT(*) AS n,
+             bool_and(active)                     AS active,
+             bool_and(role = 'admin')             AS is_admin,
+             bool_and(password_change_required)   AS forced,
+             bool_and(password_hash IS NOT NULL)  AS has_hash
+        FROM employees WHERE username = 'admin'`)).rows[0];
+    check("db:seed bootstraps one admin, forced to change on first sign-in",
+      Number(admin.n) === 1 && admin.active === true && admin.is_admin === true &&
+      admin.forced === true && admin.has_hash === true,
+      JSON.stringify(admin));
+  } finally {
+    if (client) await client.end().catch(() => {});
+    await owner.query(`DROP DATABASE IF EXISTS ${dbname}`).catch(() => {});
   }
-  check("db:seed runs", true);
-
-  // The refusal is the more important half of that script, so test it rather than trust
-  // the branch: the same file against a database told it is production must fail. An
-  // explicit process.env wins over .env.local inside loadEnvChain, which is what makes
-  // this a real test of the switch rather than a test of whichever file happens to set
-  // the variable last.
-  const prod = seedResult({ VKON_ENV: "production" });
-  check("db:seed refuses when VKON_ENV=production",
-    prod.code !== 0 && /refusing to seed/.test(prod.out),
-    `exit ${prod.code}: ${prod.out.split("\n").filter(Boolean)[0] || "(no output)"}`);
-
-  const second = seedResult({ VKON_ENV: "development" });
-  const lines = first.out.trim().split("\n");
-  const secondLines = second.out.trim().split("\n");
-  const summary = (s) => (s.find((l) => l.includes("[seed]")) || "").replace(/^\[seed\] .*?: /, "");
-  check("db:seed twice reports identical counts (idempotent)",
-    second.code === 0 && summary(lines) === summary(secondLines),
-    `1st: ${summary(lines)}\n2nd: ${summary(secondLines)}`);
-
-  // "Identical counts" is only meaningful if the counts are not zero, and only meaningful
-  // as a claim about rows if nothing else in the database is also counted. The roster and
-  // the reference tables are the seed's own work, so assert those specifically.
-  const counts = (await owner.query(`
-    SELECT (SELECT COUNT(*) FROM employees)        AS employees,
-           (SELECT COUNT(*) FROM leave_kinds)      AS kinds,
-           (SELECT COUNT(*) FROM settings)         AS settings,
-           (SELECT COUNT(*) FROM holidays)         AS holidays,
-           (SELECT COUNT(*) FROM records)          AS records,
-           (SELECT COUNT(*) FROM audit_log WHERE action = 'seed.synthetic') AS seeded`)).rows[0];
-  check("the seed produced a roster and reference data, not an empty pass",
-    Number(counts.employees) >= 5 && Number(counts.kinds) >= 5 && Number(counts.settings) >= 5 &&
-    Number(counts.holidays) >= 2 && Number(counts.records) >= 5 && Number(counts.seeded) === 1,
-    JSON.stringify(counts));
-
-  // The plan's rule for a public repository, restated as a database assertion: a synthetic
-  // roster that carries a credential is a leaked credential, however fake the name. The
-  // bootstrap admin is the one exception -- it is created by the M3 seed with a generated
-  // (never committed) hash -- so the rule is scoped to everyone the SQL file inserts.
-  const hashed = (await owner.query(
-    "SELECT COUNT(*) AS n FROM employees WHERE password_hash IS NOT NULL AND username <> 'admin'")).rows[0].n;
-  check("no synthetic roster employee carries a committed password hash", Number(hashed) === 0, `${hashed} rows`);
-
-  const domains = (await owner.query(`
-    SELECT DISTINCT split_part(email, '@', 2) AS d FROM employees WHERE email IS NOT NULL`)).rows;
-  check("every seeded email is at a reserved test domain",
-    domains.every((r) => ["example.test", "example.com", "test.invalid"].includes(r.d)),
-    domains.map((r) => (r.d || "(null)")).join(", "));
-
-  // M3 changed what a development seed does: it bootstraps exactly one live administrator,
-  // forced to change its generated password on first sign-in. This used to assert the
-  // opposite ("the seed does not create a live administrator") before bcrypt arrived.
-  const admin = (await owner.query(`
-    SELECT COUNT(*) AS n,
-           bool_and(active)                     AS active,
-           bool_and(role = 'admin')             AS is_admin,
-           bool_and(password_change_required)   AS forced,
-           bool_and(password_hash IS NOT NULL)  AS has_hash
-      FROM employees WHERE username = 'admin'`)).rows[0];
-  check("db:seed bootstraps one admin, forced to change on first sign-in",
-    Number(admin.n) === 1 && admin.active === true && admin.is_admin === true &&
-    admin.forced === true && admin.has_hash === true,
-    JSON.stringify(admin));
 }
 
 /* ------------------------------------------------------ claim 3: internal-only network */

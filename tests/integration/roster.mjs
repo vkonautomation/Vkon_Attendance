@@ -137,6 +137,9 @@ async function main() {
     return;
   }
 
+  // Probe rows from an interrupted earlier run must not collide with this run's enrols.
+  await client.query(`DELETE FROM employees WHERE employee_code IN ('ZZX1','ZZX2')`).catch(() => {});
+
   try {
     await client.query("BEGIN");
     for (const u of Object.values(USERS)) idOf[u.username] = await upsertUser(client, u);
@@ -225,7 +228,7 @@ async function runAdminOnlyWrite(client) {
 
   // A password the administrator supplies is used as-is, so no one-time password comes back.
   const withPw = await api("/api/employees", {
-    method: "POST", token: adminToken,
+    method: "POST", token: tok.ZZRA,
     body: { employeeCode: "ZZX2", username: "zzx2", name: "Typed Password Probe", accessRole: "employee", password: "a-starting-password" },
   });
   check("a supplied password means no one-time password is returned",

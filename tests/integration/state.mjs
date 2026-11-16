@@ -131,6 +131,9 @@ async function main() {
   }
 
   try {
+    // The fresh-key checks assume these stores do not exist yet; a seed or an interrupted
+    // earlier run may have left rows behind, so clear them before writing, not just after.
+    await client.query(`DELETE FROM state_documents WHERE key = ANY($1)`, [WRITTEN_KEYS]);
     await runConcurrency();
     await runRoleGates();
     await runCredentialStoreSuppressed(client);

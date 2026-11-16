@@ -4,10 +4,11 @@
  * `SameSite=Lax` on the session cookie already stops the cookie riding on a cross-site
  * POST, so state-changing requests are protected from the ordinary drive-by form. This is
  * the belt to that braces: every non-GET compares the request's own declared origin
- * against the origin the portal is actually served from, and refuses anything else before
- * the handler runs. It catches the cases SameSite alone does not -- a mismatched scheme or
- * host, a `null` origin from a sandboxed frame, a request replayed against a different
- * vhost -- and it does so without needing to trust any header the way a proxy chain would.
+ * against the origins the portal is actually served from (PUBLIC_ORIGIN may list several
+ * comma-separated domains), and refuses anything else before the handler runs. It catches
+ * the cases SameSite alone does not -- a mismatched scheme or host, a `null` origin from a
+ * sandboxed frame, a request replayed against a different vhost -- and it does so without
+ * needing to trust any header the way a proxy chain would.
  *
  * It is skipped entirely when `PUBLIC_ORIGIN` is unset (development), because there is
  * nothing honest to compare against, and inventing one from the Host header is precisely
@@ -53,11 +54,11 @@ function requestOrigin(req: RequestLike): string | null {
  * request was not made by the portal.
  */
 export function assertSameOrigin(req: RequestLike): void {
-  const expected = config().publicOrigin;
-  if (!expected) return; // not configured (development): nothing honest to compare against
+  const expected = config().publicOrigins;
+  if (expected.length === 0) return; // not configured (development): nothing honest to compare against
 
   const origin = requestOrigin(req);
-  if (origin !== expected) {
+  if (!origin || !expected.includes(origin)) {
     // One generic sentence for "no origin" and "wrong origin"; neither names the header
     // or the expected value, so a probe learns nothing about the configuration.
     throw forbidden("This request did not come from the attendance site.");

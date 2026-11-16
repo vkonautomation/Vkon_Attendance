@@ -42,8 +42,10 @@ export interface AppConfig {
    */
   trustProxyHeaders: boolean;
 
-  /** Scheme + host the portal is served from, for the Origin check (M4). */
-  publicOrigin: string | null;
+  /** Scheme + host(s) the portal is served from, for the Origin check (M4).
+   *  A comma-separated PUBLIC_ORIGIN lists every live domain (e.g. a rename or a
+   *  second hostname); a request from any one of them is same-origin. */
+  publicOrigins: string[];
 
   /** Request body ceiling in bytes. Auth bodies are two short strings. */
   maxBodyBytes: {
@@ -170,8 +172,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     );
   }
 
-  const origin = (env.PUBLIC_ORIGIN || "").trim().replace(/\/+$/, "") || null;
-  if (isProduction && !origin) {
+  const origins = Array.from(new Set(
+    (env.PUBLIC_ORIGIN || "")
+      .split(",")
+      .map((s) => s.trim().replace(/\/+$/, ""))
+      .filter(Boolean),
+  ));
+  if (isProduction && origins.length === 0) {
     throw new Error(
       "PUBLIC_ORIGIN is required in production. The Origin check (M4) has nothing to compare " +
       "against without it, and guessing it from the Host header is how a spoofed host becomes " +
@@ -188,7 +195,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     cookieSecure,
     cookieName: env.SESSION_COOKIE_NAME || DEFAULTS.cookieName,
     trustProxyHeaders: bool(env.VKON_TRUST_PROXY_HEADERS, false, "VKON_TRUST_PROXY_HEADERS"),
-    publicOrigin: origin,
+    publicOrigins: origins,
     maxBodyBytes: {
       auth: num(env.MAX_AUTH_BODY_BYTES, DEFAULTS.authBodyBytes, 256, 1024 * 1024, "MAX_AUTH_BODY_BYTES"),
       state: num(env.MAX_STATE_BODY_BYTES, DEFAULTS.stateBodyBytes, 1024, 16 * 1024 * 1024, "MAX_STATE_BODY_BYTES"),

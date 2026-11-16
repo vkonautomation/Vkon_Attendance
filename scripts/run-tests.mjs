@@ -22,11 +22,15 @@
  */
 
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, readdirSync, realpathSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+// realpathSync.native canonicalizes the Windows drive letter (c:\ -> C:\). Vitest
+// crashes with "Cannot read properties of undefined (reading 'config')" when its cwd
+// has a lowercase drive letter (vitest-dev/vitest#10812), so every child runs from
+// the canonical path.
+const ROOT = realpathSync.native(resolve(dirname(fileURLToPath(import.meta.url)), ".."));
 const SKIP_SERVE = process.argv.includes("--no-serve");
 const PORT = Number(process.env.TEST_PORT || 3210);
 
@@ -202,7 +206,7 @@ if (SKIP_SERVE) {
     await servePhase(
       PORT + 1,
       {
-        PUBLIC_ORIGIN: `http://127.0.0.1:${PORT + 1}`,
+        PUBLIC_ORIGIN: `http://127.0.0.1:${PORT + 1},https://second-origin.example`,
         VKON_TRUST_PROXY_HEADERS: "true",
         RATE_LIMIT_MAX_FAILURES: "5",
         COOKIE_SECURE: "false",
