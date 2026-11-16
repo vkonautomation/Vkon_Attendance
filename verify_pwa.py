@@ -14,7 +14,7 @@ Covers the request "i need this to be a webapp" with the two agreed decisions:
 Crucially it also asserts the safety invariants that keep the PWA from breaking
 the live sync engine: the service worker must NOT touch /api/* (the punch queue
 and state flush in js/api.js drive themselves off failed network requests), the
-worker version and the HTML cache-buster must agree, and the manifest must ship
+worker cache namespace is independently versioned, and the manifest must ship
 a complete icon set (192 / 512 / maskable / apple-touch).
 
 It is a static check -- it reads the source and asserts the wiring is present --
@@ -97,6 +97,10 @@ def verify_all():
          "sw.js leaves /api/* untouched (never cached) so the punch queue keeps working")
     need('if (req.method !== "GET") return;' in sw,
          "sw.js only ever intercepts GET (never a POST/PUT punch)")
+    api_bypass = sw.find('if (url.pathname.startsWith("/api/")) return;')
+    first_cache_response = sw.find("event.respondWith(")
+    need(api_bypass >= 0 and first_cache_response >= 0 and api_bypass < first_cache_response,
+         "sw.js bypasses API requests before any cache strategy can intercept them")
     need('req.mode === "navigate"' in sw and "networkFirst" in sw,
          "sw.js serves HTML network-first (fresh shell when online, cached when offline)")
     need('searchParams.has("v")' in sw and "cacheFirst" in sw,
@@ -126,13 +130,13 @@ def verify_all():
     need('addEventListener("offline"' in pwa and 'addEventListener("online"' in pwa,
          "pwa.js shows an offline banner and clears it back online")
 
-    # ---- 7. worker version agrees with the HTML cache-buster --------------
-    print("\n[Cache] worker version matches served assets:")
+    # ---- 7. worker cache namespace is independently versioned --------------
+    print("\n[Cache] worker cache namespace:")
     ver_line = [ln for ln in sw.splitlines() if "const VERSION" in ln]
-    need(len(ver_line) == 1 and "20261102_en22" in ver_line[0],
-         "sw.js VERSION is pinned to the current token (20261102_en22)")
+    need(len(ver_line) == 1 and '"20261113_en23"' in ver_line[0],
+         "sw.js VERSION is bumped so activation retires the previous worker caches")
     need("20261102_en22" in index_html and "20261102_en22" in admin_html,
-         "both pages carry the en13 cache-buster")
+         "both pages carry the current cache-buster version")
     need("20261102_en21" not in index_html and "20261102_en21" not in admin_html,
          "no stale en21 token left in either page")
 
@@ -150,3 +154,4 @@ if __name__ == "__main__":
     except AssertionError as e:
         print(str(e))
         sys.exit(1)
+

@@ -164,16 +164,19 @@ async function main() {
     assetUrls.add(ref.startsWith("/") ? ref : "/" + ref.replace(/^\.\/?/, ""));
   }
   // Anything else sitting in public/ must also be reachable, or the directory is
-  // a lie about what the portal needs.
-  for (const name of readdirSync(PUBLIC_DIR, { withFileTypes: true })) {
-    if (name.isDirectory()) {
-      for (const child of readdirSync(join(PUBLIC_DIR, name.name))) {
-        assetUrls.add(`/${name.name}/${child}`);
+  // a lie about what the portal needs. Recurse so nested directories contribute
+  // their files, not a URL for the directory itself.
+  function addPublicFiles(directory, urlPrefix = "") {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const urlPath = `${urlPrefix}/${entry.name}`;
+      if (entry.isDirectory()) {
+        addPublicFiles(join(directory, entry.name), urlPath);
+      } else if (!/\.(map|tsbuildinfo)$/.test(entry.name)) {
+        assetUrls.add(urlPath);
       }
-    } else if (!/\.(map|tsbuildinfo)$/.test(name.name)) {
-      assetUrls.add("/" + name.name);
     }
   }
+  addPublicFiles(PUBLIC_DIR);
 
   const jsAssets = [];
   for (const urlPath of [...assetUrls].sort()) {
