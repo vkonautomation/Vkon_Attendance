@@ -8812,10 +8812,11 @@ body:not(.light-theme) .portal-burger-btn {
     min-width: 0;
   }
   .portal-shell .navbar .admin-page-heading h2 {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
     font-size: 1.05rem;
+    line-height: 1.25;
   }
   .portal-shell .navbar .nav-controls {
     display: none;

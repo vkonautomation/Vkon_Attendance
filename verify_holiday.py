@@ -147,7 +147,7 @@ def verify_all():
          "shared.js token not bumped")
     need("app.js?v=20261112_sidebar-controls-removed" in index_html, "app.js token not bumped")
     need("admin.js?v=20261112_sidebar-controls-removed" in admin_html, "admin.js token not bumped")
-    need("styles.css?v=20261112_sidebar-controls-removed" in index_html and "styles.css?v=20261112_sidebar-controls-removed" in admin_html,
+    need("styles.css?v=20261118_mobile-title-wrap" in index_html and "styles.css?v=20261118_mobile-title-wrap" in admin_html,
          "styles.css token not bumped")
     # text + icon holiday states, not colour alone
     for cls in [".holiday-today-card", ".pill-holiday", ".badge-holidaywork", ".cell-holiday-work"]:
