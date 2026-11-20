@@ -412,7 +412,8 @@ window.VKON_API = (function () {
    * Create a real, sign-in-capable employee account. This is the one front-end write
    * that must not go through the document store: sign-in is validated against the
    * database `employees` table, so an enrolled person only exists to the login system
-   * once this succeeds. The server issues the starting password; none is sent from here.
+   * once this succeeds. The server hashes an admin-supplied password or returns a
+   * one-time password when the field is left blank.
    * Requires a verified (admin) session, so it never runs in local/demo mode.
    */
   async function createRosterEmployee(payload) {

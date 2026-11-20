@@ -22,7 +22,7 @@ import { config } from "@/lib/config";
 import { requireSession } from "@/lib/http/require-session";
 import { assertSameOrigin } from "@/lib/http/guard";
 import { expectObject, json, optionalString, readJsonBody, requireString } from "@/lib/http/json";
-import { errorResponse, forbidden } from "@/lib/http/errors";
+import { badRequest, errorResponse, forbidden } from "@/lib/http/errors";
 import { boolField, enumField, isoDateField, numOrNullField } from "@/lib/http/fields";
 import { clientIp } from "@/lib/http/request";
 import { recordAudit } from "@/lib/db/audit";
@@ -31,6 +31,15 @@ import { createEmployee, listRoster, type AccessRole, type NewEmployee } from "@
 export const dynamic = "force-dynamic";
 
 const ACCESS_ROLES: readonly AccessRole[] = ["employee", "manager", "admin"];
+
+function loginUsername(body: Record<string, unknown>): string {
+  const raw = body.username;
+  const username = requireString(body, "username", 64);
+  if (typeof raw !== "string" || /\s/.test(raw)) {
+    throw badRequest("Login usernames cannot contain spaces.", "invalid_username");
+  }
+  return username;
+}
 
 export async function GET(req: NextRequest): Promise<Response> {
   try {
@@ -57,7 +66,7 @@ export async function POST(req: NextRequest): Promise<Response> {
       // The portal code is assigned by the server from the database when the browser leaves it
       // out, so a roster document that lags the employees table can't guess a taken code.
       employeeCode: optionalString(body, "employeeCode", 64),
-      username: requireString(body, "username", 64),
+      username: loginUsername(body),
       name: requireString(body, "name", 128),
       email: optionalString(body, "email", 254),
       jobTitle: optionalString(body, "jobTitle", 128),

@@ -779,7 +779,8 @@
                 </div>
                 <div class="form-group">
                   <label for="newEmpUsername">Login Username <span class="req">*</span></label>
-                  <input type="text" id="newEmpUsername" required class="form-control" placeholder="e.g. rahul">
+                  <input type="text" id="newEmpUsername" required class="form-control" placeholder="e.g. rahul" pattern="\S+" title="Login usernames cannot contain spaces." autocapitalize="none" spellcheck="false" aria-describedby="newEmpUsernameHint">
+                  <span class="form-hint" id="newEmpUsernameHint">No spaces allowed.</span>
                 </div>
               </div>
 
@@ -796,12 +797,13 @@
               </div>
 
               <div class="form-group">
-                <label for="newEmpPassword">Login Password</label>
+                <label for="newEmpPassword">Initial Login Password</label>
                 <div class="input-icon-wrap">
                   <i class="fa-solid fa-key input-icon"></i>
-                  <input type="password" id="newEmpPassword" class="form-control" placeholder="Optional &mdash; leave blank for demo sign-in" autocomplete="new-password">
+                  <input type="password" id="newEmpPassword" class="form-control" placeholder="Optional &mdash; leave blank to generate a temporary password" autocomplete="new-password">
                   <button type="button" class="input-affix-btn toggle-password" aria-pressed="false" aria-label="Show password" tabindex="-1"><i class="fa-solid fa-eye" aria-hidden="true"></i></button>
                 </div>
+                <span class="form-hint">If set, the employee signs in with this password. If blank, a temporary password is generated and must be changed at first sign-in.</span>
               </div>
 
               <div class="form-group">
@@ -1858,6 +1860,35 @@
     </div>
   </div>
 
+  <!-- One-time credentials are shown only after the server creates an account with a generated password. -->
+  <div class="modal-backdrop" id="newEmployeeCredentialsModal" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="modal-dialog glass-panel" style="max-width: 520px;">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <h3><i class="fa-solid fa-key text-primary"></i> Temporary sign-in password</h3>
+          <span class="modal-status-badge" id="newEmployeeCredentialsIdentity"></span>
+        </div>
+        <button type="button" class="modal-close-btn" id="closeNewEmployeeCredentialsBtn" aria-label="Close Modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="form-hint">Share these sign-in details with the employee. They must choose a new password the first time they sign in.</p>
+        <div class="form-group">
+          <label for="newEmployeeTemporaryPassword">Temporary password</label>
+          <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <input type="text" id="newEmployeeTemporaryPassword" class="form-control" style="flex: 1; min-width: 0;" readonly autocomplete="off">
+            <button type="button" class="btn btn-primary btn-sm" id="copyNewEmployeePasswordBtn">
+              <i class="fa-regular fa-copy"></i> Copy password
+            </button>
+          </div>
+        </div>
+        <p id="newEmployeePasswordCopyStatus" class="form-hint" role="status" aria-live="polite"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost btn-sm" id="doneNewEmployeeCredentialsBtn">Done</button>
+      </div>
+    </div>
+  </div>
+
   <div class="toast-container" id="toastContainer"></div>
 
   <!-- Leaflet JS -->
@@ -1865,12 +1896,12 @@
   <!-- The server adapter must be parsed before shared.js: shared.js asks it whether
        this browser reads shared state or only its own localStorage, and waits on it
        before seeding. Order here is load-bearing. -->
-  <script src="js/api.js?v=20261116_snap2"></script>
+  <script src="js/api.js?v=20261120_employee-credentials-copy"></script>
   <script src="js/password-change.js?v=20261102_en22"></script>
   <script src="shared.js?v=20261102_en22"></script>
   <script src="js/confirm-decision-modal.js?v=20261023_apr1"></script>
   <script src="js/day-popover.js?v=20261030_cr1"></script>
-  <script src="admin.js?v=20261112_sidebar-controls-removed"></script>
+  <script src="admin.js?v=20261120_employee-username-no-spaces"></script>
   <script src="js/password-toggle.js?v=20261019_ui1"></script>
   <script src="js/pwa.js?v=20261102_en22"></script>
 </body>

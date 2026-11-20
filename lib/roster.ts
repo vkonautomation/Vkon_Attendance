@@ -267,10 +267,9 @@ export interface CreatedEmployee {
  * transaction so the manager lookup and the insert see the same snapshot; a cycle or a
  * duplicate is refused and nothing partial is left.
  *
- * The password is always server-generated: a random one-time value the person must replace
- * on first sign-in (the same OTP policy the bootstrap and importer use). A plaintext
- * password never enters this call, so the roster body stays free of secrets and there is no
- * "administrator sets someone's real password" path here to get wrong.
+ * The administrator may choose the starting password. If they leave it blank, this function
+ * generates a random one-time value the person must replace on first sign-in. Only its hash
+ * is stored; the plaintext is never written to the audit trail or shared roster document.
  */
 export async function createEmployee(cmd: NewEmployee): Promise<CreatedEmployee> {
   validateRole(cmd.accessRole);

@@ -1346,6 +1346,94 @@ function initEnrollmentForm() {
   const previewImg = document.getElementById("newEmpPhotoPreview");
   const camInline = document.getElementById("adminCamInline");
   const video = document.getElementById("adminWebcamVideo");
+  const usernameInput = document.getElementById("newEmpUsername");
+  const credentialsModal = document.getElementById("newEmployeeCredentialsModal");
+  const credentialsIdentity = document.getElementById("newEmployeeCredentialsIdentity");
+  const temporaryPassword = document.getElementById("newEmployeeTemporaryPassword");
+  const copyPasswordBtn = document.getElementById("copyNewEmployeePasswordBtn");
+  const copyStatus = document.getElementById("newEmployeePasswordCopyStatus");
+  const usernameSpaceMessage = "Login usernames cannot contain spaces.";
+
+  function reportUsernameSpaces() {
+    if (!usernameInput) return;
+    usernameInput.setCustomValidity(usernameSpaceMessage);
+    usernameInput.reportValidity();
+  }
+
+  if (usernameInput) {
+    usernameInput.addEventListener("beforeinput", (event) => {
+      if (event.data && /\s/.test(event.data)) {
+        event.preventDefault();
+        reportUsernameSpaces();
+      }
+    });
+    usernameInput.addEventListener("paste", (event) => {
+      const pasted = event.clipboardData && event.clipboardData.getData("text");
+      if (pasted && /\s/.test(pasted)) {
+        event.preventDefault();
+        reportUsernameSpaces();
+      }
+    });
+    usernameInput.addEventListener("input", () => {
+      usernameInput.setCustomValidity(/\s/.test(usernameInput.value) ? usernameSpaceMessage : "");
+    });
+  }
+
+  function closeCredentialsModal() {
+    if (credentialsModal) {
+      credentialsModal.classList.remove("open");
+      credentialsModal.setAttribute("aria-hidden", "true");
+    }
+    if (credentialsIdentity) credentialsIdentity.textContent = "";
+    if (temporaryPassword) temporaryPassword.value = "";
+    if (copyStatus) copyStatus.textContent = "";
+  }
+
+  function showCredentialsModal(name, employeeCode, username, password) {
+    if (!credentialsModal || !temporaryPassword) {
+      showToast("The employee was created, but the temporary password dialog is unavailable.", "error");
+      return;
+    }
+    if (credentialsIdentity) credentialsIdentity.textContent = `${name} (${employeeCode}) · ${username}`;
+    temporaryPassword.value = password;
+    if (copyStatus) copyStatus.textContent = "";
+    credentialsModal.classList.add("open");
+    credentialsModal.setAttribute("aria-hidden", "false");
+    temporaryPassword.focus();
+    temporaryPassword.select();
+  }
+
+  const closeCredentialsBtn = document.getElementById("closeNewEmployeeCredentialsBtn");
+  const doneCredentialsBtn = document.getElementById("doneNewEmployeeCredentialsBtn");
+  if (closeCredentialsBtn) closeCredentialsBtn.addEventListener("click", closeCredentialsModal);
+  if (doneCredentialsBtn) doneCredentialsBtn.addEventListener("click", closeCredentialsModal);
+  if (credentialsModal) {
+    credentialsModal.addEventListener("click", (event) => {
+      if (event.target === credentialsModal) closeCredentialsModal();
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && credentialsModal.classList.contains("open")) {
+        closeCredentialsModal();
+      }
+    });
+  }
+  if (copyPasswordBtn && temporaryPassword) {
+    copyPasswordBtn.addEventListener("click", async () => {
+      if (!temporaryPassword.value) return;
+      try {
+        if (!navigator.clipboard || !navigator.clipboard.writeText) {
+          throw new Error("Clipboard access is unavailable.");
+        }
+        await navigator.clipboard.writeText(temporaryPassword.value);
+        if (copyStatus) copyStatus.textContent = "Temporary password copied.";
+      } catch (error) {
+        temporaryPassword.focus();
+        temporaryPassword.select();
+        if (copyStatus) copyStatus.textContent = "Could not access the clipboard. The password is selected; copy it manually.";
+        console.warn("Could not copy the temporary employee password.", error);
+      }
+    });
+  }
 
   captureCamBtn.addEventListener("click", async () => {
     try {
@@ -1421,6 +1509,10 @@ function initEnrollmentForm() {
     // A password is optional in this build: while none is stored, the temporary
     // demo check accepts the identity alone (see shared.js).
     if (!name || !role || !username) return;
+    if (/\s/.test(username)) {
+      reportUsernameSpaces();
+      return;
+    }
 
     const employees = getStore(STORAGE_KEYS.EMPLOYEES, DEFAULT_EMPLOYEES);
     if (employees.some(emp => emp.username === username)) {
@@ -1433,10 +1525,8 @@ function initEnrollmentForm() {
 
     // In server mode the roster is more than a document: a person only exists to the
     // sign-in system once they are a row in the database. Create that account first and
-    // add them to the on-screen roster only if it succeeds, so the console never shows
-    // someone who cannot actually log in. The Login Password you type is sent to the server
-    // and hashed there (never published into the shared document); leave it blank and the
-    // server issues a one-time password instead, shown once below.
+    // add them to the on-screen roster only if it succeeds. A supplied password is hashed
+    // by the server; leaving it blank makes the server issue a one-time password.
     const api = window.VKON_API;
     const serverBacked = !!(api && api.isServerBacked && api.isServerBacked());
     let oneTimePassword = null;
@@ -1519,12 +1609,7 @@ function initEnrollmentForm() {
 
     if (oneTimePassword) {
       showToast(`Employee ${name} (${newId}) enrolled. Their sign-in account is ready.`, "success");
-      window.alert(
-        `${name} (${newId}) can now sign in.\n\n` +
-        `Username: ${username}\n` +
-        `Temporary password: ${oneTimePassword}\n\n` +
-        `Share these with them. They will be required to choose their own password the first time they sign in.`
-      );
+      showCredentialsModal(name, newId, username, oneTimePassword);
     } else if (serverBacked) {
       showToast(`Employee ${name} (${newId}) enrolled. They can sign in with the password you set.`, "success");
     } else {

@@ -194,6 +194,16 @@ async function runAdminOnlyWrite(client) {
   const anon = await api("/api/employees", { method: "POST", body: { employeeCode: "ZZX8", username: "zzx8", name: "Anon" } });
   check("an unauthenticated roster write is 401", anon.status === 401, `${anon.status} ${anon.text}`);
 
+  const spacedUsername = await api("/api/employees", {
+    method: "POST", token: tok.ZZRA,
+    body: { employeeCode: "ZZX3", username: "zz x3", name: "Spaced Username Probe", accessRole: "employee" },
+  });
+  check("an admin cannot create an employee with spaces in the login username",
+    spacedUsername.status === 400 &&
+      spacedUsername.json && spacedUsername.json.error &&
+      spacedUsername.json.error.reason === "invalid_username",
+    `${spacedUsername.status} ${spacedUsername.text}`);
+
   // An admin may create; the row lands with the requested fields.
   const created = await api("/api/employees", {
     method: "POST", token: tok.ZZRA,
@@ -234,6 +244,15 @@ async function runAdminOnlyWrite(client) {
   check("a supplied password means no one-time password is returned",
     withPw.status === 201 && withPw.json && withPw.json.oneTimePassword === null,
     `${withPw.status} ${withPw.text}`);
+  const typedPasswordRow = await client.query(
+    `SELECT password_hash, password_change_required
+       FROM employees WHERE employee_code = 'ZZX2'`);
+  const typedPassword = typedPasswordRow.rows[0] || {};
+  check("the supplied password is the sign-in password and is not forced to change",
+    !!typedPassword.password_hash &&
+      await bcrypt.compare(preHash("a-starting-password"), typedPassword.password_hash) &&
+      typedPassword.password_change_required === false,
+    JSON.stringify({ hasHash: !!typedPassword.password_hash, forced: typedPassword.password_change_required }));
   await client.query(`DELETE FROM employees WHERE employee_code = 'ZZX2'`).catch(() => {});
 
   // An admin PATCH can set the salary/jobTitle and returns 200 with the change reflected.
