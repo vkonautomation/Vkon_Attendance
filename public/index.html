@@ -29,7 +29,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="styles.css?v=20261118_mobile-title-wrap">
+  <link rel="stylesheet" href="styles.css?v=20261120_first-login-password">
   <link rel="stylesheet" href="regularisation-alerts.css?v=20261030_ra2">
   <link rel="stylesheet" href="calendar-refined.css?v=20261102_cr3">
   <style>
@@ -109,6 +109,45 @@
 
         <button type="submit" class="btn btn-primary btn-block" style="margin-top: 0.5rem;">
           <i class="fa-solid fa-right-to-bracket"></i> Login
+        </button>
+      </form>
+
+      <!-- First sign-in with an administrator-issued temporary password: the login
+           card itself becomes the set-a-new-password step. app.js shows it only while
+           the server reports password_change_required; the portal stays unreachable
+           until the change succeeds, so there is no skip path. -->
+      <form id="firstLoginForm" class="auth-form" style="display: none;">
+        <div class="flp-head">
+          <h2>Set your new password</h2>
+          <p>Your account was created with a temporary password. Choose one only you know to continue.</p>
+        </div>
+        <p class="flp-policy">Use at least 10 characters, with three of the following: uppercase letters, lowercase letters, numbers, and symbols.</p>
+        <div class="form-group">
+          <label for="flpNewPassword">New password <span class="req">*</span></label>
+          <div class="input-icon-wrap">
+            <i class="fa-solid fa-lock input-icon"></i>
+            <input type="password" id="flpNewPassword" class="form-control" placeholder="New password" autocomplete="new-password">
+            <button type="button" class="input-affix-btn toggle-password" aria-pressed="false" aria-label="Show password" tabindex="-1"><i class="fa-solid fa-eye" aria-hidden="true"></i></button>
+          </div>
+          <div class="flp-strength" id="flpStrength" data-level="0">
+            <div class="flp-meter" aria-hidden="true"><span id="flpMeterFill"></span></div>
+            <span class="flp-strength-label" id="flpStrengthLabel" aria-live="polite"></span>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="flpConfirmPassword">Repeat new password <span class="req">*</span></label>
+          <div class="input-icon-wrap">
+            <i class="fa-solid fa-lock input-icon"></i>
+            <input type="password" id="flpConfirmPassword" class="form-control" placeholder="Repeat new password" autocomplete="new-password">
+            <button type="button" class="input-affix-btn toggle-password" aria-pressed="false" aria-label="Show password" tabindex="-1"><i class="fa-solid fa-eye" aria-hidden="true"></i></button>
+          </div>
+        </div>
+        <p class="flp-error" id="flpError" role="alert" aria-live="polite"></p>
+        <button type="submit" class="btn btn-primary btn-block" id="flpSaveBtn">
+          <i class="fa-solid fa-key"></i> Save password &amp; continue
+        </button>
+        <button type="button" class="btn btn-ghost btn-block" id="flpBackBtn">
+          <i class="fa-solid fa-arrow-left"></i> Back to sign in
         </button>
       </form>
 
@@ -1130,7 +1169,7 @@
   <script src="shared.js?v=20261102_en22"></script>
   <script src="js/confirm-decision-modal.js?v=20261023_apr1"></script>
   <script src="js/day-popover.js?v=20261030_cr1"></script>
-  <script src="app.js?v=20261112_sidebar-controls-removed"></script>
+  <script src="app.js?v=20261120_first-login-password"></script>
   <script src="js/password-toggle.js?v=20261019_ui1"></script>
   <script src="js/pwa.js?v=20261102_en22"></script>
 

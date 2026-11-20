@@ -53,19 +53,157 @@ function clearLoginError() {
   }
 }
 
+// First sign-in with an administrator-issued password: the login card itself
+// becomes the set-a-new-password step, with the same strength meter the admin
+// form shows. The server gates every data request until the change lands, so the
+// step offers only two exits: save, or back to sign in (which signs out).
+const FLP_MIN_CHARS = 10; // mirrors lib/auth/hash.ts PASSWORD_MIN_LENGTH
+const FLP_MAX_CHARS = 256;
+
+function flpClassCount(p) {
+  let n = 0;
+  if (/[a-z]/.test(p)) n++;
+  if (/[A-Z]/.test(p)) n++;
+  if (/[0-9]/.test(p)) n++;
+  if (/[^A-Za-z0-9]/.test(p)) n++;
+  return n;
+}
+
+// The composition rule is product policy for a newly chosen password; the server
+// stays the authority on length and on closeness to the sign-in identity.
+function flpProblem(p, username) {
+  if (!p) return "Enter the new password you want to use.";
+  if (p.length > FLP_MAX_CHARS) return `Keep it under ${FLP_MAX_CHARS} characters.`;
+  const u = String(username || "").toLowerCase();
+  const l = p.toLowerCase();
+  if (u && (l.includes(u) || u.includes(l))) return "That password is too close to the sign-in name.";
+  if (p.length < FLP_MIN_CHARS || flpClassCount(p) < 3) return "This password isn't strong enough.";
+  return null;
+}
+
+function flpStrength(p) {
+  if (!p) return { score: 0, label: "" };
+  let score = 0;
+  if (p.length >= FLP_MIN_CHARS) score++;
+  if (p.length >= 14) score++;
+  if (flpClassCount(p) >= 3) score++;
+  if (flpClassCount(p) === 4) score++;
+  return { score, label: ["Weak", "Weak", "Fair", "Good", "Strong"][score] };
+}
+
+function flpPaint() {
+  const step = document.getElementById("firstLoginForm");
+  const newEl = document.getElementById("flpNewPassword");
+  const confirmEl = document.getElementById("flpConfirmPassword");
+  const errEl = document.getElementById("flpError");
+  const wrap = document.getElementById("flpStrength");
+  const label = document.getElementById("flpStrengthLabel");
+  if (!step || !newEl) return;
+  const strength = flpStrength(newEl.value);
+  if (wrap) wrap.dataset.level = String(strength.score);
+  if (label) label.textContent = strength.label;
+  if (!errEl) return;
+  let problem = newEl.value ? flpProblem(newEl.value, step.dataset.username) : "";
+  if (!problem && confirmEl && confirmEl.value && confirmEl.value !== newEl.value) {
+    problem = "The two passwords do not match.";
+  }
+  errEl.textContent = problem;
+}
+
+function flpRestoreLoginForm() {
+  const step = document.getElementById("firstLoginForm");
+  if (step) step.style.display = "none";
+  ["employeeLoginForm", "adminLoginForm"].forEach(id => {
+    const f = document.getElementById(id);
+    if (f) f.style.display = "";
+  });
+  const quick = document.querySelector(".auth-quick-fill-wrap");
+  if (quick) quick.style.display = "";
+  const adminLink = document.querySelector(".auth-admin-link-wrap");
+  if (adminLink) adminLink.style.display = "";
+}
+
+function openFirstLoginStep(session) {
+  const step = document.getElementById("firstLoginForm");
+  if (!step) return;
+  clearLoginError();
+  ["employeeLoginForm", "adminLoginForm"].forEach(id => {
+    const f = document.getElementById(id);
+    if (f) f.style.display = "none";
+  });
+  const quick = document.querySelector(".auth-quick-fill-wrap");
+  if (quick) quick.style.display = "none";
+  const adminLink = document.querySelector(".auth-admin-link-wrap");
+  if (adminLink) adminLink.style.display = "none";
+
+  step.dataset.username = (session && session.username) || "";
+  const newEl = document.getElementById("flpNewPassword");
+  const confirmEl = document.getElementById("flpConfirmPassword");
+  if (newEl) newEl.value = "";
+  if (confirmEl) confirmEl.value = "";
+  const errEl = document.getElementById("flpError");
+  if (errEl) errEl.textContent = "";
+  step.style.display = "flex";
+  flpPaint();
+
+  if (!step.dataset.bound) {
+    step.dataset.bound = "true";
+    if (newEl) newEl.addEventListener("input", flpPaint);
+    if (confirmEl) confirmEl.addEventListener("input", flpPaint);
+    const back = document.getElementById("flpBackBtn");
+    if (back) back.addEventListener("click", async () => {
+      await signOut();
+      flpRestoreLoginForm();
+      clearLoginError();
+      const u = document.getElementById("loginUsername");
+      if (u) u.focus();
+    });
+    step.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const save = document.getElementById("flpSaveBtn");
+      const next = newEl ? newEl.value : "";
+      const repeat = confirmEl ? confirmEl.value : "";
+      const problem = flpProblem(next, step.dataset.username) ||
+        (next !== repeat ? "The two passwords do not match." : "");
+      if (problem) {
+        if (errEl) errEl.textContent = problem;
+        return;
+      }
+      if (save) save.disabled = true;
+      try {
+        const res = await VKON_API.changePassword("", next);
+        if (!res.ok) {
+          if (errEl) errEl.textContent = res.message || "The server rejected that password.";
+          return;
+        }
+        // Enter through the ordinary sign-in path with the new password, so the
+        // portal hydrates exactly as it does for any other employee sign-in.
+        const uname = step.dataset.username ||
+          (document.getElementById("loginUsername") || {}).value || "";
+        if (newEl) newEl.value = "";
+        if (confirmEl) confirmEl.value = "";
+        flpRestoreLoginForm();
+        const u = document.getElementById("loginUsername");
+        const p = document.getElementById("loginPassword");
+        if (u) u.value = uname;
+        if (p) p.value = next;
+        const empForm = document.getElementById("employeeLoginForm");
+        if (empForm) empForm.dispatchEvent(new Event("submit"));
+        if (p) p.value = "";
+      } finally {
+        if (save) save.disabled = false;
+      }
+    });
+  }
+  if (newEl) newEl.focus();
+}
+
 // Sign-in codes that only a server-backed attempt can produce. Shared by both
 // forms on this page so they cannot drift apart. Returns true when the result has
 // been handled and the caller must stop.
 function handleServerAuthCodes(result) {
   if (result.code === "passwordChange") {
-    showLoginError("Your account is still using the temporary password issued to it. Set a new one below, then sign in again.", "First Sign-In");
-    if (window.VKON_PASSWORD_CHANGE) {
-      VKON_PASSWORD_CHANGE.open({
-        requireCurrent: false,
-        session: result.session,
-        message: "Choose the password you will use from now on. The attendance server keeps nothing readable until this is done."
-      });
-    }
+    openFirstLoginStep(result.session);
     return true;
   }
   if (result.code === "throttled") {
@@ -4395,13 +4533,9 @@ Promise.all([domReady, adapterReady]).then(() => {
     sessionStorage.removeItem(STORAGE_KEYS.CURRENT_SESSION);
     localStorage.removeItem(STORAGE_KEYS.CURRENT_SESSION);
     bootEmployeePortal();
-    if (window.VKON_PASSWORD_CHANGE) {
-      VKON_PASSWORD_CHANGE.open({
-        requireCurrent: false,
-        message: "This account is still using the temporary password it was issued. Set a new one to reach the shared attendance data.",
-        onSuccess: () => { window.location.reload(); }
-      });
-    }
+    openFirstLoginStep(
+      (window.VKON_API.currentSession && window.VKON_API.currentSession()) || {}
+    );
     return;
   }
   bootEmployeePortal();
