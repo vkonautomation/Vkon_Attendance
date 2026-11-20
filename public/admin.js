@@ -1347,6 +1347,7 @@ function initEnrollmentForm() {
   const camInline = document.getElementById("adminCamInline");
   const video = document.getElementById("adminWebcamVideo");
   const usernameInput = document.getElementById("newEmpUsername");
+  const usernameError = document.getElementById("newEmpUsernameError");
   const credentialsModal = document.getElementById("newEmployeeCredentialsModal");
   const credentialsIdentity = document.getElementById("newEmployeeCredentialsIdentity");
   const temporaryPassword = document.getElementById("newEmployeeTemporaryPassword");
@@ -1354,29 +1355,20 @@ function initEnrollmentForm() {
   const copyStatus = document.getElementById("newEmployeePasswordCopyStatus");
   const usernameSpaceMessage = "Login usernames cannot contain spaces.";
 
-  function reportUsernameSpaces() {
+  function validateUsernameSpaces() {
     if (!usernameInput) return;
-    usernameInput.setCustomValidity(usernameSpaceMessage);
-    usernameInput.reportValidity();
+    const containsSpaces = /\s/.test(usernameInput.value);
+    usernameInput.setCustomValidity(containsSpaces ? usernameSpaceMessage : "");
+    usernameInput.classList.toggle("input-invalid", containsSpaces);
+    usernameInput.setAttribute("aria-invalid", String(containsSpaces));
+    if (usernameError) {
+      usernameError.textContent = containsSpaces ? usernameSpaceMessage : "";
+      usernameError.hidden = !containsSpaces;
+    }
   }
 
   if (usernameInput) {
-    usernameInput.addEventListener("beforeinput", (event) => {
-      if (event.data && /\s/.test(event.data)) {
-        event.preventDefault();
-        reportUsernameSpaces();
-      }
-    });
-    usernameInput.addEventListener("paste", (event) => {
-      const pasted = event.clipboardData && event.clipboardData.getData("text");
-      if (pasted && /\s/.test(pasted)) {
-        event.preventDefault();
-        reportUsernameSpaces();
-      }
-    });
-    usernameInput.addEventListener("input", () => {
-      usernameInput.setCustomValidity(/\s/.test(usernameInput.value) ? usernameSpaceMessage : "");
-    });
+    usernameInput.addEventListener("input", validateUsernameSpaces);
   }
 
   function closeCredentialsModal() {
@@ -1510,7 +1502,8 @@ function initEnrollmentForm() {
     // demo check accepts the identity alone (see shared.js).
     if (!name || !role || !username) return;
     if (/\s/.test(username)) {
-      reportUsernameSpaces();
+      validateUsernameSpaces();
+      if (usernameInput) usernameInput.reportValidity();
       return;
     }
 

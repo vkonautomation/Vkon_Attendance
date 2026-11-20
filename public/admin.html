@@ -779,8 +779,9 @@
                 </div>
                 <div class="form-group">
                   <label for="newEmpUsername">Login Username <span class="req">*</span></label>
-                  <input type="text" id="newEmpUsername" required class="form-control" placeholder="e.g. rahul" pattern="\S+" title="Login usernames cannot contain spaces." autocapitalize="none" spellcheck="false" aria-describedby="newEmpUsernameHint">
+                  <input type="text" id="newEmpUsername" required class="form-control" placeholder="e.g. rahul" pattern="\S+" title="Login usernames cannot contain spaces." autocapitalize="none" spellcheck="false" aria-describedby="newEmpUsernameHint newEmpUsernameError">
                   <span class="form-hint" id="newEmpUsernameHint">No spaces allowed.</span>
+                  <span class="cand-form-error" id="newEmpUsernameError" role="alert" aria-live="polite" hidden></span>
                 </div>
               </div>
 
@@ -1901,7 +1902,7 @@
   <script src="shared.js?v=20261102_en22"></script>
   <script src="js/confirm-decision-modal.js?v=20261023_apr1"></script>
   <script src="js/day-popover.js?v=20261030_cr1"></script>
-  <script src="admin.js?v=20261120_employee-username-no-spaces"></script>
+  <script src="admin.js?v=20261120_username-space-error"></script>
   <script src="js/password-toggle.js?v=20261019_ui1"></script>
   <script src="js/pwa.js?v=20261102_en22"></script>
 </body>
