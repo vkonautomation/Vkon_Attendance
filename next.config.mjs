@@ -44,6 +44,10 @@ const CSP = [
 // introduced it. Removing it is a real task for the front end, not a config edit.
 
 const nextConfig = {
+  experimental: {
+    agentUpgrade: "security",
+  },
+
   // Only .next/standalone, .next/static and public/ enter the image. `.git`,
   // `db/`, `scripts/`, `server/`, `.env` and the compose files are simply not
   // there, so they cannot be fetched over HTTP by any path or traversal. This is
